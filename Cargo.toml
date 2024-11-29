@@ -4,12 +4,16 @@ version = "0.1.0"
 edition = "2021"
 rust-version = "1.73" # 1.74 dropped support for older Apple platforms we wish to keep supporting.
 description = "The premier Game Boy assembly toolchain"
-authors = [ "RGBDS maintainers <rgbds@gbdev.io>" ]
+authors = ["RGBDS maintainers <rgbds@gbdev.io>"]
 homepage = "http://rgbds.gbdev.io"
 repository = "https://github.com/gbdev/rgbds"
 license = "MPL-2.0"
 keywords = ["rgbds", "gameboy", "asm", "assembly", "gamedev"]
-categories = ["command-line-utilities", "development-tools::debugging", "game-development"]
+categories = [
+	"command-line-utilities",
+	"development-tools::debugging",
+	"game-development",
+]
 
 [features]
 # People will primarily want to `cargo install` this crate.
@@ -17,23 +21,54 @@ default = ["rgbasm", "rgblink", "rgbfix", "rgbgfx"]
 
 rgbasm = [
 	# CLI.
-	"dep:clap", "dep:os_info", "dep:ariadne", "dep:yansi", "dep:shadow-rs", "dep:sysexits",
+	"dep:clap",
+	"dep:os_info",
+	"dep:ariadne",
+	"dep:yansi",
+	"dep:shadow-rs",
+	"dep:sysexits",
 	# Specific deps.
-	"dep:chrono", "dep:compact_str", "dep:indexmap", "dep:phf", "dep:rustc-hash", "dep:string-interner", "dep:strum_macros", "dep:uncased",
+	"dep:chrono",
+	"dep:compact_str",
+	"dep:indexmap",
+	"dep:phf",
+	"dep:rustc-hash",
+	"dep:string-interner",
+	"dep:strum_macros",
+	"dep:uncased",
 ]
 rgblink = [
 	# CLI.
-	"dep:clap", "dep:os_info", "dep:ariadne", "dep:yansi", "dep:shadow-rs", "dep:sysexits",
+	"dep:clap",
+	"dep:os_info",
+	"dep:ariadne",
+	"dep:yansi",
+	"dep:shadow-rs",
+	"dep:sysexits",
 ]
 rgbfix = [
 	# CLI.
-	"dep:clap", "dep:os_info", "dep:ariadne", "dep:yansi", "dep:shadow-rs", "dep:sysexits",
+	"dep:clap",
+	"dep:os_info",
+	"dep:ariadne",
+	"dep:yansi",
+	"dep:shadow-rs",
+	"dep:sysexits",
 ]
 rgbgfx = [
 	# CLI.
-	"dep:clap", "dep:os_info", "dep:ariadne", "dep:yansi", "dep:shadow-rs", "dep:sysexits",
+	"dep:clap",
+	"dep:os_info",
+	"dep:ariadne",
+	"dep:yansi",
+	"dep:shadow-rs",
+	"dep:sysexits",
 	# Specific deps.
-	"dep:arrayvec", "dep:bitvec", "dep:cfg-if", "dep:funty", "dep:plumers",
+	"dep:arrayvec",
+	"dep:bitvec",
+	"dep:cfg-if",
+	"dep:funty",
+	"dep:plumers",
 ]
 
 [dependencies] # TODO: audit deps & features
@@ -56,16 +91,27 @@ os_info = { version = "3.8", default-features = false, optional = true }
 phf = { version = "0.11.2", features = ["macros", "uncased"], optional = true }
 plumers = { version = "1.0", optional = true }
 rustc-hash = { version = "2.0.0", optional = true }
-shadow-rs = { version = "0.28", optional = true }
+shadow-rs = { version = "0.28", optional = true, default-features = false, features = [
+	"git2",
+] }
 # TODO: maybe use feature `inline-more`
-string-interner = { version = "0.14", default-features = false, features = ["std", "backends"], optional = true }
+string-interner = { version = "0.14", default-features = false, features = [
+	"std",
+	"backends",
+], optional = true }
 strum_macros = { version = "0.26.4", optional = true }
 sysexits = { version = "0.8", optional = true }
 uncased = { version = "0.9.10", optional = true }
-yansi = { version = "1.0", features = ["detect-env", "detect-tty", "hyperlink"], optional = true }
+yansi = { version = "1.0", features = [
+	"detect-env",
+	"detect-tty",
+	"hyperlink",
+], optional = true }
 
 [build-dependencies]
-shadow-rs = { version = "0.28", optional = true }
+shadow-rs = { version = "0.28", optional = true, default-features = false, features = [
+	"git2",
+] }
 
 [dev-dependencies]
 libtest-mimic = "0.7.2"
