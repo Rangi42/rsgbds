@@ -29,7 +29,17 @@ macro_rules! define_tokens {
         )*}
 
         macro_rules! tok {$(
-            ($descr) => {$enum_name::$token};
+            // Turns out that e.g. `tok!("number")(num)` does *not* combine `(num)` into
+            // the same `Pattern` AST node as the `crate::syntax::tokens::$enum_name::Number`,
+            // and this creates obscure syntax errors.
+            // Hence, we allow passing any parameters to the `tok!` macro itself, to rustc can
+            // understand that we desire expansion into a single `Pattern` AST node.
+            // Two rules are required, as repetition syntax is interpreted by the outer
+            // `define_tokes!` macro, with no good workaround. [1]
+            //
+            // [1]: https://users.rust-lang.org/t/nested-macros-issue/8348
+            ($descr) => {$crate::syntax::tokens::$enum_name::$token};
+            ($descr $params:tt) => {$crate::syntax::tokens::$enum_name::$token $params};
         )*}
         // Workaround for rust-lang/rust#52234, from https://github.com/rust-lang/rust/pull/52234#issuecomment-976702997
         pub(crate) use tok;

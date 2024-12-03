@@ -99,9 +99,9 @@ fn run(options: Options, input_path: PathBuf, defines: Vec<String>) -> Result<()
             ), // Try to keep going even after this failure.
             Ok(handle) => {
                 syntax::parser::parse_file(
+                    handle,
                     &context_stack,
                     &sources,
-                    handle,
                     &mut symbols,
                     &remaining_errors,
                     &options,
@@ -129,9 +129,9 @@ fn run(options: Options, input_path: PathBuf, defines: Vec<String>) -> Result<()
         }
     };
     syntax::parser::parse_file(
+        handle,
         &context_stack,
         &sources,
-        handle,
         &mut symbols,
         &remaining_errors,
         &options,

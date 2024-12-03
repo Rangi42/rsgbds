@@ -15,91 +15,94 @@ The extra boilerplate is counter-balanced by how much the aforementioned workaro
 
 use std::{cell::Cell, rc::Rc};
 
+use compact_str::CompactString;
+
 use crate::{
     context_stack::{ContextStack, Span},
     diagnostics::{self, warning},
     macro_args::MacroArgs,
-    source_store::{SourceHandle, SourceStore},
+    source_store::{self, SourceHandle, SourceStore},
     symbols::Symbols,
     syntax::{
         lexer,
-        tokens::{tok, Token, TokenPayload},
+        tokens::{Token, TokenPayload},
     },
     Options,
 };
 
+mod expr;
+
 macro_rules! expect_one_of {
     ($payload:expr => {
         $( None => $if_none:expr, )?
-        $( $($token:ident is)? $($kind:tt)|+ => $then:expr, )+
-    } $( else { $default_ident:ident => $default:expr } )?) => {match $payload {
+        $( |$($token:ident:)? $($kind:tt $(($fields:tt))?)/+| => $then:expr, )+
+        else |$unexpected:pat_param, $expected:pat_param| => $handle_default:expr $(,)?
+    }) => {match $payload {
         $( None => $if_none, )?
         $( Some($($token @)? Token {
-            payload: $(tok!($kind))|+,
+            payload: $( $crate::syntax::tokens::tok!($kind $(($fields))?) )|+,
             ..
         }) => $then, )+
-        $(
-            $default_ident => $default,
-            #[allow(unreachable_patterns)] // Since the above is a catch-all, the next pattern will be unreachable.
-        )?
-        _ => eprintln!("Syntax error"),
+        $unexpected => {
+            let $expected = vec![$($( $kind )+),+]; // TODO: handle `if_none`, adding "end of file" to the list
+            $handle_default
+        }
     }}
 }
+pub(crate) use expect_one_of;
 
-pub fn parse_file(
-    ctx_stack: &ContextStack,
-    sources: &SourceStore,
+pub fn parse_file<'ctx_stack>(
     source: SourceHandle,
-    symbols: &mut Symbols,
+    ctx_stack: &'ctx_stack ContextStack,
+    sources: &SourceStore,
+    symbols: &mut Symbols<'ctx_stack>,
     nb_errors_remaining: &Cell<usize>,
     options: &Options,
 ) {
+    let mut parse_ctx = ParseCtx {
+        ctx_stack,
+        sources,
+        symbols,
+        nb_errors_remaining,
+        options,
+    };
+
     ctx_stack.sources_mut().push_file_context(source);
     while ctx_stack.sources_mut().active_context().is_some() {
-        while let Some(mut first_token) =
-            lexer::next_token(ctx_stack, sources, symbols, nb_errors_remaining, options)
-        {
-            // TODO: handle directives that cannot be preceded by a label def.
+        while let Some(mut first_token) = parse_ctx.next_token() {
             // TODO: handle leading diff marks
             // TODO: handle Git conflict markers
             if let TokenPayload::Identifier(ident) = first_token.payload {
                 // Identifiers at the beginning of the line can be two things.
                 // Either a label name, if it's *directly* followed by a colon; or the name of a macro.
-                if lexer::is_next_char_a_colon(
-                    ctx_stack,
-                    sources,
-                    symbols,
-                    nb_errors_remaining,
-                    options,
-                ) {
-                    expect_one_of!(lexer::next_token(
-                        ctx_stack,
-                        sources,
-                        symbols,
-                        nb_errors_remaining,
-                        options
-                    ) => {
-                        ":" => {
+                if parse_ctx.is_next_char_a_colon() {
+                    expect_one_of!(parse_ctx.next_token() => {
+                        None => unreachable!(),
+                        |":"| => {
                             // TODO
-                            eprintln!("Defining label {}", symbols.resolve(ident));
-                            match lexer::next_token(ctx_stack, sources, symbols, nb_errors_remaining, options) {
+                            eprintln!("Defining label {}", parse_ctx.symbols.resolve(ident));
+                            match parse_ctx.next_token() {
                                 Some(token) => first_token = token,
                                 None => break,
                             };
                         },
-                        "::" => {
+                        |"::"| => {
                             // TODO
-                            eprintln!("Defining exported label {}", symbols.resolve(ident));
-                            match lexer::next_token(ctx_stack, sources, symbols, nb_errors_remaining, options) {
+                            eprintln!("Defining exported label {}", parse_ctx.symbols.resolve(ident));
+                            match parse_ctx.next_token() {
                                 Some(token) => first_token = token,
                                 None => break,
                             };
                         },
-                    } else {
-                        // Try continuing the parse with this token as the first in the line.
-                        token => first_token = token.unwrap()
+                        else |token, _expected| => {
+                            // Try continuing the parse with this token as the first in the line.
+                            // We know the token can't be empty, because the lexer just reported that its next character would be a colon.
+                            first_token = token.unwrap();
+                        }
                     });
                 }
+
+                // TODO: handle directives that cannot be preceded by a label def.
             }
 
             match first_token.payload {
@@ -109,22 +112,13 @@ pub fn parse_file(
                     // Macro call.
                     // Get the macro's arguments.
                     let args = Rc::new(MacroArgs::new(
-                        std::iter::from_fn(|| {
-                            lexer::next_raw(
-                                ctx_stack,
-                                sources,
-                                symbols,
-                                nb_errors_remaining,
-                                options,
-                            )
-                        })
-                        .collect(),
+                        std::iter::from_fn(|| parse_ctx.next_token_raw()).collect(),
                     ));
 
                     // TODO: consume the newline, if `next_raw` doesn't already?
 
-                    let name = symbols.resolve(ident);
-                    match symbols.find_macro_interned(&ident) {
+                    let name = parse_ctx.symbols.resolve(ident);
+                    match parse_ctx.symbols.find_macro_interned(&ident) {
                         None => diagnostics::error(
                             &first_token.span,
                             |error| {
@@ -260,28 +254,105 @@ pub fn parse_file(
                 TokenPayload::Union => todo!(),
                 TokenPayload::Warn => todo!(),
 
-                _ => diagnostics::error(
-                    &first_token.span,
-                    |error| {
-                        error
-                            .with_message(format!(
-                                "Syntax error: unexpected {}",
-                                &first_token.payload
-                            ))
-                            .with_label(
-                                diagnostics::error_label(first_token.span.resolve())
-                                    .with_message("Expected an instruction or a directive here"),
-                            )
-                    },
-                    sources,
-                    nb_errors_remaining,
-                    options,
-                ),
+                _ => {
+                    report_syntax_error(
+                        Some(&first_token),
+                        ctx_stack,
+                        sources,
+                        nb_errors_remaining,
+                        options,
+                    );
+                    // Discard the rest of the line.
+                    while let Some(token) = parse_ctx.next_token() {
+                        if matches!(token.payload, TokenPayload::Newline) {
+                            break;
+                        }
+                    }
+                }
             }
         }
 
         // We're done parsing from this context, so end it.
         // (This will make REPT/FOR loop if possible, and pop everything else.)
         ctx_stack.sources_mut().end_current_context();
+    }
+}
+
+struct ParseCtx<'ctx_stack, 'sources, 'symbols, 'nb_errs, 'options> {
+    ctx_stack: &'ctx_stack ContextStack,
+    sources: &'sources SourceStore,
+    symbols: &'symbols mut Symbols<'ctx_stack>,
+    nb_errors_remaining: &'nb_errs Cell<usize>,
+    options: &'options Options,
+}
+
+impl<'ctx_stack> ParseCtx<'ctx_stack, '_, '_, '_, '_> {
+    fn next_token(&mut self) -> Option<Token<'ctx_stack>> {
+        lexer::next_token(
+            self.ctx_stack,
+            self.sources,
+            self.symbols,
+            self.nb_errors_remaining,
+            self.options,
+        )
+    }
+    fn next_token_raw(&mut self) -> Option<CompactString> {
+        lexer::next_token_raw(
+            self.ctx_stack,
+            self.sources,
+            self.symbols,
+            self.nb_errors_remaining,
+            self.options,
+        )
+    }
+
+    fn is_next_char_a_colon(&mut self) -> bool {
+        lexer::is_next_char_a_colon(
+            self.ctx_stack,
+            self.sources,
+            self.symbols,
+            self.nb_errors_remaining,
+            self.options,
+        )
+    }
+}
+
+fn report_syntax_error(
+    token: Option<&Token>,
+    ctx_stack: &ContextStack,
+    sources: &SourceStore,
+    nb_errors_remaining: &Cell<usize>,
+    options: &Options,
+) {
+    match token {
+        Some(Token { payload, span }) => diagnostics::error(
+            span,
+            |error| {
+                error
+                    .with_message(format!("Syntax error: unexpected {payload}"))
+                    .with_label(
+                        diagnostics::error_label(span.resolve()).with_message("Expected TODO"),
+                    )
+            },
+            sources,
+            nb_errors_remaining,
+            options,
+        ),
+        None => {
+            let span = lexer::current_span(ctx_stack);
+            diagnostics::error(
+                &span,
+                |error| {
+                    error
+                        .with_message("Syntax error: unexpected end of input")
+                        .with_label(
+                            diagnostics::error_label(span.resolve()).with_message("Expected TODO"),
+                        )
+                },
+                sources,
+                nb_errors_remaining,
+                options,
+            );
+        }
     }
 }

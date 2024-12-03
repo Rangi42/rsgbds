@@ -107,17 +107,19 @@ macro_rules! chars {
     (starts_macro_arg) => {'@' | '#' | '<' | '1'..='9'};
 }
 
-/// Parameters that remain constant throughout a call to `next_token`.
-/// This is used to pass all of them at once, for simplicity.
-struct LexParams<'ctx_stack, 'src_store, 'syms, 'sym_ctx_stack, 'errs_rem, 'options> {
-    ctx_stack: &'ctx_stack ContextStack,
-    src_ctx: &'ctx_stack mut SourceContext,
-    source_store: &'src_store SourceStore,
-    node: &'ctx_stack SourceNode,
-    source: &'src_store str,
-    symbols: &'syms mut Symbols<'sym_ctx_stack>,
-    nb_errors_remaining: &'errs_rem Cell<usize>,
-    options: &'options Options,
+/// Returns a **one-byte** span at the current lexer position.
+///
+/// This is only meant to be called when at the end of a context, when no more tokens can be produced to extract spans out of.
+pub fn current_span(ctx_stack: &ContextStack) -> Span<'_> {
+    let sources = ctx_stack.sources();
+    let src_ctx = sources
+        .active_context()
+        .expect("Called `current_span` with no active context");
+    let (src_idx, start) = loc(src_ctx);
+    Span {
+        src: Some(SourceRef::new(ctx_stack, src_idx)),
+        byte_span: start..(start + 1),
+    }
 }
 
 pub fn is_next_char_a_colon(
@@ -144,6 +146,19 @@ pub fn is_next_char_a_colon(
         options,
     };
     peek(&mut parameters, true, true) == Some(':')
+}
+
+/// Parameters that remain constant throughout a call to `next_token`.
+/// This is used to pass all of them at once, for simplicity.
+struct LexParams<'ctx_stack, 'src_store, 'syms, 'sym_ctx_stack, 'errs_rem, 'options> {
+    ctx_stack: &'ctx_stack ContextStack,
+    src_ctx: &'ctx_stack mut SourceContext,
+    source_store: &'src_store SourceStore,
+    node: &'ctx_stack SourceNode,
+    source: &'src_store str,
+    symbols: &'syms mut Symbols<'sym_ctx_stack>,
+    nb_errors_remaining: &'errs_rem Cell<usize>,
+    options: &'options Options,
 }
 
 pub fn next_token<'ctx_stack>(
@@ -658,7 +673,7 @@ fn read_ident(
     tok!("identifier")(params.symbols.intern_name(name))
 }
 
-pub fn next_raw(
+pub fn next_token_raw(
     ctx_stack: &ContextStack,
     source_store: &SourceStore,
     symbols: &mut Symbols,

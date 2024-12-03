@@ -179,18 +179,18 @@ mod source_ref {
     pub struct SourceRef<'stack>(&'stack ContextStack, NonZeroUsize);
 
     impl<'stack> SourceRef<'stack> {
-        pub fn new(stack: &'stack ContextStack, idx: NonZeroUsize) -> Self {
-            stack.sources_mut()[idx].ref_count += 1;
-            Self(stack, idx)
+        pub fn new(stack: &'stack ContextStack, src_idx: NonZeroUsize) -> Self {
+            stack.sources_mut()[src_idx].ref_count += 1;
+            Self(stack, src_idx)
         }
 
         pub fn new_via(
             stack: &'stack ContextStack,
-            idx: NonZeroUsize,
+            src_idx: NonZeroUsize,
             sources: &mut SourcesMut<'_>,
         ) -> Self {
-            sources[idx].ref_count += 1;
-            Self(stack, idx)
+            sources[src_idx].ref_count += 1;
+            Self(stack, src_idx)
         }
 
         pub fn get(&self) -> SourceGuard {
