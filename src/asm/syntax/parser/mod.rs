@@ -18,14 +18,14 @@ use std::{cell::Cell, rc::Rc};
 use compact_str::CompactString;
 
 use crate::{
-    context_stack::{ContextStack, Span},
+    context_stack::ContextStack,
     diagnostics::{self, warning},
     macro_args::MacroArgs,
-    source_store::{self, SourceHandle, SourceStore},
+    source_store::{SourceHandle, SourceStore},
     symbols::Symbols,
     syntax::{
         lexer,
-        tokens::{Token, TokenPayload},
+        tokens::{tok, Token},
     },
     Options,
 };
@@ -36,7 +36,7 @@ macro_rules! expect_one_of {
     ($payload:expr => {
         $( None => $if_none:expr, )?
         $( |$($token:ident:)? $($kind:tt $(($fields:tt))?)/+| => $then:expr, )+
-        else |$unexpected:pat_param, $expected:pat_param| => $handle_default:expr $(,)?
+        else |$unexpected:pat_param $(, $expected:pat_param)? $(,)?| => $handle_default:expr $(,)?
     }) => {match $payload {
         $( None => $if_none, )?
         $( Some($($token @)? Token {
@@ -44,12 +44,21 @@ macro_rules! expect_one_of {
             ..
         }) => $then, )+
         $unexpected => {
-            let $expected = vec![$($( $kind )+),+]; // TODO: handle `if_none`, adding "end of file" to the list
+            // TODO: handle `if_none`, adding "end of file" to the list
+            expect_one_of!(@expected [$($( $kind )+),+] $($expected)?); // Internal call.
             $handle_default
         }
-    }}
+    }};
+
+    // Using internal rules rather than calling other macros allows the macro to remain self-contained.
+    // (This does make the macro's name irrelevant or even confusing, unfortunately.)
+    //
+    // [1]: https://danielkeep.github.io/tlborm/book/pat-internal-rules.html
+    (@expected $kinds:tt $($name:tt)?) => {
+        $(let $name = &$kinds;)?
+    };
 }
-pub(crate) use expect_one_of;
+use expect_one_of; // Allow this macro to be used by children modules.
 
 pub fn parse_file<'ctx_stack>(
     source: SourceHandle,
@@ -72,7 +81,7 @@ pub fn parse_file<'ctx_stack>(
         while let Some(mut first_token) = parse_ctx.next_token() {
             // TODO: handle leading diff marks
             // TODO: handle Git conflict markers
-            if let TokenPayload::Identifier(ident) = first_token.payload {
+            if let tok!("identifier"(ident)) = first_token.payload {
                 // Identifiers at the beginning of the line can be two things.
                 // Either a label name, if it's *directly* followed by a colon; or the name of a macro.
                 if parse_ctx.is_next_char_a_colon() {
@@ -106,9 +115,9 @@ pub fn parse_file<'ctx_stack>(
             }
 
             match first_token.payload {
-                TokenPayload::Newline => {} // Empty line.
+                tok!("end of line") => {} // Empty line.
 
-                TokenPayload::Identifier(ident) => {
+                tok!("identifier"(ident)) => {
                     // Macro call.
                     // Get the macro's arguments.
                     let args = Rc::new(MacroArgs::new(
@@ -156,115 +165,118 @@ pub fn parse_file<'ctx_stack>(
                 }
 
                 // These are not valid after a label.
-                TokenPayload::Macro => todo!(),
-                TokenPayload::Endm => todo!(),
-                TokenPayload::Rept => todo!(),
-                TokenPayload::For => todo!(),
-                TokenPayload::Endr => todo!(),
-                TokenPayload::If => todo!(),
-                TokenPayload::Elif => todo!(),
-                TokenPayload::Else => todo!(),
-                TokenPayload::Endc => todo!(),
+                tok!("macro") => todo!(),
+                tok!("endm") => todo!(),
+                tok!("rept") => todo!(),
+                tok!("for") => todo!(),
+                tok!("endr") => todo!(),
+                tok!("if") => todo!(),
+                tok!("elif") => todo!(),
+                tok!("else") => todo!(),
+                tok!("endc") => todo!(),
 
-                TokenPayload::Adc => todo!(),
-                TokenPayload::Add => todo!(),
-                TokenPayload::And => todo!(),
-                TokenPayload::Bit => todo!(),
-                TokenPayload::Call => todo!(),
-                TokenPayload::Ccf => todo!(),
-                TokenPayload::Cp => todo!(),
-                TokenPayload::Cpl => todo!(),
-                TokenPayload::Daa => todo!(),
-                TokenPayload::Dec => todo!(),
-                TokenPayload::Di => todo!(),
-                TokenPayload::Ei => todo!(),
-                TokenPayload::Halt => todo!(),
-                TokenPayload::Inc => todo!(),
-                TokenPayload::Jp => todo!(),
-                TokenPayload::Jr => todo!(),
-                TokenPayload::Ldd => todo!(),
-                TokenPayload::Ldh => todo!(),
-                TokenPayload::Ldi => todo!(),
-                TokenPayload::Ld => todo!(),
-                TokenPayload::Nop => todo!(),
-                TokenPayload::Or => todo!(),
-                TokenPayload::Pop => todo!(),
-                TokenPayload::Push => todo!(),
-                TokenPayload::Res => todo!(),
-                TokenPayload::Reti => todo!(),
-                TokenPayload::Ret => todo!(),
-                TokenPayload::Rla => todo!(),
-                TokenPayload::Rlca => todo!(),
-                TokenPayload::Rlc => todo!(),
-                TokenPayload::Rl => todo!(),
-                TokenPayload::Rra => todo!(),
-                TokenPayload::Rrca => todo!(),
-                TokenPayload::Rrc => todo!(),
-                TokenPayload::Rr => todo!(),
-                TokenPayload::Rst => todo!(),
-                TokenPayload::Sbc => todo!(),
-                TokenPayload::Scf => todo!(),
-                TokenPayload::Set => todo!(),
-                TokenPayload::Sla => todo!(),
-                TokenPayload::Sra => todo!(),
-                TokenPayload::Srl => todo!(),
-                TokenPayload::Stop => todo!(),
-                TokenPayload::Sub => todo!(),
-                TokenPayload::Swap => todo!(),
-                TokenPayload::Xor => todo!(),
+                tok!("adc") => todo!(),
+                tok!("add") => todo!(),
+                tok!("and") => todo!(),
+                tok!("bit") => todo!(),
+                tok!("call") => todo!(),
+                tok!("ccf") => todo!(),
+                tok!("cp") => todo!(),
+                tok!("cpl") => todo!(),
+                tok!("daa") => todo!(),
+                tok!("dec") => todo!(),
+                tok!("di") => todo!(),
+                tok!("ei") => todo!(),
+                tok!("halt") => todo!(),
+                tok!("inc") => todo!(),
+                tok!("jp") => todo!(),
+                tok!("jr") => todo!(),
+                tok!("ldd") => todo!(),
+                tok!("ldh") => todo!(),
+                tok!("ldi") => todo!(),
+                tok!("ld") => todo!(),
+                tok!("nop") => todo!(),
+                tok!("or") => todo!(),
+                tok!("pop") => todo!(),
+                tok!("push") => todo!(),
+                tok!("res") => todo!(),
+                tok!("reti") => todo!(),
+                tok!("ret") => todo!(),
+                tok!("rla") => todo!(),
+                tok!("rlca") => todo!(),
+                tok!("rlc") => todo!(),
+                tok!("rl") => todo!(),
+                tok!("rra") => todo!(),
+                tok!("rrca") => todo!(),
+                tok!("rrc") => todo!(),
+                tok!("rr") => todo!(),
+                tok!("rst") => todo!(),
+                tok!("sbc") => todo!(),
+                tok!("scf") => todo!(),
+                tok!("set") => todo!(),
+                tok!("sla") => todo!(),
+                tok!("sra") => todo!(),
+                tok!("srl") => todo!(),
+                tok!("stop") => todo!(),
+                tok!("sub") => todo!(),
+                tok!("swap") => todo!(),
+                tok!("xor") => todo!(),
 
-                TokenPayload::Align => todo!(),
-                TokenPayload::Assert => todo!(),
-                TokenPayload::Break => todo!(),
-                TokenPayload::Charmap => todo!(),
-                TokenPayload::Db => todo!(),
-                TokenPayload::Dl => todo!(),
-                TokenPayload::Ds => todo!(),
-                TokenPayload::Dw => todo!(),
-                TokenPayload::Endsection => todo!(),
-                TokenPayload::Endl => todo!(),
-                TokenPayload::Endu => todo!(),
-                TokenPayload::Export => todo!(),
-                TokenPayload::Fail => todo!(),
-                TokenPayload::Fatal => todo!(),
-                TokenPayload::Incbin => todo!(),
-                TokenPayload::Include => todo!(),
-                TokenPayload::Load => todo!(),
-                TokenPayload::Newcharmap => todo!(),
-                TokenPayload::Nextu => todo!(),
-                TokenPayload::Opt => todo!(),
-                TokenPayload::Popc => todo!(),
-                TokenPayload::Popo => todo!(),
-                TokenPayload::Pops => todo!(),
-                TokenPayload::Println => todo!(),
-                TokenPayload::Print => todo!(),
-                TokenPayload::Purge => todo!(),
-                TokenPayload::Pushc => todo!(),
-                TokenPayload::Pusho => todo!(),
-                TokenPayload::Pushs => todo!(),
-                TokenPayload::Rb => todo!(),
-                TokenPayload::Rw => todo!(),
-                TokenPayload::Redef => todo!(),
-                TokenPayload::Rsreset => todo!(),
-                TokenPayload::Rsset => todo!(),
-                TokenPayload::Section => todo!(),
-                TokenPayload::Setcharmap => todo!(),
-                TokenPayload::Shift => todo!(),
-                TokenPayload::StaticAssert => todo!(),
-                TokenPayload::Union => todo!(),
-                TokenPayload::Warn => todo!(),
+                tok!("align") => todo!(),
+                tok!("assert") => todo!(),
+                tok!("break") => todo!(),
+                tok!("charmap") => todo!(),
+                tok!("db") => todo!(),
+                tok!("dl") => todo!(),
+                tok!("ds") => todo!(),
+                tok!("dw") => todo!(),
+                tok!("endsection") => todo!(),
+                tok!("endl") => todo!(),
+                tok!("endu") => todo!(),
+                tok!("export") => todo!(),
+                tok!("fail") => todo!(),
+                tok!("fatal") => todo!(),
+                tok!("incbin") => todo!(),
+                tok!("include") => todo!(),
+                tok!("load") => todo!(),
+                tok!("newcharmap") => todo!(),
+                tok!("nextu") => todo!(),
+                tok!("opt") => todo!(),
+                tok!("popc") => todo!(),
+                tok!("popo") => todo!(),
+                tok!("pops") => todo!(),
+                tok!("println") => {
+                    let (expr, next) = expr::parse_numeric_expr(&mut parse_ctx);
+                    if let Some(expr) = expr {
+                        match expr.try_eval::<std::convert::Infallible, _>(|id| todo!()) {
+                            Ok(n) => println!("{n}"),
+                            Err(err) => todo!(),
+                        }
+                    }
+                }
+                tok!("print") => todo!(),
+                tok!("purge") => todo!(),
+                tok!("pushc") => todo!(),
+                tok!("pusho") => todo!(),
+                tok!("pushs") => todo!(),
+                tok!("rb") => todo!(),
+                tok!("rw") => todo!(),
+                tok!("redef") => todo!(),
+                tok!("rsreset") => todo!(),
+                tok!("rsset") => todo!(),
+                tok!("section") => todo!(),
+                tok!("setcharmap") => todo!(),
+                tok!("shift") => todo!(),
+                tok!("static_assert") => todo!(),
+                tok!("union") => todo!(),
+                tok!("warn") => todo!(),
 
                 _ => {
-                    report_syntax_error(
-                        Some(&first_token),
-                        ctx_stack,
-                        sources,
-                        nb_errors_remaining,
-                        options,
-                    );
+                    parse_ctx.report_syntax_error(Some(&first_token));
+
                     // Discard the rest of the line.
                     while let Some(token) = parse_ctx.next_token() {
-                        if matches!(token.payload, TokenPayload::Newline) {
+                        if matches!(token.payload, tok!("end of line")) {
                             break;
                         }
                     }
@@ -315,44 +327,39 @@ impl<'ctx_stack> ParseCtx<'ctx_stack, '_, '_, '_, '_> {
             self.options,
         )
     }
-}
 
-fn report_syntax_error(
-    token: Option<&Token>,
-    ctx_stack: &ContextStack,
-    sources: &SourceStore,
-    nb_errors_remaining: &Cell<usize>,
-    options: &Options,
-) {
-    match token {
-        Some(Token { payload, span }) => diagnostics::error(
-            span,
-            |error| {
-                error
-                    .with_message(format!("Syntax error: unexpected {payload}"))
-                    .with_label(
-                        diagnostics::error_label(span.resolve()).with_message("Expected TODO"),
-                    )
-            },
-            sources,
-            nb_errors_remaining,
-            options,
-        ),
-        None => {
-            let span = lexer::current_span(ctx_stack);
-            diagnostics::error(
-                &span,
+    fn report_syntax_error(&self, token: Option<&Token>) {
+        match token {
+            Some(Token { payload, span }) => diagnostics::error(
+                span,
                 |error| {
                     error
-                        .with_message("Syntax error: unexpected end of input")
+                        .with_message(format!("Syntax error: unexpected {payload}"))
                         .with_label(
                             diagnostics::error_label(span.resolve()).with_message("Expected TODO"),
                         )
                 },
-                sources,
-                nb_errors_remaining,
-                options,
-            );
+                self.sources,
+                self.nb_errors_remaining,
+                self.options,
+            ),
+            None => {
+                let span = lexer::current_span(self.ctx_stack);
+                diagnostics::error(
+                    &span,
+                    |error| {
+                        error
+                            .with_message("Syntax error: unexpected end of input")
+                            .with_label(
+                                diagnostics::error_label(span.resolve())
+                                    .with_message("Expected TODO"),
+                            )
+                    },
+                    self.sources,
+                    self.nb_errors_remaining,
+                    self.options,
+                );
+            }
         }
     }
 }
