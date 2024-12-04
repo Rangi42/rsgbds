@@ -61,14 +61,18 @@ pub(super) fn parse_numeric_expr<'ctx_stack>(
             // TODO: all of the function calls...
 
             else |other| => {
-                let Some(operator) = other.as_ref().and_then(|token| UnOp::from_token(&token.payload)) else {
-                    // The next token is neither a prefix operator, nor a terminal / "atom".
-                    // Thus, there is no expression to parse.
-                    return (None, other);
+                // If the next token is neither a prefix operator, nor a terminal / "atom",
+                // then there is no expression to parse.
+                let Some(op_token) = other else {
+                    return (None, None);
                 };
+                let Some(operator) = UnOp::from_token(&op_token.payload) else {
+                    return (None, Some(op_token));
+                };
+
                 let ((), right_power) = operator.binding_power();
                 let (rhs, lookahead) = parse_subexpr(parse_ctx, right_power);
-                (expect_numeric_expr(rhs).unary_op(operator), lookahead)
+                (expect_numeric_expr(rhs).unary_op(operator, op_token.span), lookahead)
             }
         });
 

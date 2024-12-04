@@ -5,12 +5,10 @@ use crate::{
 };
 
 pub struct Expr<'ctx_stack> {
-    /// Either a tree of operations, or an error that has occurred while evaluating the expression.
-    /// Note that expressions are evaluated greedily when the result is known, and that operations
-    /// performed on an "error value" yield that same error (like a floating-point NaN), so that
-    /// the innermost error(s) only is (are) reported.
-    // TODO: use `smallvec` or something, these will most often contain few elements
-    payload: Result<Vec<Op<'ctx_stack>>, Vec<Error<'ctx_stack>>>,
+    /// This is never empty for a valid expression; however, syntax errors yield bogus [`Expr`]s
+    /// that have this list be empty.
+    // TODO: use `smallvec` or something, it will most often contain few elements
+    payload: Vec<Op<'ctx_stack>>,
 }
 
 struct Op<'ctx_stack> {
@@ -21,6 +19,8 @@ struct Op<'ctx_stack> {
 enum OpKind {
     Number(i32),
     Symbol(SymName),
+    Binary(BinOp),
+    Unary(UnOp),
 }
 
 struct Error<'ctx_stack> {
@@ -29,20 +29,17 @@ struct Error<'ctx_stack> {
 }
 
 enum ErrKind {
+    SymNotFound,
     DivBy0,
 }
 
 impl<'ctx_stack> Expr<'ctx_stack> {
     pub fn nothing() -> Self {
-        Self {
-            payload: Err(vec![]),
-        }
+        Self { payload: vec![] }
     }
 
     fn from_terminal(op: Op<'ctx_stack>) -> Self {
-        Self {
-            payload: Ok(vec![op]),
-        }
+        Self { payload: vec![op] }
     }
 
     pub fn number(number: i32, span: Span<'ctx_stack>) -> Self {
@@ -60,59 +57,59 @@ impl<'ctx_stack> Expr<'ctx_stack> {
     }
 }
 
-impl Expr<'_> {
-    pub fn binary_op(self, operator: BinOp, rhs: Self) -> Self {
-        match (self.payload, rhs.payload) {
-            (Err(mut errors), Err(mut more_errors)) => {
-                errors.append(&mut more_errors);
-                Self {
-                    payload: Err(errors),
-                }
-            }
-            (Err(errors), Ok(_)) | (Ok(_), Err(errors)) => Self {
-                payload: Err(errors),
-            },
-            (Ok(ops), Ok(more_ops)) => match (&ops[..], &more_ops[..]) {
-                (
-                    [Op {
-                        kind: OpKind::Number(lhs),
-                        span: left_span,
-                    }],
-                    [Op {
-                        kind: OpKind::Number(rhs),
-                        span: right_span,
-                    }],
-                ) => Self {
-                    payload: Ok(vec![Op {
-                        span: left_span.merged_with(right_span),
-                        kind: OpKind::Number(operator.const_eval(*lhs, *rhs)),
-                    }]),
-                },
-                _ => todo!(),
-            },
-        }
+impl<'ctx_stack> Expr<'ctx_stack> {
+    pub fn binary_op(mut self, operator: BinOp, mut other: Self) -> Self {
+        let (Some(lhs), Some(rhs)) = (self.payload.last(), other.payload.last()) else {
+            self.payload.clear();
+            return self;
+        };
+
+        let new_op = Op {
+            kind: OpKind::Binary(operator),
+            span: lhs.span.merged_with(&rhs.span),
+        };
+        self.payload.reserve(other.payload.len() + 1);
+        self.payload.append(&mut other.payload);
+        self.payload.push(new_op);
+
+        self
     }
 
-    pub fn unary_op(mut self, operator: UnOp) -> Self {
-        if let Ok(ops) = &mut self.payload {
-            todo!();
+    pub fn unary_op(mut self, operator: UnOp, op_span: Span<'ctx_stack>) -> Self {
+        if let Some(last) = self.payload.last() {
+            self.payload.push(Op {
+                kind: OpKind::Unary(operator),
+                span: op_span.merged_with(&last.span),
+            });
         }
         self
     }
 }
 
 impl Expr<'_> {
-    // TODO: maybe return a reason why instead?
+    // TODO: maybe return a reason why instead? But there may be more than one reason!
     pub fn try_const_eval(&self) -> Option<i32> {
-        match &self.payload {
-            Ok(ops) => match ops[..] {
-                [Op {
-                    kind: OpKind::Number(num),
-                    ..
-                }] => Some(num),
-                _ => None,
-            },
-            _ => None,
+        if self.payload.is_empty() {
+            None
+        } else {
+            let mut eval_stack = vec![];
+            for op in &self.payload {
+                match &op.kind {
+                    OpKind::Number(value) => eval_stack.push(*value),
+                    OpKind::Symbol(name) => todo!(),
+                    OpKind::Binary(operator) => {
+                        let rhs = eval_stack.pop().unwrap();
+                        let lhs = eval_stack.last_mut().unwrap();
+                        *lhs = operator.const_eval(*lhs, rhs);
+                    }
+                    OpKind::Unary(operator) => {
+                        let value = eval_stack.last_mut().unwrap();
+                        *value = operator.const_eval(*value);
+                    }
+                }
+            }
+            debug_assert_eq!(eval_stack.len(), 1);
+            Some(eval_stack[0])
         }
     }
 }
@@ -151,7 +148,24 @@ impl BinOp {
             BinOp::Multiply => (lhs as u32).wrapping_mul(rhs as u32) as i32,
             BinOp::Divide => todo!(),
             BinOp::Modulo => todo!(),
-            BinOp::Exponent => todo!(),
+            BinOp::Exponent => lhs.wrapping_pow(rhs as u32),
+        }
+    }
+}
+
+impl UnOp {
+    fn const_eval(&self, value: i32) -> i32 {
+        match self {
+            UnOp::Complement => !value,
+            UnOp::Identity => value,
+            UnOp::Negation => -value,
+            UnOp::Not => {
+                if value == 0 {
+                    1
+                } else {
+                    0
+                }
+            }
         }
     }
 }
