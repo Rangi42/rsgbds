@@ -35,12 +35,13 @@ mod expr;
 macro_rules! expect_one_of {
     ($payload:expr => {
         $( None => $if_none:expr, )?
-        $( |$($token:ident:)? $($kind:tt $(($fields:tt))?)/+| => $then:expr, )+
+        $( $( Token {$( $captured_fields:ident ),+} )? |$($kind:tt $(($fields:tt))?)/+| => $then:expr, )+
         else |$unexpected:pat_param $(, $expected:pat_param)? $(,)?| => $handle_default:expr $(,)?
     }) => {match $payload {
         $( None => $if_none, )?
-        $( Some($($token @)? Token {
+        $( Some(Token {
             payload: $( $crate::syntax::tokens::tok!($kind $(($fields))?) )|+,
+            $($($captured_fields,)+)?
             ..
         }) => $then, )+
         $unexpected => {
@@ -247,12 +248,12 @@ pub fn parse_file<'ctx_stack>(
                 tok!("pops") => todo!(),
                 tok!("println") => {
                     let (expr, next) = expr::parse_numeric_expr(&mut parse_ctx);
-                    if let Some(expr) = expr {
-                        match expr.try_eval::<std::convert::Infallible, _>(|id| todo!()) {
-                            Ok(n) => println!("{n}"),
-                            Err(err) => todo!(),
-                        }
-                    }
+                    println!(
+                        "{}",
+                        expr.expect("No expr")
+                            .try_const_eval()
+                            .expect("Const evail fail")
+                    );
                 }
                 tok!("print") => todo!(),
                 tok!("purge") => todo!(),

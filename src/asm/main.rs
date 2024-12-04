@@ -43,6 +43,7 @@ mod context_stack;
 use context_stack::{ContextStack, Span};
 mod diagnostics;
 use diagnostics::{WarningLevel, NB_WARNINGS};
+mod expr;
 mod format;
 mod macro_args;
 mod source_store;

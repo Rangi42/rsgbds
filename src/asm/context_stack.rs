@@ -154,6 +154,15 @@ impl Span<'_> {
             (SourceHandle::COMMAND_LINE, 0..0)
         }
     }
+
+    pub fn merged_with(&self, other: &Self) -> Self {
+        debug_assert_eq!(&self.src, &other.src);
+        debug_assert!(self.byte_span.end <= other.byte_span.start);
+        Self {
+            src: self.src.clone(),
+            byte_span: self.byte_span.start..other.byte_span.end,
+        }
+    }
 }
 
 impl SourceNode {
@@ -201,6 +210,20 @@ mod source_ref {
     impl Drop for SourceRef<'_> {
         fn drop(&mut self) {
             self.0.sources_mut()[self.1].ref_count -= 1;
+        }
+    }
+
+    impl Clone for SourceRef<'_> {
+        fn clone(&self) -> Self {
+            Self::new(self.0, self.1)
+        }
+    }
+
+    impl PartialEq for SourceRef<'_> {
+        fn eq(&self, other: &Self) -> bool {
+            // The two refs must hail from the same stack, otherwise the comparison is meaningless.
+            debug_assert!(std::ptr::eq(self.0, other.0));
+            self.1 == other.1
         }
     }
 

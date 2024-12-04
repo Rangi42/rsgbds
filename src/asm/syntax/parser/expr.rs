@@ -1,8 +1,18 @@
 use rgbds::rpn::Rpn;
 
-use crate::syntax::tokens::{tok, Token, TokenPayload};
+use crate::{
+    expr::{BinOp, Expr, UnOp},
+    syntax::tokens::{tok, Token, TokenPayload},
+};
 
 use super::{expect_one_of, ParseCtx};
+
+pub fn expect_numeric_expr<'ctx_stack>(maybe_expr: Option<Expr<'ctx_stack>>) -> Expr<'ctx_stack> {
+    match maybe_expr {
+        Some(expr) => expr,
+        None => Expr::nothing(),
+    }
+}
 
 // The implementation strategy is a Pratt parser.
 //
@@ -10,15 +20,17 @@ use super::{expect_one_of, ParseCtx};
 // [2]: https://martin.janiczek.cz/2023/07/03/demystifying-pratt-parsers.html
 pub(super) fn parse_numeric_expr<'ctx_stack>(
     parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
-) -> (Option<Rpn>, Option<Token<'ctx_stack>>) {
+) -> (Option<Expr<'ctx_stack>>, Option<Token<'ctx_stack>>) {
     fn parse_subexpr<'ctx_stack>(
         parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
         min_binding_power: u8,
-    ) -> (Option<Rpn>, Option<Token<'ctx_stack>>) {
-        let (mut lhs, mut next_token) = expect_one_of!(parse_ctx.next_token() => {
+    ) -> (Option<Expr<'ctx_stack>>, Option<Token<'ctx_stack>>) {
+        // First, attempt to parse an "atom" (in short, a sub-expression that will maybe serve
+        // as an operand to some operator).
+        let (mut lhs, mut token) = expect_one_of!(parse_ctx.next_token() => {
             |"("| => {
-                let (res, next_token) = parse_subexpr(parse_ctx, 0); // The inner expression's minimum power is reset, due to the parens' grouping behavior.
-                let next_token = expect_one_of!(next_token => {
+                let (res, lookahead) = parse_subexpr(parse_ctx, 0); // The inner expression's minimum power is reset, due to the parens' grouping behavior.
+                let lookahead = expect_one_of!(lookahead => {
                     |")"| => parse_ctx.next_token(),
                     else |unexpected| => {
                         // TODO: would be nice to make this say "Syntax error: unclosed parenthesis" somehow
@@ -26,77 +38,67 @@ pub(super) fn parse_numeric_expr<'ctx_stack>(
                         unexpected
                     }
                 });
-                // TODO: what to do if `res` is `None`?
-                todo!();
+                (expect_numeric_expr(res), lookahead)
             },
 
-            |"number"(number)| => {
-                let next_token = parse_ctx.next_token();
-                (Rpn::constant(number as u32), next_token)
+            Token { span } |"number"(number)| => {
+                let lookahead = parse_ctx.next_token();
+                (Expr::number(number, span), lookahead)
             },
-            |"identifier"(ident)| => {
-                let next_token = parse_ctx.next_token();
-                if matches!(next_token, Some(Token { payload: tok!("("), .. })) {
+            Token { span } |"identifier"(ident)| => {
+                let lookahead = parse_ctx.next_token();
+                if matches!(lookahead, Some(Token { payload: tok!("("), .. })) {
                     todo!(); // Function call.
                 } else {
-                    (Rpn::symbol(todo!()), next_token)
+                    (Expr::symbol(ident, span), lookahead)
                 }
             },
-            |"string"(string)| => {
-                let next_token = parse_ctx.next_token();
-                (Rpn::constant(todo!()), next_token)
+            Token { span } |"string"(string)| => {
+                let lookahead = parse_ctx.next_token();
+                (Expr::number(todo!(), span), lookahead)
             },
 
             // TODO: all of the function calls...
 
             else |other| => {
-                let Some(((), right_power)) = other.as_ref().and_then(|token| prefix_binding_power(&token.payload)) else {
+                let Some(operator) = other.as_ref().and_then(|token| UnOp::from_token(&token.payload)) else {
                     // The next token is neither a prefix operator, nor a terminal / "atom".
                     // Thus, there is no expression to parse.
                     return (None, other);
                 };
-                let (rhs, next_token) = parse_subexpr(parse_ctx, right_power);
-                // TODO: what to do if `res` is `None`?
-                todo!()
+                let ((), right_power) = operator.binding_power();
+                let (rhs, lookahead) = parse_subexpr(parse_ctx, right_power);
+                (expect_numeric_expr(rhs).unary_op(operator), lookahead)
             }
         });
 
-        while let Some((left_power, right_power)) = next_token
-            .as_ref()
-            .and_then(|token| infix_binding_power(&token.payload))
-        {
+        let lookahead = loop {
+            // If at end of input, the expression is over.
+            let Some(op_token) = token else {
+                break None;
+            };
+            // If the next token is not a binary operator, stop parsing the expression.
+            let Some(operator) = BinOp::from_token(&op_token.payload) else {
+                break Some(op_token);
+            };
+            let (left_power, right_power) = operator.binding_power();
+            // Compare the binding powers surrounding the last "atom" (left = `min_binding_power`,
+            // the right-hand power of the last operator shifted in; right = `left_power`).
+            // If said "atom" is bound more tightly to its left than to its right,
+            // "wrap up" the current expression.
             if left_power < min_binding_power {
-                break;
+                break Some(op_token);
             }
-            let (rhs, tok) = parse_subexpr(parse_ctx, right_power);
-            next_token = tok;
-            // What if `rhs` is `None`?
-            todo!();
-        }
 
-        (Some(lhs), next_token)
+            let (rhs, lookahead) = parse_subexpr(parse_ctx, right_power);
+            let rhs = expect_numeric_expr(rhs);
+
+            token = lookahead;
+            lhs = lhs.binary_op(operator, rhs);
+        };
+
+        (Some(lhs), lookahead)
     }
 
     parse_subexpr(parse_ctx, 0)
-}
-
-fn prefix_binding_power(kind: &TokenPayload) -> Option<((), u8)> {
-    match kind {
-        tok!("~") | tok!("+") | tok!("-") | tok!("!") => Some(((), 15)),
-        _ => None,
-    }
-}
-
-fn infix_binding_power(kind: &TokenPayload) -> Option<(u8, u8)> {
-    match kind {
-        tok!("**") => Some((18, 17)),
-        tok!("*") | tok!("/") | tok!("%") => Some((13, 14)),
-        tok!("<<") | tok!(">>") | tok!(">>>") => Some((11, 12)),
-        tok!("&") | tok!("|") | tok!("^") => Some((9, 10)),
-        tok!("+") | tok!("-") => Some((7, 8)),
-        tok!("!=") | tok!("==") | tok!("<=") | tok!("<") | tok!(">=") | tok!(">") => Some((5, 6)),
-        tok!("&&") => Some((3, 4)),
-        tok!("||") => Some((1, 2)),
-        _ => None,
-    }
 }

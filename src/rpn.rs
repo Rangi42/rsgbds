@@ -499,6 +499,7 @@ pub enum Command {
 }
 
 #[derive(Debug, Display, Clone)]
+#[non_exhaustive]
 pub enum EvalError<SymErr> {
     #[display("Division by zero")]
     DivByZero,
