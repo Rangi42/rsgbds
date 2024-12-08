@@ -15,13 +15,14 @@ The extra boilerplate is counter-balanced by how much the aforementioned workaro
 
 use std::{cell::Cell, rc::Rc};
 
+use ariadne::ReportBuilder;
 use compact_str::CompactString;
 
 use crate::{
-    context_stack::ContextStack,
+    context_stack::{ContextStack, Span},
     diagnostics::{self, warning},
     macro_args::MacroArgs,
-    source_store::{SourceHandle, SourceStore},
+    source_store::{RawSpan, SourceHandle, SourceStore},
     symbols::Symbols,
     syntax::{
         lexer,
@@ -132,12 +133,11 @@ pub fn parse_file<'ctx_stack>(
                         None => diagnostics::error(
                             &first_token.span,
                             |error| {
-                                error
-                                    .with_message(format!("Macro `{name}` does not exist"))
-                                    .with_label(
-                                        diagnostics::error_label(first_token.span.resolve())
-                                            .with_message("Attempting to call the macro here"),
-                                    )
+                                error.set_message(format!("Macro `{name}` does not exist"));
+                                error.add_label(
+                                    diagnostics::error_label(first_token.span.resolve())
+                                        .with_message("Attempting to call the macro here"),
+                                );
                             },
                             sources,
                             nb_errors_remaining,
@@ -146,12 +146,11 @@ pub fn parse_file<'ctx_stack>(
                         Some(Err(other)) => diagnostics::error(
                             &first_token.span,
                             |error| {
-                                error
-                                    .with_message(format!("`{name}` is not a macro"))
-                                    .with_label(
-                                        diagnostics::error_label(first_token.span.resolve())
-                                            .with_message("Attempting to call the macro here"),
-                                    )
+                                error.set_message(format!("`{name}` is not a macro"));
+                                error.add_label(
+                                    diagnostics::error_label(first_token.span.resolve())
+                                        .with_message("Attempting to call the macro here"),
+                                );
                             },
                             sources,
                             nb_errors_remaining,
@@ -274,7 +273,12 @@ pub fn parse_file<'ctx_stack>(
                 tok!("warn") => todo!(),
 
                 _ => {
-                    parse_ctx.report_syntax_error(Some(&first_token));
+                    parse_ctx.report_syntax_error(Some(&first_token), |error, span| {
+                        error.add_label(
+                            diagnostics::error_label(span.resolve())
+                                .with_message("Expected an instruction or a directive here"),
+                        )
+                    });
 
                     // Discard the rest of the line.
                     while let Some(token) = parse_ctx.next_token() {
@@ -330,16 +334,17 @@ impl<'ctx_stack> ParseCtx<'ctx_stack, '_, '_, '_, '_> {
         )
     }
 
-    fn report_syntax_error(&self, token: Option<&Token>) {
+    fn report_syntax_error<F: FnOnce(&mut ReportBuilder<'_, RawSpan>, &Span)>(
+        &self,
+        token: Option<&Token>,
+        callback: F,
+    ) {
         match token {
             Some(Token { payload, span }) => diagnostics::error(
                 span,
                 |error| {
-                    error
-                        .with_message(format!("Syntax error: unexpected {payload}"))
-                        .with_label(
-                            diagnostics::error_label(span.resolve()).with_message("Expected TODO"),
-                        )
+                    error.set_message(format!("Syntax error: unexpected {payload}"));
+                    callback(error, &span);
                 },
                 self.sources,
                 self.nb_errors_remaining,
@@ -350,12 +355,8 @@ impl<'ctx_stack> ParseCtx<'ctx_stack, '_, '_, '_, '_> {
                 diagnostics::error(
                     &span,
                     |error| {
-                        error
-                            .with_message("Syntax error: unexpected end of input")
-                            .with_label(
-                                diagnostics::error_label(span.resolve())
-                                    .with_message("Expected TODO"),
-                            )
+                        error.set_message("Syntax error: unexpected end of input");
+                        callback(error, &span);
                     },
                     self.sources,
                     self.nb_errors_remaining,

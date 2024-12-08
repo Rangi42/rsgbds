@@ -12,7 +12,12 @@ use crate::{
 const ERROR_COLOR: Color = Color::Red;
 pub const ERROR_KIND: ReportKind = ReportKind::Custom("error", ERROR_COLOR);
 
-pub fn error<F: FnOnce(ReportBuilder) -> ReportBuilder>(
+const WARNING_COLOR: Color = Color::Yellow;
+pub const WARNING_KIND: ReportKind = ReportKind::Custom("warning", WARNING_COLOR);
+
+const NOTE_COLOR: Color = Color::Fixed(115); // ariadne's default `note_color`.
+
+pub fn error<F: FnOnce(&mut ReportBuilder)>(
     span: &Span<'_>,
     build: F,
     sources: &SourceStore,
@@ -24,13 +29,13 @@ pub fn error<F: FnOnce(ReportBuilder) -> ReportBuilder>(
     }
 
     let (src_id, byte_range) = span.resolve();
-    build(
-        Report::build(ERROR_KIND, src_id, byte_range.start)
-            .with_config(Config::new().with_index_type(IndexType::Byte)),
-    )
-    .finish()
-    .eprint(sources)
-    .expect("Failed to print diagnostic");
+    let mut error = Report::build(ERROR_KIND, src_id, byte_range.start)
+        .with_config(Config::new().with_index_type(IndexType::Byte));
+    build(&mut error);
+    error
+        .finish()
+        .eprint(sources)
+        .expect("Failed to print diagnostic");
     decrement_error_count(sources, nb_errors_left, options);
 }
 
@@ -74,11 +79,7 @@ fn decrement_error_count(sources: &SourceStore, nb_errors_left: &Cell<usize>, op
     }
 }
 
-const WARNING_COLOR: Color = Color::Yellow;
-pub const WARNING_KIND: ReportKind = ReportKind::Custom("warning", WARNING_COLOR);
-
-// TODO: need also to give me a warning flag!
-pub fn warn<F: FnOnce(ReportBuilder) -> ReportBuilder>(
+pub fn warn<F: FnOnce(&mut ReportBuilder)>(
     id: WarningKind,
     span: &Span<'_>,
     build: F,
@@ -102,14 +103,14 @@ pub fn warn<F: FnOnce(ReportBuilder) -> ReportBuilder>(
     }
 
     let (src_id, byte_range) = span.resolve();
-    build(
-        Report::build(kind, src_id, byte_range.start)
-            .with_config(Config::new().with_index_type(IndexType::Byte))
-            .with_code(id),
-    )
-    .finish()
-    .eprint(sources)
-    .expect("Failed to print diagnostic");
+    let mut warning = Report::build(kind, src_id, byte_range.start)
+        .with_config(Config::new().with_index_type(IndexType::Byte))
+        .with_code(id);
+    build(&mut warning);
+    warning
+        .finish()
+        .eprint(sources)
+        .expect("Failed to print diagnostic");
     if kind == ERROR_KIND {
         decrement_error_count(sources, nb_errors_left, options);
     }
@@ -132,4 +133,8 @@ pub fn error_label<S: Into<RawSpan>>(span: S) -> Label<RawSpan> {
 
 pub fn warning_label<S: Into<RawSpan>>(span: S) -> Label<RawSpan> {
     Label::new(span.into()).with_color(WARNING_COLOR)
+}
+
+pub fn note_label<S: Into<RawSpan>>(span: S) -> Label<RawSpan> {
+    Label::new(span.into()).with_color(NOTE_COLOR)
 }

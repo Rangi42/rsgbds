@@ -93,7 +93,7 @@ fn run(options: Options, input_path: PathBuf, defines: Vec<String>) -> Result<()
         match options.load_file(preinc_path, &mut sources) {
             Err(err) => diagnostics::error(
                 &Span::COMMAND_LINE,
-                |report| report.with_message(format!("Failed to open preinclude file: {err}")),
+                |report| report.set_message(format!("Failed to open preinclude file: {err}")),
                 &sources,
                 &remaining_errors,
                 &options,
@@ -121,7 +121,7 @@ fn run(options: Options, input_path: PathBuf, defines: Vec<String>) -> Result<()
         Err(err) => {
             diagnostics::error(
                 &Span::COMMAND_LINE,
-                |report| report.with_message(format!("Failed to open input file: {err}")),
+                |report| report.set_message(format!("Failed to open input file: {err}")),
                 &sources,
                 &remaining_errors,
                 &options,

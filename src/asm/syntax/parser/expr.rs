@@ -1,6 +1,7 @@
 use rgbds::rpn::Rpn;
 
 use crate::{
+    diagnostics,
     expr::{BinOp, Expr, UnOp},
     syntax::tokens::{tok, Token, TokenPayload},
 };
@@ -30,13 +31,21 @@ pub(super) fn parse_numeric_expr<'ctx_stack>(
         // First, attempt to parse an "atom" (in short, a sub-expression that will maybe serve
         // as an operand to some operator).
         let (mut lhs, mut token) = expect_one_of!(lookahead => {
-            |"("| => {
-                let (res, lookahead) = parse_subexpr(parse_ctx.next_token(),parse_ctx, 0); // The inner expression's minimum power is reset, due to the parens' grouping behavior.
+            Token { span } |"("| => {
+                // The inner expression's minimum power is reset, due to the parens' grouping behavior.
+                let (res, lookahead) = parse_subexpr(parse_ctx.next_token(),parse_ctx, 0);
                 let lookahead = expect_one_of!(lookahead => {
                     |")"| => parse_ctx.next_token(),
                     else |unexpected| => {
-                        // TODO: would be nice to make this say "Syntax error: unclosed parenthesis" somehow
-                        parse_ctx.report_syntax_error(unexpected.as_ref());
+                        parse_ctx.report_syntax_error(unexpected.as_ref(), |error, cur_span| {
+                            error.set_message("Syntax error: unclosed parenthesis");
+                            error.add_labels([
+                                diagnostics::error_label(span.resolve())
+                                    .with_message("This parenthesis should be closed..."),
+                                diagnostics::note_label(cur_span.resolve())
+                                    .with_message("...before this point"),
+                            ]);
+                        });
                         unexpected
                     }
                 });
