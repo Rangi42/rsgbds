@@ -247,7 +247,8 @@ pub fn parse_file<'ctx_stack>(
                 tok!("popo") => todo!(),
                 tok!("pops") => todo!(),
                 tok!("println") => {
-                    let (expr, next) = expr::parse_numeric_expr(&mut parse_ctx);
+                    let (expr, lookahead) =
+                        expr::parse_numeric_expr(parse_ctx.next_token(), &mut parse_ctx);
                     println!(
                         "{}",
                         expr.expect("No expr")

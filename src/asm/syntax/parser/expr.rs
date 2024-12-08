@@ -19,17 +19,19 @@ pub fn expect_numeric_expr<'ctx_stack>(maybe_expr: Option<Expr<'ctx_stack>>) -> 
 // [1]: https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
 // [2]: https://martin.janiczek.cz/2023/07/03/demystifying-pratt-parsers.html
 pub(super) fn parse_numeric_expr<'ctx_stack>(
+    lookahead: Option<Token<'ctx_stack>>,
     parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
 ) -> (Option<Expr<'ctx_stack>>, Option<Token<'ctx_stack>>) {
     fn parse_subexpr<'ctx_stack>(
+        lookahead: Option<Token<'ctx_stack>>,
         parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
         min_binding_power: u8,
     ) -> (Option<Expr<'ctx_stack>>, Option<Token<'ctx_stack>>) {
         // First, attempt to parse an "atom" (in short, a sub-expression that will maybe serve
         // as an operand to some operator).
-        let (mut lhs, mut token) = expect_one_of!(parse_ctx.next_token() => {
+        let (mut lhs, mut token) = expect_one_of!(lookahead => {
             |"("| => {
-                let (res, lookahead) = parse_subexpr(parse_ctx, 0); // The inner expression's minimum power is reset, due to the parens' grouping behavior.
+                let (res, lookahead) = parse_subexpr(parse_ctx.next_token(),parse_ctx, 0); // The inner expression's minimum power is reset, due to the parens' grouping behavior.
                 let lookahead = expect_one_of!(lookahead => {
                     |")"| => parse_ctx.next_token(),
                     else |unexpected| => {
@@ -53,10 +55,6 @@ pub(super) fn parse_numeric_expr<'ctx_stack>(
                     (Expr::symbol(ident, span), lookahead)
                 }
             },
-            Token { span } |"string"(string)| => {
-                let lookahead = parse_ctx.next_token();
-                (Expr::number(todo!(), span), lookahead)
-            },
 
             // TODO: all of the function calls...
 
@@ -66,12 +64,13 @@ pub(super) fn parse_numeric_expr<'ctx_stack>(
                 let Some(op_token) = other else {
                     return (None, None);
                 };
+                // TODO: string expressions are also atoms!
                 let Some(operator) = UnOp::from_token(&op_token.payload) else {
                     return (None, Some(op_token));
                 };
 
                 let ((), right_power) = operator.binding_power();
-                let (rhs, lookahead) = parse_subexpr(parse_ctx, right_power);
+                let (rhs, lookahead) = parse_subexpr(parse_ctx.next_token(),parse_ctx, right_power);
                 (expect_numeric_expr(rhs).unary_op(operator, op_token.span), lookahead)
             }
         });
@@ -94,7 +93,7 @@ pub(super) fn parse_numeric_expr<'ctx_stack>(
                 break Some(op_token);
             }
 
-            let (rhs, lookahead) = parse_subexpr(parse_ctx, right_power);
+            let (rhs, lookahead) = parse_subexpr(parse_ctx.next_token(), parse_ctx, right_power);
             let rhs = expect_numeric_expr(rhs);
 
             token = lookahead;
@@ -104,5 +103,5 @@ pub(super) fn parse_numeric_expr<'ctx_stack>(
         (Some(lhs), lookahead)
     }
 
-    parse_subexpr(parse_ctx, 0)
+    parse_subexpr(lookahead, parse_ctx, 0)
 }

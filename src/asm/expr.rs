@@ -4,6 +4,7 @@ use crate::{
     syntax::tokens::{tok, TokenPayload},
 };
 
+#[derive(Debug)]
 pub struct Expr<'ctx_stack> {
     /// This is never empty for a valid expression; however, syntax errors yield bogus [`Expr`]s
     /// that have this list be empty.
@@ -11,11 +12,13 @@ pub struct Expr<'ctx_stack> {
     payload: Vec<Op<'ctx_stack>>,
 }
 
+#[derive(Debug)]
 struct Op<'ctx_stack> {
     span: Span<'ctx_stack>,
     kind: OpKind,
 }
 
+#[derive(Debug)]
 enum OpKind {
     Number(i32),
     Symbol(SymName),
@@ -23,11 +26,13 @@ enum OpKind {
     Unary(UnOp),
 }
 
-struct Error<'ctx_stack> {
+#[derive(Debug)]
+pub struct Error<'ctx_stack> {
     span: Span<'ctx_stack>,
     kind: ErrKind,
 }
 
+#[derive(Debug)]
 enum ErrKind {
     SymNotFound,
     DivBy0,
@@ -87,29 +92,29 @@ impl<'ctx_stack> Expr<'ctx_stack> {
 }
 
 impl Expr<'_> {
-    // TODO: maybe return a reason why instead? But there may be more than one reason!
-    pub fn try_const_eval(&self) -> Option<i32> {
+    // TODO: there may be more than one reason!
+    pub fn try_const_eval(&self) -> Result<i32, Error> {
         if self.payload.is_empty() {
-            None
+            Err(todo!())
         } else {
             let mut eval_stack = vec![];
             for op in &self.payload {
                 match &op.kind {
-                    OpKind::Number(value) => eval_stack.push(*value),
+                    OpKind::Number(value) => eval_stack.push(Ok(*value)),
                     OpKind::Symbol(name) => todo!(),
                     OpKind::Binary(operator) => {
                         let rhs = eval_stack.pop().unwrap();
-                        let lhs = eval_stack.last_mut().unwrap();
-                        *lhs = operator.const_eval(*lhs, rhs);
+                        let lhs = eval_stack.pop().unwrap();
+                        eval_stack.push(operator.const_eval(lhs, rhs));
                     }
                     OpKind::Unary(operator) => {
-                        let value = eval_stack.last_mut().unwrap();
-                        *value = operator.const_eval(*value);
+                        let value = eval_stack.pop().unwrap();
+                        eval_stack.push(operator.const_eval(value));
                     }
                 }
             }
             debug_assert_eq!(eval_stack.len(), 1);
-            Some(eval_stack[0])
+            eval_stack.pop().unwrap()
         }
     }
 }
@@ -126,46 +131,77 @@ operators! { // Sorted from lowest binding power (precedence), to highest.
     BinOp[right_assoc] Exponent("**");
 }
 
+/// Convenience function to turn a Rust boolean to rgbasm's equivalent.
+fn from_bool(b: bool) -> i32 {
+    if b {
+        1
+    } else {
+        0
+    }
+}
+
 impl BinOp {
-    fn const_eval(&self, lhs: i32, rhs: i32) -> i32 {
+    fn const_eval<'ctx_stack>(
+        &self,
+        lhs: Result<i32, Error<'ctx_stack>>,
+        rhs: Result<i32, Error<'ctx_stack>>,
+    ) -> Result<i32, Error<'ctx_stack>> {
+        // Most operators are "greedy", and require both operands to be known in order to be
+        // const-evaluable themselves.
+        macro_rules! greedy {
+            (|$left:ident, $right:ident| $res:expr) => {
+                match (lhs, rhs) {
+                    (Ok($left), Ok($right)) => $res,
+                    (Ok(_), Err(err)) | (Err(err), _) => Err(err),
+                }
+            };
+        };
+
         match self {
-            BinOp::LogicalOr => todo!(),
-            BinOp::LogicalAnd => todo!(),
-            BinOp::NotEqual => todo!(),
-            BinOp::Equal => todo!(),
-            BinOp::LessEq => todo!(),
-            BinOp::Less => todo!(),
-            BinOp::GreaterEq => todo!(),
-            BinOp::Greater => todo!(),
-            BinOp::Add => lhs.wrapping_add(rhs),
-            BinOp::Subtract => todo!(),
-            BinOp::And => todo!(),
-            BinOp::Or => todo!(),
-            BinOp::Xor => todo!(),
+            // These two operators are "lazy", so errors on the right-hand side are ignored if possible.
+            BinOp::LogicalOr => match (lhs, rhs) {
+                (Err(err), _) | (Ok(0), Err(err)) => Err(err),
+                (Ok(0), Ok(0)) => Ok(0),
+                (Ok(_), _) => Ok(1), // Either operand must be Ok(non_zero).
+            },
+            BinOp::LogicalAnd => match (lhs, rhs) {
+                (Ok(0), _) | (Ok(_), Ok(0)) => Ok(0),
+                (Ok(_), Ok(_)) => Ok(1),
+                (Ok(_), Err(err)) | (Err(err), _) => Err(err),
+            },
+            BinOp::NotEqual => greedy!(|lhs, rhs| Ok(from_bool(lhs != rhs))),
+            BinOp::Equal => greedy!(|lhs, rhs| Ok(from_bool(lhs == rhs))),
+            BinOp::LessEq => greedy!(|lhs, rhs| Ok(from_bool(lhs <= rhs))),
+            BinOp::Less => greedy!(|lhs, rhs| Ok(from_bool(lhs < rhs))),
+            BinOp::GreaterEq => greedy!(|lhs, rhs| Ok(from_bool(lhs >= rhs))),
+            BinOp::Greater => greedy!(|lhs, rhs| Ok(from_bool(lhs > rhs))),
+            BinOp::Add => greedy!(|lhs, rhs| Ok(lhs.wrapping_add(rhs))),
+            BinOp::Subtract => greedy!(|lhs, rhs| Ok(lhs.wrapping_sub(rhs))),
+            BinOp::And => greedy!(|lhs, rhs| Ok(lhs & rhs)),
+            BinOp::Or => greedy!(|lhs, rhs| Ok(lhs | rhs)),
+            BinOp::Xor => greedy!(|lhs, rhs| Ok(lhs ^ rhs)),
             BinOp::LeftShift => todo!(),
             BinOp::RightShift => todo!(),
             BinOp::UnsignedRightShift => todo!(),
-            BinOp::Multiply => (lhs as u32).wrapping_mul(rhs as u32) as i32,
+            BinOp::Multiply => greedy!(|lhs, rhs| Ok((lhs as u32).wrapping_mul(rhs as u32) as i32)),
             BinOp::Divide => todo!(),
             BinOp::Modulo => todo!(),
-            BinOp::Exponent => lhs.wrapping_pow(rhs as u32),
+            BinOp::Exponent => greedy!(|lhs, rhs| Ok(lhs.wrapping_pow(rhs as u32))),
         }
     }
 }
 
 impl UnOp {
-    fn const_eval(&self, value: i32) -> i32 {
+    fn const_eval<'ctx_stack>(
+        &self,
+        value: Result<i32, Error<'ctx_stack>>,
+    ) -> Result<i32, Error<'ctx_stack>> {
+        let map = |f: fn(i32) -> i32| value.map(f);
         match self {
-            UnOp::Complement => !value,
-            UnOp::Identity => value,
-            UnOp::Negation => -value,
-            UnOp::Not => {
-                if value == 0 {
-                    1
-                } else {
-                    0
-                }
-            }
+            UnOp::Complement => map(|n| !n),
+            UnOp::Identity => map(|n| n),
+            UnOp::Negation => map(|n| -n),
+            UnOp::Not => map(|n| if n == 0 { 1 } else { 0 }),
         }
     }
 }
@@ -174,7 +210,7 @@ macro_rules! operators {
     ($(
         $kind:ident $([$assoc:ident])? $first_name:ident $first_tok:tt $(, $name:ident $tok:tt)*
     );* $(;)?) => {
-        enum Precedence {$( $first_name, )*}
+        enum Precedence {$( $first_name, )*} // Only used to auto-gen incrementing values.
         binary_operators! {$( $kind $([$assoc])? $first_name $first_tok $(, $name $tok)* );*}
         unary_operators! {$( $kind $([$assoc])? $first_name $first_tok $(, $name $tok)* );*}
     };
@@ -184,6 +220,7 @@ macro_rules! binary_operators {
         $(BinOp[$assoc:ident] $first_name:ident($first_token:tt) $(, $name:ident($token:tt))*)?
         $(UnOp $($un_name:ident $un_tok:tt),+)?
     );*) => {
+        #[derive(Debug)]
         pub enum BinOp {
             $($( $first_name, $( $name, )*)?)*
         }
@@ -211,6 +248,7 @@ macro_rules! unary_operators {
         $(BinOp[$assoc:ident] $($bin_name:ident $bin_tok:tt),+)?
         $(UnOp $first_name:ident($first_token:tt) $(, $name:ident($token:tt))*)?
     );*) => {
+        #[derive(Debug)]
         pub enum UnOp {
             $($( $first_name, $( $name, )*)?)*
         }
