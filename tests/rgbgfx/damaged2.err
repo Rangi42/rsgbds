@@ -1,5 +1,5 @@
 error: Couldn't load the input image: invalid image data or unknown format
-   ╭─[[INPATH]:1:1]
+   ╭─[ [INPATH]:1:1 ]
    │
  1 │ 
 ───╯

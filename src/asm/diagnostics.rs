@@ -28,9 +28,8 @@ pub fn error<F: FnOnce(&mut ReportBuilder)>(
         return;
     }
 
-    let (src_id, byte_range) = span.resolve();
-    let mut error = Report::build(ERROR_KIND, src_id, byte_range.start)
-        .with_config(Config::new().with_index_type(IndexType::Byte));
+    let mut error = Report::build(ERROR_KIND, span.resolve())
+        .with_config(Config::default().with_index_type(IndexType::Byte));
     build(&mut error);
     error
         .finish()
@@ -39,7 +38,7 @@ pub fn error<F: FnOnce(&mut ReportBuilder)>(
     decrement_error_count(sources, nb_errors_left, options);
 }
 
-pub fn lex_error<F: FnOnce(ReportBuilder, (SourceHandle, Range<usize>)) -> ReportBuilder>(
+pub fn lex_error<F: FnOnce(ReportBuilder, RawSpan) -> ReportBuilder>(
     src_node: &SourceNode,
     byte_range: &Range<usize>,
     build: F,
@@ -51,11 +50,11 @@ pub fn lex_error<F: FnOnce(ReportBuilder, (SourceHandle, Range<usize>)) -> Repor
         return;
     }
 
-    let (src_id, byte_range) = src_node.resolve(byte_range);
+    let span = src_node.resolve(byte_range);
     build(
-        Report::build(ERROR_KIND, src_id, byte_range.start)
-            .with_config(Config::new().with_index_type(IndexType::Byte)),
-        (src_id, byte_range),
+        Report::build(ERROR_KIND, span.clone())
+            .with_config(Config::default().with_index_type(IndexType::Byte)),
+        span,
     )
     .finish()
     .eprint(sources)
@@ -67,8 +66,8 @@ fn decrement_error_count(sources: &SourceStore, nb_errors_left: &Cell<usize>, op
     nb_errors_left.set(nb_errors_left.get() - 1);
 
     if nb_errors_left.get() == 0 {
-        let (src_id, byte_range) = Span::BUILTIN.resolve();
-        Report::build(WARNING_KIND, src_id, byte_range.start)
+        let span = Span::BUILTIN.resolve();
+        Report::build(WARNING_KIND, span)
             .with_message(format!(
                 "Reached {} errors, any subsequent will not be printed",
                 options.max_errors,
@@ -102,9 +101,9 @@ pub fn warn<F: FnOnce(&mut ReportBuilder)>(
         return;
     }
 
-    let (src_id, byte_range) = span.resolve();
-    let mut warning = Report::build(kind, src_id, byte_range.start)
-        .with_config(Config::new().with_index_type(IndexType::Byte))
+    let span = span.resolve();
+    let mut warning = Report::build(kind, span)
+        .with_config(Config::default().with_index_type(IndexType::Byte))
         .with_code(id);
     build(&mut warning);
     warning

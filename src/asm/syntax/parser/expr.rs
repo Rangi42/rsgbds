@@ -1,6 +1,7 @@
 use rgbds::rpn::Rpn;
 
 use crate::{
+    context_stack::Span,
     diagnostics,
     expr::{BinOp, Expr, UnOp},
     syntax::tokens::{tok, Token, TokenPayload},

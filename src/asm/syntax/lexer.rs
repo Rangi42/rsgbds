@@ -23,7 +23,7 @@ use crate::{
     context_stack::{ContextStack, SourceContext, SourceNode, SourceRef, SourcesMut, Span},
     diagnostics,
     format::FormatSpec,
-    source_store::{ReportBuilder, SourceHandle, SourceStore},
+    source_store::{RawSpan, ReportBuilder, SourceHandle, SourceStore},
     symbols::Symbols,
     syntax::tokens::{tok, Token, TokenPayload, KEYWORDS},
     Options,
@@ -427,7 +427,7 @@ fn discard_block_comment(
                         params.warning_at(
                             marker_start..params.src_ctx.lexer_state().cursor,
                             |warning, span| {
-                                let source_handle = span.0;
+                                let source_handle = span.source;
                                 warning
                                     .with_message("Block comment opening marker found inside of a block comment")
                                     .with_labels([
@@ -755,12 +755,13 @@ pub fn next_token_raw(
                 let Some(ch) = peek(params, false, false)
                     .and_then(|ch| (multiline || !matches!(ch, chars!(newline))).then_some(ch))
                 else {
-                    params.error(start, |error, (handle, range)| {
+                    params.error(start, |error, mut span| {
+                        span.byte_range.end = span.byte_range.start + '"'.len_utf8();
                         error
                             .with_message("Unterminated string literal")
                             .with_label(
-                                diagnostics::error_label((handle, range.start..range.start + 1))
-                                    .with_message("The string begun here"),
+                                diagnostics::error_label(span)
+                                    .with_message("The string began here"),
                             )
                     });
                     return;
@@ -971,13 +972,11 @@ fn read_interpolation(
                     }
                 }
                 None | Some('\r' | '\n' | '"') => {
-                    params.error(start, |error, (src_id, byte_range)| {
+                    params.error(start, |error, mut span| {
+                        span.byte_range.end = span.byte_range.start + '{'.len_utf8();
                         error.with_message("Unterminated interpolation").with_label(
-                            diagnostics::error_label((
-                                src_id,
-                                byte_range.start..byte_range.start + 1, // Braces are 1-byte.
-                            ))
-                            .with_message("This brace is never closed"),
+                            diagnostics::error_label(span)
+                                .with_message("This brace is never closed"),
                         )
                     });
                     return None;
@@ -990,16 +989,14 @@ fn read_interpolation(
                     let start = loc(params.src_ctx);
                     consume_char(params.src_ctx, ':');
                     if fmt.is_finished() {
-                        params.error(start, |error, (src_id, byte_range)| {
+                        params.error(start, |error, mut span| {
                             // TODO: would be nice to highlight the other colon
+                            span.byte_range.start = span.byte_range.end - ':'.len_utf8();
                             error
                                 .with_message("A format spec has already been provided")
                                 .with_label(
-                                    diagnostics::error_label((
-                                        src_id,
-                                        byte_range.end - 1..byte_range.end,
-                                    ))
-                                    .with_message("Second colon here"),
+                                    diagnostics::error_label(span)
+                                        .with_message("Second colon here"),
                                 )
                         });
                     } else {
@@ -1022,15 +1019,13 @@ fn read_interpolation(
             let mut chars = name.chars();
             match chars.next() {
                 None => {
-                    params.error(start, |error, (src_id, byte_range)| {
+                    params.error(start, |error, mut span| {
+                        span.byte_range.start = span.byte_range.end - '}'.len_utf8();
                         error
                             .with_message("Missing symbol name in this interpolation")
                             .with_label(
-                                diagnostics::error_label((
-                                    src_id,
-                                    byte_range.end - 1..byte_range.end,
-                                ))
-                                .with_message("Missing before this brace"),
+                                diagnostics::error_label(span)
+                                    .with_message("Missing before this brace"),
                             )
                     });
                     return None;
@@ -1190,7 +1185,7 @@ fn span<'ctx_stack>(
     }
 }
 impl LexParams<'_, '_, '_, '_, '_, '_> {
-    fn error_at<F: FnOnce(ReportBuilder, (SourceHandle, Range<usize>)) -> ReportBuilder>(
+    fn error_at<F: FnOnce(ReportBuilder, RawSpan) -> ReportBuilder>(
         &self,
         byte_range: Range<usize>,
         build: F,
@@ -1205,7 +1200,7 @@ impl LexParams<'_, '_, '_, '_, '_, '_> {
         );
     }
 
-    fn error<F: FnOnce(ReportBuilder, (SourceHandle, Range<usize>)) -> ReportBuilder>(
+    fn error<F: FnOnce(ReportBuilder, RawSpan) -> ReportBuilder>(
         &self,
         start: (NonZeroUsize, usize),
         build: F,
@@ -1214,7 +1209,7 @@ impl LexParams<'_, '_, '_, '_, '_, '_> {
         self.error_at(start.1..end, build);
     }
 
-    fn warning_at<F: FnOnce(ReportBuilder, (SourceHandle, Range<usize>)) -> ReportBuilder>(
+    fn warning_at<F: FnOnce(ReportBuilder, RawSpan) -> ReportBuilder>(
         &self,
         byte_range: Range<usize>,
         build: F,
@@ -1222,7 +1217,7 @@ impl LexParams<'_, '_, '_, '_, '_, '_> {
         todo!();
     }
 
-    fn warning<F: FnOnce(ReportBuilder, (SourceHandle, Range<usize>)) -> ReportBuilder>(
+    fn warning<F: FnOnce(ReportBuilder, RawSpan) -> ReportBuilder>(
         &self,
         start: (NonZeroUsize, usize),
         build: F,

@@ -14,7 +14,7 @@ pub type Report = ariadne::Report<'static, FilelessReports>;
 pub type ReportBuilder = ariadne::ReportBuilder<'static, FilelessReports>;
 
 pub fn new_report(kind: ReportKind) -> ariadne::ReportBuilder<'_, FilelessReports> {
-    Report::build(kind, (), 0)
+    Report::build(kind, FilelessReports)
 }
 
 pub const ERROR_KIND: ReportKind = ReportKind::Custom("error", Color::Red);

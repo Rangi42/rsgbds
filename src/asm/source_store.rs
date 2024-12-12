@@ -105,8 +105,8 @@ impl SourceSlice {
 // This `Span` should not be used outside of diagnostic management.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RawSpan {
-    source: SourceHandle,
-    byte_range: Range<usize>,
+    pub source: SourceHandle,
+    pub byte_range: Range<usize>,
 }
 
 impl SourceHandle {

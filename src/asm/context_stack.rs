@@ -10,7 +10,7 @@ use string_interner::symbol::SymbolUsize;
 
 use crate::{
     macro_args::MacroArgs,
-    source_store::{SourceHandle, SourceSlice, SourceStore},
+    source_store::{RawSpan, SourceHandle, SourceSlice, SourceStore},
     syntax::lexer::LexerState,
 };
 
@@ -144,14 +144,14 @@ impl Span<'_> {
         byte_span: 1..1,
     };
 
-    pub fn resolve(&self) -> (SourceHandle, Range<usize>) {
+    pub fn resolve(&self) -> RawSpan {
         if let Some(src) = &self.src {
             src.get().resolve(&self.byte_span)
         } else if self.byte_span == Span::BUILTIN.byte_span {
-            (SourceHandle::BUILTIN, 0..0)
+            (SourceHandle::BUILTIN, 0..0).into()
         } else {
             debug_assert_eq!(self.byte_span, Span::COMMAND_LINE.byte_span);
-            (SourceHandle::COMMAND_LINE, 0..0)
+            (SourceHandle::COMMAND_LINE, 0..0).into()
         }
     }
 
@@ -166,16 +166,16 @@ impl Span<'_> {
 }
 
 impl SourceNode {
-    pub fn resolve(&self, byte_span: &Range<usize>) -> (SourceHandle, Range<usize>) {
+    pub fn resolve(&self, byte_span: &Range<usize>) -> RawSpan {
         fn offset_by(byte_span: &Range<usize>, buffer_slice: &Range<usize>) -> Range<usize> {
             debug_assert!(byte_span.end <= buffer_slice.len());
             byte_span.start + buffer_slice.start..byte_span.end + buffer_slice.start
         }
 
         match &self.kind {
-            SourceKind::File(handle) => (*handle, byte_span.clone()),
-            SourceKind::Macro { file, slice, .. } => (*file, offset_by(byte_span, slice)),
-            SourceKind::Rept { file, slice, .. } => (*file, offset_by(byte_span, slice)),
+            SourceKind::File(handle) => (*handle, byte_span.clone()).into(),
+            SourceKind::Macro { file, slice, .. } => (*file, offset_by(byte_span, slice)).into(),
+            SourceKind::Rept { file, slice, .. } => (*file, offset_by(byte_span, slice)).into(),
         }
     }
 }
