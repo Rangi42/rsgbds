@@ -21,6 +21,7 @@ use compact_str::CompactString;
 use crate::{
     context_stack::{ContextStack, Span},
     diagnostics::{self, warning},
+    expr::Expr,
     macro_args::MacroArgs,
     source_store::{RawSpan, SourceHandle, SourceStore},
     symbols::Symbols,
@@ -247,13 +248,11 @@ pub fn parse_file<'ctx_stack>(
                 tok!("pops") => todo!(),
                 tok!("println") => {
                     let (expr, lookahead) =
-                        expr::parse_numeric_expr(parse_ctx.next_token(), &mut parse_ctx);
-                    println!(
-                        "{}",
-                        expr.expect("No expr")
-                            .try_const_eval()
-                            .expect("Const evail fail")
-                    );
+                        expr::expect_numeric_expr(parse_ctx.next_token(), &mut parse_ctx);
+                    match expr.try_const_eval() {
+                        Err(error) => parse_ctx.report_expr_error(error),
+                        Ok(n) => println!("{n}"),
+                    };
                 }
                 tok!("print") => todo!(),
                 tok!("purge") => todo!(),
@@ -334,6 +333,20 @@ impl<'ctx_stack> ParseCtx<'ctx_stack, '_, '_, '_, '_> {
         )
     }
 
+    fn current_span(&self) -> Span<'ctx_stack> {
+        lexer::current_span(self.ctx_stack)
+    }
+    fn extended_to(
+        &self,
+        span: &Span<'ctx_stack>,
+        token: Option<&Token<'ctx_stack>>,
+    ) -> Span<'ctx_stack> {
+        match token {
+            Some(tok) => span.merged_with(&tok.span),
+            None => span.merged_with(&self.current_span()),
+        }
+    }
+
     fn report_syntax_error<F: FnOnce(&mut ReportBuilder<'_, RawSpan>, &Span)>(
         &self,
         token: Option<&Token>,
@@ -344,14 +357,14 @@ impl<'ctx_stack> ParseCtx<'ctx_stack, '_, '_, '_, '_> {
                 span,
                 |error| {
                     error.set_message(format!("Syntax error: unexpected {payload}"));
-                    callback(error, &span);
+                    callback(error, span);
                 },
                 self.sources,
                 self.nb_errors_remaining,
                 self.options,
             ),
             None => {
-                let span = lexer::current_span(self.ctx_stack);
+                let span = self.current_span();
                 diagnostics::error(
                     &span,
                     |error| {
@@ -364,5 +377,8 @@ impl<'ctx_stack> ParseCtx<'ctx_stack, '_, '_, '_, '_> {
                 );
             }
         }
+    }
+    fn report_expr_error(&self, error: crate::expr::Error<'ctx_stack>) {
+        error.report(self.sources, self.nb_errors_remaining, self.options);
     }
 }

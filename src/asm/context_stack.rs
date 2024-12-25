@@ -80,7 +80,7 @@ pub enum LoopState {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Span<'ctx_stack> {
     pub src: Option<SourceRef<'ctx_stack>>,
     pub byte_span: Range<usize>,

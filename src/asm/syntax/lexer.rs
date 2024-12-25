@@ -116,6 +116,7 @@ pub fn current_span(ctx_stack: &ContextStack) -> Span<'_> {
         .active_context()
         .expect("Called `current_span` with no active context");
     let (src_idx, start) = loc(src_ctx);
+    drop(sources);
     Span {
         src: Some(SourceRef::new(ctx_stack, src_idx)),
         byte_span: start..(start + 1),

@@ -1,7 +1,12 @@
+use std::cell::Cell;
+
 use crate::{
     context_stack::Span,
+    diagnostics,
+    source_store::SourceStore,
     symbols::SymName,
     syntax::tokens::{tok, TokenPayload},
+    Options,
 };
 
 #[derive(Debug)]
@@ -24,6 +29,8 @@ enum OpKind {
     Symbol(SymName),
     Binary(BinOp),
     Unary(UnOp),
+    /// Placeholder of sorts.
+    Nothing,
 }
 
 #[derive(Debug)]
@@ -36,15 +43,20 @@ pub struct Error<'ctx_stack> {
 enum ErrKind {
     SymNotFound,
     DivBy0,
+    // TODO: not sure this makes sense
+    NoExpr,
 }
 
 impl<'ctx_stack> Expr<'ctx_stack> {
-    pub fn nothing() -> Self {
-        Self { payload: vec![] }
-    }
-
     fn from_terminal(op: Op<'ctx_stack>) -> Self {
         Self { payload: vec![op] }
+    }
+
+    pub fn nothing(span: Span<'ctx_stack>) -> Self {
+        Self::from_terminal(Op {
+            span,
+            kind: OpKind::Nothing,
+        })
     }
 
     pub fn number(number: i32, span: Span<'ctx_stack>) -> Self {
@@ -91,31 +103,38 @@ impl<'ctx_stack> Expr<'ctx_stack> {
     }
 }
 
-impl Expr<'_> {
+impl<'ctx_stack> Expr<'ctx_stack> {
     // TODO: there may be more than one reason!
-    pub fn try_const_eval(&self) -> Result<i32, Error> {
-        if self.payload.is_empty() {
-            Err(todo!())
-        } else {
-            let mut eval_stack = vec![];
-            for op in &self.payload {
-                match &op.kind {
-                    OpKind::Number(value) => eval_stack.push(Ok(*value)),
-                    OpKind::Symbol(name) => todo!(),
-                    OpKind::Binary(operator) => {
-                        let rhs = eval_stack.pop().unwrap();
-                        let lhs = eval_stack.pop().unwrap();
-                        eval_stack.push(operator.const_eval(lhs, rhs));
-                    }
-                    OpKind::Unary(operator) => {
-                        let value = eval_stack.pop().unwrap();
-                        eval_stack.push(operator.const_eval(value));
-                    }
+    pub fn try_const_eval(&self) -> Result<i32, Error<'ctx_stack>> {
+        debug_assert!(!self.payload.is_empty());
+        let mut eval_stack = vec![];
+        for op in &self.payload {
+            match &op.kind {
+                OpKind::Number(value) => eval_stack.push(Ok(*value)),
+                OpKind::Symbol(name) => todo!(),
+                OpKind::Binary(operator) => {
+                    let rhs = eval_stack.pop().unwrap();
+                    let lhs = eval_stack.pop().unwrap();
+                    eval_stack.push(operator.const_eval(lhs, rhs));
+                }
+                OpKind::Unary(operator) => {
+                    let value = eval_stack.pop().unwrap();
+                    eval_stack.push(operator.const_eval(value));
+                }
+                OpKind::Nothing => {
+                    eval_stack.push(Err(Error {
+                        span: op.span.clone(),
+                        kind: ErrKind::NoExpr,
+                    }));
                 }
             }
-            debug_assert_eq!(eval_stack.len(), 1);
-            eval_stack.pop().unwrap()
         }
+        debug_assert_eq!(eval_stack.len(), 1);
+        eval_stack.pop().unwrap()
+    }
+
+    pub fn first_span(&self) -> &Span<'ctx_stack> {
+        &self.payload[0].span
     }
 }
 
@@ -184,7 +203,10 @@ impl BinOp {
             BinOp::RightShift => todo!(),
             BinOp::UnsignedRightShift => todo!(),
             BinOp::Multiply => greedy!(|lhs, rhs| Ok((lhs as u32).wrapping_mul(rhs as u32) as i32)),
-            BinOp::Divide => todo!(),
+            BinOp::Divide => greedy!(|lhs, rhs| lhs.checked_div(rhs).ok_or_else(|| Error {
+                span: todo!(),
+                kind: ErrKind::DivBy0
+            })),
             BinOp::Modulo => todo!(),
             BinOp::Exponent => greedy!(|lhs, rhs| Ok(lhs.wrapping_pow(rhs as u32))),
         }
@@ -203,6 +225,21 @@ impl UnOp {
             UnOp::Negation => map(|n| -n),
             UnOp::Not => map(|n| if n == 0 { 1 } else { 0 }),
         }
+    }
+}
+
+impl Error<'_> {
+    pub fn report(&self, sources: &SourceStore, nb_errors_left: &Cell<usize>, options: &Options) {
+        diagnostics::error(
+            &self.span,
+            |error| {
+                error.set_message("TODO");
+                error.add_label(diagnostics::error_label(self.span.resolve()).with_message("TODO"))
+            },
+            sources,
+            nb_errors_left,
+            options,
+        )
     }
 }
 
