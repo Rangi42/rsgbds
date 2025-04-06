@@ -81,218 +81,254 @@ pub fn parse_file<'ctx_stack>(
 
     ctx_stack.sources_mut().push_file_context(source);
     while ctx_stack.sources_mut().active_context().is_some() {
-        while let Some(mut first_token) = parse_ctx.next_token() {
-            // TODO: handle leading diff marks
-            // TODO: handle Git conflict markers
-            if let tok!("identifier"(ident)) = first_token.payload {
-                // Identifiers at the beginning of the line can be two things.
-                // Either a label name, if it's *directly* followed by a colon; or the name of a macro.
-                if parse_ctx.is_next_char_a_colon() {
-                    expect_one_of!(parse_ctx.next_token() => {
-                        None => unreachable!(),
-                        |":"| => {
-                            // TODO
-                            eprintln!("Defining label {}", parse_ctx.symbols.resolve(ident));
-                            match parse_ctx.next_token() {
-                                Some(token) => first_token = token,
-                                None => break,
-                            };
-                        },
-                        |"::"| => {
-                            // TODO
-                            eprintln!("Defining exported label {}", parse_ctx.symbols.resolve(ident));
-                            match parse_ctx.next_token() {
-                                Some(token) => first_token = token,
-                                None => break,
-                            };
-                        },
-                        else |token, _expected| => {
-                            // Try continuing the parse with this token as the first in the line.
-                            // We know the token can't be empty, because the lexer just reported that its next character would be a colon.
-                            first_token = token.unwrap();
-                        }
-                    });
-                }
-
-                // TODO: handle directives that cannot be preceded by a label def.
-            }
-
-            match first_token.payload {
-                tok!("end of line") => {} // Empty line.
-
-                tok!("identifier"(ident)) => {
-                    // Macro call.
-                    // Get the macro's arguments.
-                    let args = Rc::new(MacroArgs::new(
-                        std::iter::from_fn(|| parse_ctx.next_token_raw()).collect(),
-                    ));
-
-                    // TODO: consume the newline, if `next_raw` doesn't already?
-
-                    let name = parse_ctx.symbols.resolve(ident);
-                    match parse_ctx.symbols.find_macro_interned(&ident) {
-                        None => diagnostics::error(
-                            &first_token.span,
-                            |error| {
-                                error.set_message(format!("Macro `{name}` does not exist"));
-                                error.add_label(
-                                    diagnostics::error_label(first_token.span.resolve())
-                                        .with_message("Attempting to call the macro here"),
-                                );
-                            },
-                            sources,
-                            nb_errors_remaining,
-                            options,
-                        ),
-                        Some(Err(other)) => diagnostics::error(
-                            &first_token.span,
-                            |error| {
-                                error.set_message(format!("`{name}` is not a macro"));
-                                error.add_label(
-                                    diagnostics::error_label(first_token.span.resolve())
-                                        .with_message("Attempting to call the macro here"),
-                                );
-                            },
-                            sources,
-                            nb_errors_remaining,
-                            options,
-                        ),
-                        Some(Ok(slice)) => {
-                            ctx_stack
-                                .sources_mut()
-                                .push_macro_context(name.into(), slice, args)
-                        }
-                    }
-                }
-
-                // These are not valid after a label.
-                tok!("macro") => todo!(),
-                tok!("endm") => todo!(),
-                tok!("rept") => todo!(),
-                tok!("for") => todo!(),
-                tok!("endr") => todo!(),
-                tok!("if") => todo!(),
-                tok!("elif") => todo!(),
-                tok!("else") => todo!(),
-                tok!("endc") => todo!(),
-
-                tok!("adc") => todo!(),
-                tok!("add") => todo!(),
-                tok!("and") => todo!(),
-                tok!("bit") => todo!(),
-                tok!("call") => todo!(),
-                tok!("ccf") => todo!(),
-                tok!("cp") => todo!(),
-                tok!("cpl") => todo!(),
-                tok!("daa") => todo!(),
-                tok!("dec") => todo!(),
-                tok!("di") => todo!(),
-                tok!("ei") => todo!(),
-                tok!("halt") => todo!(),
-                tok!("inc") => todo!(),
-                tok!("jp") => todo!(),
-                tok!("jr") => todo!(),
-                tok!("ldd") => todo!(),
-                tok!("ldh") => todo!(),
-                tok!("ldi") => todo!(),
-                tok!("ld") => todo!(),
-                tok!("nop") => todo!(),
-                tok!("or") => todo!(),
-                tok!("pop") => todo!(),
-                tok!("push") => todo!(),
-                tok!("res") => todo!(),
-                tok!("reti") => todo!(),
-                tok!("ret") => todo!(),
-                tok!("rla") => todo!(),
-                tok!("rlca") => todo!(),
-                tok!("rlc") => todo!(),
-                tok!("rl") => todo!(),
-                tok!("rra") => todo!(),
-                tok!("rrca") => todo!(),
-                tok!("rrc") => todo!(),
-                tok!("rr") => todo!(),
-                tok!("rst") => todo!(),
-                tok!("sbc") => todo!(),
-                tok!("scf") => todo!(),
-                tok!("set") => todo!(),
-                tok!("sla") => todo!(),
-                tok!("sra") => todo!(),
-                tok!("srl") => todo!(),
-                tok!("stop") => todo!(),
-                tok!("sub") => todo!(),
-                tok!("swap") => todo!(),
-                tok!("xor") => todo!(),
-
-                tok!("align") => todo!(),
-                tok!("assert") => todo!(),
-                tok!("break") => todo!(),
-                tok!("charmap") => todo!(),
-                tok!("db") => todo!(),
-                tok!("dl") => todo!(),
-                tok!("ds") => todo!(),
-                tok!("dw") => todo!(),
-                tok!("endsection") => todo!(),
-                tok!("endl") => todo!(),
-                tok!("endu") => todo!(),
-                tok!("export") => todo!(),
-                tok!("fail") => todo!(),
-                tok!("fatal") => todo!(),
-                tok!("incbin") => todo!(),
-                tok!("include") => todo!(),
-                tok!("load") => todo!(),
-                tok!("newcharmap") => todo!(),
-                tok!("nextu") => todo!(),
-                tok!("opt") => todo!(),
-                tok!("popc") => todo!(),
-                tok!("popo") => todo!(),
-                tok!("pops") => todo!(),
-                tok!("println") => {
-                    let (expr, lookahead) =
-                        expr::expect_numeric_expr(parse_ctx.next_token(), &mut parse_ctx);
-                    match expr.try_const_eval() {
-                        Err(error) => parse_ctx.report_expr_error(error),
-                        Ok(n) => println!("{n}"),
-                    };
-                }
-                tok!("print") => todo!(),
-                tok!("purge") => todo!(),
-                tok!("pushc") => todo!(),
-                tok!("pusho") => todo!(),
-                tok!("pushs") => todo!(),
-                tok!("rb") => todo!(),
-                tok!("rw") => todo!(),
-                tok!("redef") => todo!(),
-                tok!("rsreset") => todo!(),
-                tok!("rsset") => todo!(),
-                tok!("section") => todo!(),
-                tok!("setcharmap") => todo!(),
-                tok!("shift") => todo!(),
-                tok!("static_assert") => todo!(),
-                tok!("union") => todo!(),
-                tok!("warn") => todo!(),
-
-                _ => {
-                    parse_ctx.report_syntax_error(Some(&first_token), |error, span| {
-                        error.add_label(
-                            diagnostics::error_label(span.resolve())
-                                .with_message("Expected an instruction or a directive here"),
-                        )
-                    });
-
-                    // Discard the rest of the line.
-                    while let Some(token) = parse_ctx.next_token() {
-                        if matches!(token.payload, tok!("end of line")) {
-                            break;
-                        }
-                    }
-                }
-            }
+        while let Some(first_token) = parse_ctx.next_token() {
+            parse_line(
+                first_token,
+                &mut parse_ctx,
+                sources,
+                nb_errors_remaining,
+                options,
+                ctx_stack,
+            );
         }
 
         // We're done parsing from this context, so end it.
         // (This will make REPT/FOR loop if possible, and pop everything else.)
         ctx_stack.sources_mut().end_current_context();
     }
+}
+
+fn parse_line<'ctx_stack>(
+    mut first_token: Token<'ctx_stack>,
+    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
+    sources: &SourceStore,
+    nb_errors_remaining: &Cell<usize>,
+    options: &Options,
+    ctx_stack: &'ctx_stack ContextStack,
+) {
+    // TODO: handle leading diff marks
+    // TODO: handle Git conflict markers
+    if let tok!("identifier"(ident)) = first_token.payload {
+        // Identifiers at the beginning of the line can be two things.
+        // Either a label name, if it's *directly* followed by a colon; or the name of a macro.
+        if parse_ctx.is_next_char_a_colon() {
+            expect_one_of!(parse_ctx.next_token() => {
+                None => unreachable!(),
+                |":"| => {
+                    // TODO
+                    eprintln!("Defining label {}", parse_ctx.symbols.resolve(ident));
+                    match parse_ctx.next_token() {
+                        Some(token) => first_token = token,
+                        None => return,
+                    };
+                },
+                |"::"| => {
+                    // TODO
+                    eprintln!("Defining exported label {}", parse_ctx.symbols.resolve(ident));
+                    match parse_ctx.next_token() {
+                        Some(token) => first_token = token,
+                        None => return,
+                    };
+                },
+                else |token, _expected| => {
+                    // Try continuing the parse with this token as the first in the line.
+                    // We know the token can't be empty, because the lexer just reported that its next character would be a colon.
+                    first_token = token.unwrap();
+                }
+            });
+        }
+
+        // TODO: handle directives that cannot be preceded by a label def.
+    }
+
+    let eol_token = match first_token.payload {
+        tok!("end of line") => Some(first_token), // Empty line.
+
+        tok!("identifier"(ident)) => {
+            // Macro call.
+            // Get the macro's arguments.
+            let args = Rc::new(MacroArgs::new(
+                std::iter::from_fn(|| parse_ctx.next_token_raw()).collect(),
+            ));
+
+            // TODO: consume the newline, if `next_raw` doesn't already?
+
+            let name = parse_ctx.symbols.resolve(ident);
+            match parse_ctx.symbols.find_macro_interned(&ident) {
+                None => diagnostics::error(
+                    &first_token.span,
+                    |error| {
+                        error.set_message(format!("Macro `{name}` does not exist"));
+                        error.add_label(
+                            diagnostics::error_label(first_token.span.resolve())
+                                .with_message("Attempting to call the macro here"),
+                        );
+                    },
+                    sources,
+                    nb_errors_remaining,
+                    options,
+                ),
+                Some(Err(other)) => diagnostics::error(
+                    &first_token.span,
+                    |error| {
+                        error.set_message(format!("`{name}` is not a macro"));
+                        error.add_label(
+                            diagnostics::error_label(first_token.span.resolve())
+                                .with_message("Attempting to call the macro here"),
+                        );
+                    },
+                    sources,
+                    nb_errors_remaining,
+                    options,
+                ),
+                Some(Ok(slice)) => {
+                    ctx_stack
+                        .sources_mut()
+                        .push_macro_context(name.into(), slice, args)
+                }
+            }
+            todo!()
+        }
+
+        // These are not valid after a label.
+        tok!("macro") => todo!(),
+        tok!("endm") => todo!(),
+        tok!("rept") => todo!(),
+        tok!("for") => todo!(),
+        tok!("endr") => todo!(),
+        tok!("if") => todo!(),
+        tok!("elif") => todo!(),
+        tok!("else") => todo!(),
+        tok!("endc") => todo!(),
+
+        tok!("adc") => todo!(),
+        tok!("add") => todo!(),
+        tok!("and") => todo!(),
+        tok!("bit") => todo!(),
+        tok!("call") => todo!(),
+        tok!("ccf") => todo!(),
+        tok!("cp") => todo!(),
+        tok!("cpl") => todo!(),
+        tok!("daa") => todo!(),
+        tok!("dec") => todo!(),
+        tok!("di") => todo!(),
+        tok!("ei") => todo!(),
+        tok!("halt") => todo!(),
+        tok!("inc") => todo!(),
+        tok!("jp") => todo!(),
+        tok!("jr") => todo!(),
+        tok!("ldd") => todo!(),
+        tok!("ldh") => todo!(),
+        tok!("ldi") => todo!(),
+        tok!("ld") => todo!(),
+        tok!("nop") => todo!(),
+        tok!("or") => todo!(),
+        tok!("pop") => todo!(),
+        tok!("push") => todo!(),
+        tok!("res") => todo!(),
+        tok!("reti") => todo!(),
+        tok!("ret") => todo!(),
+        tok!("rla") => todo!(),
+        tok!("rlca") => todo!(),
+        tok!("rlc") => todo!(),
+        tok!("rl") => todo!(),
+        tok!("rra") => todo!(),
+        tok!("rrca") => todo!(),
+        tok!("rrc") => todo!(),
+        tok!("rr") => todo!(),
+        tok!("rst") => todo!(),
+        tok!("sbc") => todo!(),
+        tok!("scf") => todo!(),
+        tok!("set") => todo!(),
+        tok!("sla") => todo!(),
+        tok!("sra") => todo!(),
+        tok!("srl") => todo!(),
+        tok!("stop") => todo!(),
+        tok!("sub") => todo!(),
+        tok!("swap") => todo!(),
+        tok!("xor") => todo!(),
+
+        tok!("align") => todo!(),
+        tok!("assert") => todo!(),
+        tok!("break") => todo!(),
+        tok!("charmap") => todo!(),
+        tok!("db") => todo!(),
+        tok!("dl") => todo!(),
+        tok!("ds") => todo!(),
+        tok!("dw") => todo!(),
+        tok!("endsection") => todo!(),
+        tok!("endl") => todo!(),
+        tok!("endu") => todo!(),
+        tok!("export") => todo!(),
+        tok!("fail") => todo!(),
+        tok!("fatal") => todo!(),
+        tok!("incbin") => todo!(),
+        tok!("include") => todo!(),
+        tok!("load") => todo!(),
+        tok!("newcharmap") => todo!(),
+        tok!("nextu") => todo!(),
+        tok!("opt") => todo!(),
+        tok!("popc") => todo!(),
+        tok!("popo") => todo!(),
+        tok!("pops") => todo!(),
+        tok!("println") => {
+            let (expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
+            match expr.try_const_eval() {
+                Err(error) => parse_ctx.report_expr_error(error),
+                Ok(n) => println!("{n}"),
+            };
+            lookahead
+        }
+        tok!("print") => todo!(),
+        tok!("purge") => todo!(),
+        tok!("pushc") => todo!(),
+        tok!("pusho") => todo!(),
+        tok!("pushs") => todo!(),
+        tok!("rb") => todo!(),
+        tok!("rw") => todo!(),
+        tok!("redef") => todo!(),
+        tok!("rsreset") => todo!(),
+        tok!("rsset") => todo!(),
+        tok!("section") => todo!(),
+        tok!("setcharmap") => todo!(),
+        tok!("shift") => todo!(),
+        tok!("static_assert") => todo!(),
+        tok!("union") => todo!(),
+        tok!("warn") => todo!(),
+
+        _ => {
+            parse_ctx.report_syntax_error(Some(&first_token), |error, span| {
+                error.add_label(
+                    diagnostics::error_label(span.resolve())
+                        .with_message("Expected an instruction or a directive here"),
+                )
+            });
+
+            // Discard the rest of the line.
+            loop {
+                match parse_ctx.next_token() {
+                    None => break None,
+                    Some(
+                        token @ Token {
+                            payload: tok!("end of line"),
+                            ..
+                        },
+                    ) => break Some(token),
+                    Some(_) => {}
+                }
+            }
+        }
+    };
+
+    expect_one_of!(eol_token => {
+        None => {},
+        |"end of line"| => {},
+        else |unexpected| => {
+            parse_ctx.report_syntax_error(unexpected.as_ref(), |error, span| {
+                error.add_label(diagnostics::error_label(span.resolve()).with_message("Expected nothing else on this line"))
+            });
+        }
+    })
 }
 
 struct ParseCtx<'ctx_stack, 'sources, 'symbols, 'nb_errs, 'options> {
