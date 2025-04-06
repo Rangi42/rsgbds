@@ -106,8 +106,31 @@ fn parse_line<'ctx_stack>(
     options: &Options,
     ctx_stack: &'ctx_stack ContextStack,
 ) {
-    // TODO: handle leading diff marks
-    // TODO: handle Git conflict markers
+    match &first_token.payload {
+        tok!("+") | tok!("-") => {
+            diagnostics::error(
+                &first_token.span,
+                |error| {
+                    error.set_message("Leftover diff marker");
+                    error.add_label(
+                        diagnostics::error_label(first_token.span.resolve())
+                            .with_message("Extraneous character here"),
+                    );
+                    error.set_help("Consider applying patches using `patch` or `git apply`");
+                },
+                sources,
+                nb_errors_remaining,
+                options,
+            );
+            match parse_ctx.next_token() {
+                None => return,
+                Some(token) => first_token = token,
+            };
+        }
+        // TODO: handle Git conflict markers
+        _ => {}
+    }
+
     if let tok!("identifier"(ident)) = first_token.payload {
         // Identifiers at the beginning of the line can be two things.
         // Either a label name, if it's *directly* followed by a colon; or the name of a macro.
