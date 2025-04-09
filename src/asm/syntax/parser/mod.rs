@@ -138,6 +138,7 @@ fn parse_line<'ctx_stack>(
             expect_one_of!(parse_ctx.next_token() => {
                 None => unreachable!(),
                 |":"| => {
+                    parse_ctx.symbols;
                     // TODO
                     eprintln!("Defining label {}", parse_ctx.symbols.resolve(ident));
                     match parse_ctx.next_token() {

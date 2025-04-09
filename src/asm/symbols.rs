@@ -241,14 +241,10 @@ impl<'ctx_stack> Symbols<'ctx_stack> {
                         exported: previously_exported,
                         ..
                     } if matches!(kind, SymbolKind::Label | SymbolKind::Numeric { .. }) => {
-                        // It should be impossible for references to be marked as exported.
-                        // TODO: even when you purge an exported symbol referenced in a link-time expression?
-                        debug_assert!(!*previously_exported);
-
                         *existing = SymbolData::User {
                             definition,
                             kind,
-                            exported,
+                            exported: exported || *previously_exported,
                         };
                         Ok(())
                     }
