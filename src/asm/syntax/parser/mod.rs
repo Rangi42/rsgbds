@@ -138,17 +138,14 @@ fn parse_line<'ctx_stack>(
             expect_one_of!(parse_ctx.next_token() => {
                 None => unreachable!(),
                 |":"| => {
-                    parse_ctx.symbols;
-                    // TODO
-                    eprintln!("Defining label {}", parse_ctx.symbols.resolve(ident));
+                    parse_ctx.symbols.define_label(ident, first_token.span, false, parse_ctx.sources, parse_ctx.nb_errors_remaining, parse_ctx.options);
                     match parse_ctx.next_token() {
                         Some(token) => first_token = token,
                         None => return,
                     };
                 },
                 |"::"| => {
-                    // TODO
-                    eprintln!("Defining exported label {}", parse_ctx.symbols.resolve(ident));
+                    parse_ctx.symbols.define_label(ident, first_token.span, true, parse_ctx.sources, parse_ctx.nb_errors_remaining, parse_ctx.options);
                     match parse_ctx.next_token() {
                         Some(token) => first_token = token,
                         None => return,
@@ -196,10 +193,12 @@ fn parse_line<'ctx_stack>(
                     &first_token.span,
                     |error| {
                         error.set_message(format!("`{name}` is not a macro"));
-                        error.add_label(
+                        error.add_labels([
                             diagnostics::error_label(first_token.span.resolve())
-                                .with_message("Attempting to call the macro here"),
-                        );
+                                .with_message("Macro call here"),
+                            diagnostics::note_label(other.def_span().resolve())
+                                .with_message("A symbol by this name was defined here"),
+                        ]);
                     },
                     sources,
                     nb_errors_remaining,

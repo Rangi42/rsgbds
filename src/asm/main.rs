@@ -86,7 +86,14 @@ fn run(options: Options, input_path: PathBuf, defines: Vec<String>) -> Result<()
             }),
             None => (symbols.intern_name(define), CompactString::const_new("1")),
         };
-        symbols.define_string_interned(name, Span::COMMAND_LINE, value);
+        symbols.define_string_interned(
+            name,
+            Span::COMMAND_LINE,
+            value,
+            &sources,
+            &remaining_errors,
+            &options,
+        );
     }
 
     if let Some(preinc_path) = &options.preinclude {

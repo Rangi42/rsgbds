@@ -1,23 +1,30 @@
+use std::cell::Cell;
+
 use chrono::prelude::*;
 use compact_str::CompactString;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use string_interner::{backend::StringBackend, symbol::SymbolU32, StringInterner};
 
 use crate::{
-    context_stack::Span, diagnostics, format::FormatSpec, macro_args::MacroArgs,
-    source_store::SourceSlice,
+    context_stack::Span,
+    diagnostics,
+    format::FormatSpec,
+    macro_args::MacroArgs,
+    source_store::{SourceSlice, SourceStore},
+    Options,
 };
 
 type Symbol = SymbolU32;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct SymName(Symbol);
 type SymbolNames = StringInterner<StringBackend<Symbol>, FxBuildHasher>;
+type SymMap<'ctx_stack> = FxHashMap<SymName, SymbolData<'ctx_stack>>;
 
 // TODO: consider using a `Vec<Option<SymbolData>>` instead of a hash map?
 #[derive(Debug)]
 pub struct Symbols<'ctx_stack> {
     names: SymbolNames,
-    symbols: FxHashMap<SymName, SymbolData<'ctx_stack>>,
+    symbols: SymMap<'ctx_stack>,
     scope: Option<SymName>,
 }
 
@@ -205,16 +212,16 @@ impl<'ctx_stack> Symbols<'ctx_stack> {
         Ok(())
     }
 
-    fn define_symbol(
-        &mut self,
+    fn try_define_symbol<'map>(
+        symbols: &'map mut SymMap<'ctx_stack>,
         name: SymName,
         definition: Span<'ctx_stack>,
         kind: SymbolKind,
         exported: bool,
-    ) -> Result<(), &mut SymbolData<'ctx_stack>> {
+    ) -> Result<(), (&'map mut SymbolData<'ctx_stack>, Span<'ctx_stack>)> {
         use std::collections::hash_map::Entry;
 
-        match self.symbols.entry(name) {
+        match symbols.entry(name) {
             Entry::Vacant(entry) => {
                 entry.insert(SymbolData::User {
                     definition,
@@ -248,9 +255,48 @@ impl<'ctx_stack> Symbols<'ctx_stack> {
                         };
                         Ok(())
                     }
-                    _ => Err(existing),
+                    _ => Err((existing, definition)),
                 }
             }
+        }
+    }
+
+    fn define_symbol(
+        &mut self,
+        name: SymName,
+        definition: Span<'ctx_stack>,
+        payload: SymbolKind,
+        exported: bool,
+        sources: &SourceStore,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        if let Err((existing, definition)) = Self::try_define_symbol(
+            &mut self.symbols,
+            name,
+            definition,
+            SymbolKind::Label,
+            exported,
+        ) {
+            diagnostics::error(
+                &definition,
+                |error| {
+                    error.set_message(format!(
+                        "A symbol called \"{}\" already exists",
+                        self.names.resolve(name.0).unwrap()
+                    ));
+                    error.add_labels([
+                        diagnostics::note_label(existing.def_span().resolve())
+                            .with_message("The name is used here..."),
+                        diagnostics::error_label(definition.resolve())
+                            .with_message("...so it's not available for this definition"),
+                    ]);
+                    error.set_help("If this is intentional, consider using `PURGE` to delete the old definition first");
+                },
+                sources,
+                nb_errors_left,
+                options,
+            )
         }
     }
 
@@ -259,12 +305,39 @@ impl<'ctx_stack> Symbols<'ctx_stack> {
         name: SymName,
         definition: Span<'ctx_stack>,
         string: CompactString,
+        sources: &SourceStore,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
     ) {
-        if let Err(existing) =
-            self.define_symbol(name, definition, SymbolKind::String(string), false)
-        {
-            todo!()
-        }
+        self.define_symbol(
+            name,
+            definition,
+            SymbolKind::String(string),
+            false,
+            sources,
+            nb_errors_left,
+            options,
+        );
+    }
+
+    pub fn define_label(
+        &mut self,
+        name: SymName,
+        definition: Span<'ctx_stack>,
+        exported: bool,
+        sources: &SourceStore,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        self.define_symbol(
+            name,
+            definition,
+            SymbolKind::Label,
+            exported,
+            sources,
+            nb_errors_left,
+            options,
+        )
     }
 }
 
