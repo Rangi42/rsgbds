@@ -113,7 +113,7 @@ fn parse_line<'ctx_stack>(
                 |error| {
                     error.set_message("Leftover diff marker");
                     error.add_label(
-                        diagnostics::error_label(first_token.span.resolve())
+                        diagnostics::error_label(&first_token.span)
                             .with_message("Extraneous character here"),
                     );
                     error.set_help("Consider applying patches using `patch` or `git apply`");
@@ -196,7 +196,7 @@ fn parse_line<'ctx_stack>(
                     |error| {
                         error.set_message(format!("Macro `{name}` does not exist"));
                         error.add_label(
-                            diagnostics::error_label(first_token.span.resolve())
+                            diagnostics::error_label(&first_token.span)
                                 .with_message("Attempting to call the macro here"),
                         );
                     },
@@ -209,7 +209,7 @@ fn parse_line<'ctx_stack>(
                     |error| {
                         error.set_message(format!("`{name}` is not a macro"));
                         error.add_labels([
-                            diagnostics::error_label(first_token.span.resolve())
+                            diagnostics::error_label(&first_token.span)
                                 .with_message("Macro call here"),
                             diagnostics::note_label(other.def_span().resolve())
                                 .with_message("A symbol by this name was defined here"),
@@ -365,7 +365,7 @@ fn parse_line<'ctx_stack>(
         _ => {
             parse_ctx.report_syntax_error(Some(&first_token), |error, span| {
                 error.add_label(
-                    diagnostics::error_label(span.resolve())
+                    diagnostics::error_label(span)
                         .with_message("Expected an instruction or a directive here"),
                 )
             });
@@ -391,7 +391,7 @@ fn parse_line<'ctx_stack>(
         |"end of line"| => {},
         else |unexpected| => {
             parse_ctx.report_syntax_error(unexpected.as_ref(), |error, span| {
-                error.add_label(diagnostics::error_label(span.resolve()).with_message("Expected nothing else on this line"))
+                error.add_label(diagnostics::error_label(span).with_message("Expected nothing else on this line"))
             });
         }
     })
@@ -409,9 +409,9 @@ fn reject_prior_label_def<'ctx_stack>(
             |error| {
                 error.set_message("A label is not allowed here");
                 error.add_labels([
-                    diagnostics::error_label(span.resolve())
+                    diagnostics::error_label(&span)
                         .with_message("This label cannot be on the same line..."),
-                    diagnostics::note_label(directive_span.resolve())
+                    diagnostics::note_label(directive_span)
                         .with_message(format!("...as a `{directive_name}` directive")),
                 ]);
             },

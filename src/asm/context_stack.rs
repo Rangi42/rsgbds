@@ -164,6 +164,11 @@ impl Span<'_> {
         }
     }
 }
+impl From<&Span<'_>> for RawSpan {
+    fn from(value: &Span<'_>) -> Self {
+        value.resolve()
+    }
+}
 
 impl SourceNode {
     pub fn resolve(&self, byte_span: &Range<usize>) -> RawSpan {

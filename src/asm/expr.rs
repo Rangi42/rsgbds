@@ -234,7 +234,7 @@ impl Error<'_> {
             &self.span,
             |error| {
                 error.set_message("TODO");
-                error.add_label(diagnostics::error_label(self.span.resolve()).with_message("TODO"))
+                error.add_label(diagnostics::error_label(&self.span).with_message("TODO"))
             },
             sources,
             nb_errors_left,

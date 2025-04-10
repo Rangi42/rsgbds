@@ -37,9 +37,9 @@ fn parse_subexpr<'ctx_stack>(
                     parse_ctx.report_syntax_error(unexpected.as_ref(), |error, cur_span| {
                         error.set_message("Syntax error: unclosed parenthesis");
                         error.add_labels([
-                            diagnostics::error_label(span.resolve())
+                            diagnostics::error_label(&span)
                                 .with_message("This parenthesis should be closed..."),
-                            diagnostics::note_label(cur_span.resolve())
+                            diagnostics::note_label(cur_span)
                                 .with_message("...before this point"),
                         ]);
                     });
@@ -125,7 +125,7 @@ fn expect_subexpr<'ctx_stack>(
         res.unwrap_or_else(|| {
             parse_ctx.report_syntax_error(lookahead.as_ref(), |error, span| {
                 error.add_label(
-                    diagnostics::error_label(span.resolve())
+                    diagnostics::error_label(span)
                         .with_message("Expected a number or an expression here"),
                 )
             });
