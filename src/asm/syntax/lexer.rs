@@ -769,7 +769,7 @@ pub fn next_token_raw(
                 };
 
                 // Since we will be staying in the string, we can safely consume that character.
-                let start = loc(&params.src_ctx);
+                let start = loc(params.src_ctx);
                 consume_char(params.src_ctx, ch);
 
                 match ch {

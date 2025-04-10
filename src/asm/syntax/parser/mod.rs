@@ -131,6 +131,7 @@ fn parse_line<'ctx_stack>(
         _ => {}
     }
 
+    let mut label_span = None;
     if let tok!("identifier"(ident)) = first_token.payload {
         // Identifiers at the beginning of the line can be two things.
         // Either a label name, if it's *directly* followed by a colon; or the name of a macro.
@@ -138,14 +139,30 @@ fn parse_line<'ctx_stack>(
             expect_one_of!(parse_ctx.next_token() => {
                 None => unreachable!(),
                 |":"| => {
-                    parse_ctx.symbols.define_label(ident, first_token.span, false, parse_ctx.sources, parse_ctx.nb_errors_remaining, parse_ctx.options);
+                    label_span = Some(first_token.span.clone());
+                    parse_ctx.symbols.define_label(
+                        ident,
+                        first_token.span,
+                        false,
+                        parse_ctx.sources,
+                        parse_ctx.nb_errors_remaining,
+                        parse_ctx.options
+                    );
                     match parse_ctx.next_token() {
                         Some(token) => first_token = token,
                         None => return,
                     };
                 },
                 |"::"| => {
-                    parse_ctx.symbols.define_label(ident, first_token.span, true, parse_ctx.sources, parse_ctx.nb_errors_remaining, parse_ctx.options);
+                    label_span = Some(first_token.span.clone());
+                    parse_ctx.symbols.define_label(
+                        ident,
+                        first_token.span,
+                        true,
+                        parse_ctx.sources,
+                        parse_ctx.nb_errors_remaining,
+                        parse_ctx.options
+                    );
                     match parse_ctx.next_token() {
                         Some(token) => first_token = token,
                         None => return,
@@ -171,8 +188,6 @@ fn parse_line<'ctx_stack>(
             let args = Rc::new(MacroArgs::new(
                 std::iter::from_fn(|| parse_ctx.next_token_raw()).collect(),
             ));
-
-            // TODO: consume the newline, if `next_raw` doesn't already?
 
             let name = parse_ctx.symbols.resolve(ident);
             match parse_ctx.symbols.find_macro_interned(&ident) {
@@ -210,19 +225,47 @@ fn parse_line<'ctx_stack>(
                         .push_macro_context(name.into(), slice, args)
                 }
             }
-            todo!()
+
+            parse_ctx.next_token()
         }
 
         // These are not valid after a label.
-        tok!("macro") => todo!(),
-        tok!("endm") => todo!(),
-        tok!("rept") => todo!(),
-        tok!("for") => todo!(),
-        tok!("endr") => todo!(),
-        tok!("if") => todo!(),
-        tok!("elif") => todo!(),
-        tok!("else") => todo!(),
-        tok!("endc") => todo!(),
+        tok!("macro") => {
+            reject_prior_label_def(parse_ctx, label_span, &first_token.span, "macro");
+            todo!()
+        }
+        tok!("endm") => {
+            reject_prior_label_def(parse_ctx, label_span, &first_token.span, "endm");
+            todo!()
+        }
+        tok!("rept") => {
+            reject_prior_label_def(parse_ctx, label_span, &first_token.span, "rept");
+            todo!()
+        }
+        tok!("for") => {
+            reject_prior_label_def(parse_ctx, label_span, &first_token.span, "for");
+            todo!()
+        }
+        tok!("endr") => {
+            reject_prior_label_def(parse_ctx, label_span, &first_token.span, "endr");
+            todo!()
+        }
+        tok!("if") => {
+            reject_prior_label_def(parse_ctx, label_span, &first_token.span, "if");
+            todo!()
+        }
+        tok!("elif") => {
+            reject_prior_label_def(parse_ctx, label_span, &first_token.span, "elif");
+            todo!()
+        }
+        tok!("else") => {
+            reject_prior_label_def(parse_ctx, label_span, &first_token.span, "else");
+            todo!()
+        }
+        tok!("endc") => {
+            reject_prior_label_def(parse_ctx, label_span, &first_token.span, "endc");
+            todo!()
+        }
 
         tok!("adc") => todo!(),
         tok!("add") => todo!(),
@@ -352,6 +395,31 @@ fn parse_line<'ctx_stack>(
             });
         }
     })
+}
+
+fn reject_prior_label_def<'ctx_stack>(
+    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
+    label_span: Option<Span<'ctx_stack>>,
+    directive_span: &Span<'ctx_stack>,
+    directive_name: &str,
+) {
+    if let Some(span) = label_span {
+        diagnostics::error(
+            &span,
+            |error| {
+                error.set_message("A label is not allowed here");
+                error.add_labels([
+                    diagnostics::error_label(span.resolve())
+                        .with_message("This label cannot be on the same line..."),
+                    diagnostics::note_label(directive_span.resolve())
+                        .with_message(format!("...as a `{directive_name}` directive")),
+                ]);
+            },
+            parse_ctx.sources,
+            parse_ctx.nb_errors_remaining,
+            parse_ctx.options,
+        )
+    }
 }
 
 struct ParseCtx<'ctx_stack, 'sources, 'symbols, 'nb_errs, 'options> {
