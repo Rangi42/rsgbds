@@ -444,6 +444,8 @@ define_tokens! {
         Low,
         #[name = "pow", keyword()]
         Pow,
+        #[name = "revchar", keyword()]
+        Revchar,
         #[name = "round", keyword()]
         Round,
         #[name = "sin", keyword()]
@@ -454,6 +456,8 @@ define_tokens! {
         Startof,
         #[name = "strcat", keyword()]
         Strcat,
+        #[name = "strchar", keyword()]
+        Strchar,
         #[name = "strcmp", keyword()]
         Strcmp,
         #[name = "strfmt", keyword()]
@@ -468,6 +472,8 @@ define_tokens! {
         Strrin,
         #[name = "strrpl", keyword()]
         Strrpl,
+        #[name = "strslice", keyword()]
+        Strslice,
         #[name = "strsub", keyword()]
         Strsub,
         #[name = "strupr", keyword()]

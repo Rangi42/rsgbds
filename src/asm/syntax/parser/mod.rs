@@ -35,6 +35,8 @@ use crate::{
 mod directives;
 mod expr;
 mod instructions;
+mod misc;
+mod string;
 
 macro_rules! expect_one_of {
     ($payload:expr => {
