@@ -12,6 +12,8 @@
     unused_unsafe
 )]
 #![debugger_visualizer(gdb_script_file = "../../maintainer/gdb_pretty_printers.py")]
+// These create a *lot* of noise while I'm progressively building the code.
+#![allow(unused_variables)]
 
 use std::{
     cell::Cell,

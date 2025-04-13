@@ -24,7 +24,7 @@ use crate::{
     diagnostics,
     format::FormatSpec,
     source_store::{RawSpan, ReportBuilder, SourceHandle, SourceStore},
-    symbols::Symbols,
+    symbols::{SymName, Symbols},
     syntax::tokens::{tok, Token, TokenPayload, KEYWORDS},
     Options,
 };
@@ -163,6 +163,7 @@ struct LexParams<'ctx_stack, 'src_store, 'syms, 'sym_ctx_stack, 'errs_rem, 'opti
 }
 
 pub fn next_token<'ctx_stack>(
+    expand_equs: bool,
     ctx_stack: &'ctx_stack ContextStack,
     source_store: &SourceStore,
     symbols: &mut Symbols, // We need to be able to intern names, and to resolve them for expansion.
@@ -354,8 +355,28 @@ pub fn next_token<'ctx_stack>(
                 }
             }
             chars!(starts_ident) => {
+                let payload = read_ident(params, false, true);
+                // If EQUS expansion is active...
+                if expand_equs {
+                    // ...then any identifier...
+                    if let TokenPayload::Identifier(ident) = &payload {
+                        // ...for a symbol...
+                        if let Some(sym) = params.symbols.find_interned(ident) {
+                            // ...that is string-typed...
+                            if let Some(string) = sym.get_string() {
+                                // ...triggers EQUS expansion.
+                                params.src_ctx.lexer_state_mut().begin_expansion(
+                                    Some(params.symbols.resolve(*ident).into()),
+                                    string,
+                                    params.options,
+                                );
+                                continue;
+                            }
+                        }
+                    }
+                }
                 break Token {
-                    payload: read_ident(params, false, true),
+                    payload,
                     span: span(start, loc(params.src_ctx), ctx_stack, &mut sources),
                 };
             }

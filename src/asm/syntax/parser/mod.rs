@@ -428,6 +428,17 @@ struct ParseCtx<'ctx_stack, 'sources, 'symbols, 'nb_errs, 'options> {
 impl<'ctx_stack> ParseCtx<'ctx_stack, '_, '_, '_, '_> {
     fn next_token(&mut self) -> Option<Token<'ctx_stack>> {
         lexer::next_token(
+            true,
+            self.ctx_stack,
+            self.sources,
+            self.symbols,
+            self.nb_errors_remaining,
+            self.options,
+        )
+    }
+    fn next_token_unexpanded(&mut self) -> Option<Token<'ctx_stack>> {
+        lexer::next_token(
+            false,
             self.ctx_stack,
             self.sources,
             self.symbols,
