@@ -14,19 +14,17 @@ use std::{
     str::FromStr,
 };
 
-fn main() -> Result<(), Box<dyn Error>> {
+fn main() {
     #[cfg(any(
         feature = "rgbasm",
         feature = "rgblink",
         feature = "rgbfix",
         feature = "rgbgfx"
     ))]
-    shadow_rs::new()?;
+    shadow_rs::ShadowBuilder::builder().build().unwrap();
 
     #[cfg(feature = "rgbasm")]
     generate_warnings_mod();
-
-    Ok(())
 }
 
 #[derive(Debug)]
