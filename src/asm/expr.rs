@@ -43,7 +43,10 @@ pub struct Error<'ctx_stack> {
 enum ErrKind {
     SymNotFound,
     DivBy0,
-    // TODO: not sure this makes sense
+    // This error kind is special, in that it's never reported.
+    // It's required so that expressions with bad syntax can be "evaluated" gracefully,
+    // but since bad syntax already causes a syntax error to be reported, emitting an
+    // error for this would just create duplicates.
     NoExpr,
 }
 
@@ -105,12 +108,12 @@ impl<'ctx_stack> Expr<'ctx_stack> {
 
 impl<'ctx_stack> Expr<'ctx_stack> {
     // TODO: there may be more than one reason!
-    pub fn try_const_eval(&self) -> Result<i32, Error<'ctx_stack>> {
+    pub fn try_const_eval(&self) -> Result<(i32, Span<'ctx_stack>), Error<'ctx_stack>> {
         debug_assert!(!self.payload.is_empty());
         let mut eval_stack = vec![];
         for op in &self.payload {
             match &op.kind {
-                OpKind::Number(value) => eval_stack.push(Ok(*value)),
+                OpKind::Number(value) => eval_stack.push(Ok((*value, op.span.clone()))),
                 OpKind::Symbol(name) => todo!(),
                 OpKind::Binary(operator) => {
                     let rhs = eval_stack.pop().unwrap();
@@ -119,7 +122,7 @@ impl<'ctx_stack> Expr<'ctx_stack> {
                 }
                 OpKind::Unary(operator) => {
                     let value = eval_stack.pop().unwrap();
-                    eval_stack.push(operator.const_eval(value));
+                    eval_stack.push(operator.const_eval(value, &op.span));
                 }
                 OpKind::Nothing => {
                     eval_stack.push(Err(Error {
@@ -162,30 +165,58 @@ fn from_bool(b: bool) -> i32 {
 impl BinOp {
     fn const_eval<'ctx_stack>(
         &self,
-        lhs: Result<i32, Error<'ctx_stack>>,
-        rhs: Result<i32, Error<'ctx_stack>>,
-    ) -> Result<i32, Error<'ctx_stack>> {
+        lhs: Result<(i32, Span<'ctx_stack>), Error<'ctx_stack>>,
+        rhs: Result<(i32, Span<'ctx_stack>), Error<'ctx_stack>>,
+    ) -> Result<(i32, Span<'ctx_stack>), Error<'ctx_stack>> {
         // Most operators are "greedy", and require both operands to be known in order to be
         // const-evaluable themselves.
         macro_rules! greedy {
             (|$left:ident, $right:ident| $res:expr) => {
                 match (lhs, rhs) {
-                    (Ok($left), Ok($right)) => $res,
+                    (Ok(($left, left_span)), Ok(($right, right_span))) => {
+                        $res.map(|value| (value, left_span.merged_with(&right_span)))
+                    }
                     (Ok(_), Err(err)) | (Err(err), _) => Err(err),
                 }
             };
-        };
+            (|($left:ident, $left_span:ident), ($right:ident, $right_span:ident)| $res:expr) => {
+                match (lhs, rhs) {
+                    (Ok(($left, $left_span)), Ok(($right, $right_span))) => $res,
+                    (Ok(_), Err(err)) | (Err(err), _) => Err(err),
+                }
+            };
+        }
 
         match self {
             // These two operators are "lazy", so errors on the right-hand side are ignored if possible.
             BinOp::LogicalOr => match (lhs, rhs) {
-                (Err(err), _) | (Ok(0), Err(err)) => Err(err),
-                (Ok(0), Ok(0)) => Ok(0),
-                (Ok(_), _) => Ok(1), // Either operand must be Ok(non_zero).
+                (Err(err), _) | (Ok((0, _)), Err(err)) => Err(err),
+                (Ok((0, left_span)), Ok((0, right_span))) => {
+                    Ok((0, left_span.merged_with(&right_span)))
+                }
+                // Either operand must be Ok(non_zero).
+                (
+                    Ok((_, left_span)),
+                    Ok((_, right_span))
+                    | Err(Error {
+                        span: right_span, ..
+                    }),
+                ) => Ok((1, left_span.merged_with(&right_span))),
             },
             BinOp::LogicalAnd => match (lhs, rhs) {
-                (Ok(0), _) | (Ok(_), Ok(0)) => Ok(0),
-                (Ok(_), Ok(_)) => Ok(1),
+                (
+                    Ok((0, left_span)),
+                    Ok((_, right_span))
+                    | Err(Error {
+                        span: right_span, ..
+                    }),
+                )
+                | (Ok((_, left_span)), Ok((0, right_span))) => {
+                    Ok((0, left_span.merged_with(&right_span)))
+                }
+                (Ok((_, left_span)), Ok((_, right_span))) => {
+                    Ok((1, left_span.merged_with(&right_span)))
+                }
                 (Ok(_), Err(err)) | (Err(err), _) => Err(err),
             },
             BinOp::NotEqual => greedy!(|lhs, rhs| Ok(from_bool(lhs != rhs))),
@@ -203,10 +234,14 @@ impl BinOp {
             BinOp::RightShift => todo!(),
             BinOp::UnsignedRightShift => todo!(),
             BinOp::Multiply => greedy!(|lhs, rhs| Ok((lhs as u32).wrapping_mul(rhs as u32) as i32)),
-            BinOp::Divide => greedy!(|lhs, rhs| lhs.checked_div(rhs).ok_or_else(|| Error {
-                span: todo!(),
-                kind: ErrKind::DivBy0
-            })),
+            BinOp::Divide => greedy!(|(lhs, left_span), (rhs, right_span)| if rhs == 0 {
+                Err(Error {
+                    span: right_span,
+                    kind: ErrKind::DivBy0,
+                })
+            } else {
+                Ok((lhs.wrapping_div(rhs), left_span.merged_with(&right_span)))
+            }),
             BinOp::Modulo => todo!(),
             BinOp::Exponent => greedy!(|lhs, rhs| Ok(lhs.wrapping_pow(rhs as u32))),
         }
@@ -216,9 +251,11 @@ impl BinOp {
 impl UnOp {
     fn const_eval<'ctx_stack>(
         &self,
-        value: Result<i32, Error<'ctx_stack>>,
-    ) -> Result<i32, Error<'ctx_stack>> {
-        let map = |f: fn(i32) -> i32| value.map(f);
+        value: Result<(i32, Span<'ctx_stack>), Error<'ctx_stack>>,
+        operator_span: &Span<'ctx_stack>,
+    ) -> Result<(i32, Span<'ctx_stack>), Error<'ctx_stack>> {
+        let map =
+            |f: fn(i32) -> i32| value.map(|(num, span)| (f(num), operator_span.merged_with(&span)));
         match self {
             UnOp::Complement => map(|n| !n),
             UnOp::Identity => map(|n| n),
@@ -230,16 +267,31 @@ impl UnOp {
 
 impl Error<'_> {
     pub fn report(&self, sources: &SourceStore, nb_errors_left: &Cell<usize>, options: &Options) {
+        // Do not report these, as they stem from syntax errors, and thus are duplicates.
+        if matches!(self.kind, ErrKind::NoExpr) {
+            return;
+        }
+
         diagnostics::error(
             &self.span,
             |error| {
-                error.set_message("TODO");
-                error.add_label(diagnostics::error_label(&self.span).with_message("TODO"))
+                let (message, label_message) = self.kind.messages();
+                error.set_message(message);
+                error.add_label(diagnostics::error_label(&self.span).with_message(label_message))
             },
             sources,
             nb_errors_left,
             options,
         )
+    }
+}
+impl ErrKind {
+    fn messages(&self) -> (&'static str, &'static str) {
+        match self {
+            ErrKind::SymNotFound => todo!(),
+            ErrKind::DivBy0 => ("Division by zero", "This is equal to zero"),
+            ErrKind::NoExpr => unreachable!(),
+        }
     }
 }
 

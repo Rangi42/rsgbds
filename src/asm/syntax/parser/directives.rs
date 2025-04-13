@@ -227,7 +227,7 @@ pub(super) fn parse_println<'ctx_stack>(
     let (expr, lookahead) = super::expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
     match expr.try_const_eval() {
         Err(error) => parse_ctx.report_expr_error(error),
-        Ok(n) => println!("{n}"),
+        Ok((n, _span)) => println!("{n}"),
     };
     lookahead
 }
