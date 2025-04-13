@@ -20,7 +20,7 @@ use compact_str::CompactString;
 
 use crate::{
     context_stack::{ContextStack, Span},
-    diagnostics::{self, warning},
+    diagnostics,
     expr::Expr,
     macro_args::MacroArgs,
     source_store::{RawSpan, SourceHandle, SourceStore},
@@ -32,7 +32,9 @@ use crate::{
     Options,
 };
 
+mod directives;
 mod expr;
+mod instructions;
 
 macro_rules! expect_one_of {
     ($payload:expr => {
@@ -232,135 +234,128 @@ fn parse_line<'ctx_stack>(
         // These are not valid after a label.
         tok!("macro") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "macro");
-            todo!()
+            directives::parse_macro(first_token, parse_ctx)
         }
         tok!("endm") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "endm");
-            todo!()
+            directives::parse_endm(first_token, parse_ctx)
         }
         tok!("rept") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "rept");
-            todo!()
+            directives::parse_rept(first_token, parse_ctx)
         }
         tok!("for") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "for");
-            todo!()
+            directives::parse_for(first_token, parse_ctx)
         }
         tok!("endr") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "endr");
-            todo!()
+            directives::parse_endr(first_token, parse_ctx)
         }
         tok!("if") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "if");
-            todo!()
+            directives::parse_if(first_token, parse_ctx)
         }
         tok!("elif") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "elif");
-            todo!()
+            directives::parse_elif(first_token, parse_ctx)
         }
         tok!("else") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "else");
-            todo!()
+            directives::parse_else(first_token, parse_ctx)
         }
         tok!("endc") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "endc");
-            todo!()
+            directives::parse_endc(first_token, parse_ctx)
         }
 
-        tok!("adc") => todo!(),
-        tok!("add") => todo!(),
-        tok!("and") => todo!(),
-        tok!("bit") => todo!(),
-        tok!("call") => todo!(),
-        tok!("ccf") => todo!(),
-        tok!("cp") => todo!(),
-        tok!("cpl") => todo!(),
-        tok!("daa") => todo!(),
-        tok!("dec") => todo!(),
-        tok!("di") => todo!(),
-        tok!("ei") => todo!(),
-        tok!("halt") => todo!(),
-        tok!("inc") => todo!(),
-        tok!("jp") => todo!(),
-        tok!("jr") => todo!(),
-        tok!("ldd") => todo!(),
-        tok!("ldh") => todo!(),
-        tok!("ldi") => todo!(),
-        tok!("ld") => todo!(),
-        tok!("nop") => todo!(),
-        tok!("or") => todo!(),
-        tok!("pop") => todo!(),
-        tok!("push") => todo!(),
-        tok!("res") => todo!(),
-        tok!("reti") => todo!(),
-        tok!("ret") => todo!(),
-        tok!("rla") => todo!(),
-        tok!("rlca") => todo!(),
-        tok!("rlc") => todo!(),
-        tok!("rl") => todo!(),
-        tok!("rra") => todo!(),
-        tok!("rrca") => todo!(),
-        tok!("rrc") => todo!(),
-        tok!("rr") => todo!(),
-        tok!("rst") => todo!(),
-        tok!("sbc") => todo!(),
-        tok!("scf") => todo!(),
-        tok!("set") => todo!(),
-        tok!("sla") => todo!(),
-        tok!("sra") => todo!(),
-        tok!("srl") => todo!(),
-        tok!("stop") => todo!(),
-        tok!("sub") => todo!(),
-        tok!("swap") => todo!(),
-        tok!("xor") => todo!(),
+        tok!("adc") => instructions::parse_adc(first_token, parse_ctx),
+        tok!("add") => instructions::parse_add(first_token, parse_ctx),
+        tok!("and") => instructions::parse_and(first_token, parse_ctx),
+        tok!("bit") => instructions::parse_bit(first_token, parse_ctx),
+        tok!("call") => instructions::parse_call(first_token, parse_ctx),
+        tok!("ccf") => instructions::parse_ccf(first_token, parse_ctx),
+        tok!("cp") => instructions::parse_cp(first_token, parse_ctx),
+        tok!("cpl") => instructions::parse_cpl(first_token, parse_ctx),
+        tok!("daa") => instructions::parse_daa(first_token, parse_ctx),
+        tok!("dec") => instructions::parse_dec(first_token, parse_ctx),
+        tok!("di") => instructions::parse_di(first_token, parse_ctx),
+        tok!("ei") => instructions::parse_ei(first_token, parse_ctx),
+        tok!("halt") => instructions::parse_halt(first_token, parse_ctx),
+        tok!("inc") => instructions::parse_inc(first_token, parse_ctx),
+        tok!("jp") => instructions::parse_jp(first_token, parse_ctx),
+        tok!("jr") => instructions::parse_jr(first_token, parse_ctx),
+        tok!("ldd") => instructions::parse_ldd(first_token, parse_ctx),
+        tok!("ldh") => instructions::parse_ldh(first_token, parse_ctx),
+        tok!("ldi") => instructions::parse_ldi(first_token, parse_ctx),
+        tok!("ld") => instructions::parse_ld(first_token, parse_ctx),
+        tok!("nop") => instructions::parse_nop(first_token, parse_ctx),
+        tok!("or") => instructions::parse_or(first_token, parse_ctx),
+        tok!("pop") => instructions::parse_pop(first_token, parse_ctx),
+        tok!("push") => instructions::parse_push(first_token, parse_ctx),
+        tok!("res") => instructions::parse_res(first_token, parse_ctx),
+        tok!("reti") => instructions::parse_reti(first_token, parse_ctx),
+        tok!("ret") => instructions::parse_ret(first_token, parse_ctx),
+        tok!("rla") => instructions::parse_rla(first_token, parse_ctx),
+        tok!("rlca") => instructions::parse_rlca(first_token, parse_ctx),
+        tok!("rlc") => instructions::parse_rlc(first_token, parse_ctx),
+        tok!("rl") => instructions::parse_rl(first_token, parse_ctx),
+        tok!("rra") => instructions::parse_rra(first_token, parse_ctx),
+        tok!("rrca") => instructions::parse_rrca(first_token, parse_ctx),
+        tok!("rrc") => instructions::parse_rrc(first_token, parse_ctx),
+        tok!("rr") => instructions::parse_rr(first_token, parse_ctx),
+        tok!("rst") => instructions::parse_rst(first_token, parse_ctx),
+        tok!("sbc") => instructions::parse_sbc(first_token, parse_ctx),
+        tok!("scf") => instructions::parse_scf(first_token, parse_ctx),
+        tok!("set") => instructions::parse_set(first_token, parse_ctx),
+        tok!("sla") => instructions::parse_sla(first_token, parse_ctx),
+        tok!("sra") => instructions::parse_sra(first_token, parse_ctx),
+        tok!("srl") => instructions::parse_srl(first_token, parse_ctx),
+        tok!("stop") => instructions::parse_stop(first_token, parse_ctx),
+        tok!("sub") => instructions::parse_sub(first_token, parse_ctx),
+        tok!("swap") => instructions::parse_swap(first_token, parse_ctx),
+        tok!("xor") => instructions::parse_xor(first_token, parse_ctx),
 
-        tok!("align") => todo!(),
-        tok!("assert") => todo!(),
-        tok!("break") => todo!(),
-        tok!("charmap") => todo!(),
-        tok!("db") => todo!(),
-        tok!("dl") => todo!(),
-        tok!("ds") => todo!(),
-        tok!("dw") => todo!(),
-        tok!("endsection") => todo!(),
-        tok!("endl") => todo!(),
-        tok!("endu") => todo!(),
-        tok!("export") => todo!(),
-        tok!("fail") => todo!(),
-        tok!("fatal") => todo!(),
-        tok!("incbin") => todo!(),
-        tok!("include") => todo!(),
-        tok!("load") => todo!(),
-        tok!("newcharmap") => todo!(),
-        tok!("nextu") => todo!(),
-        tok!("opt") => todo!(),
-        tok!("popc") => todo!(),
-        tok!("popo") => todo!(),
-        tok!("pops") => todo!(),
-        tok!("println") => {
-            let (expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
-            match expr.try_const_eval() {
-                Err(error) => parse_ctx.report_expr_error(error),
-                Ok(n) => println!("{n}"),
-            };
-            lookahead
-        }
-        tok!("print") => todo!(),
-        tok!("purge") => todo!(),
-        tok!("pushc") => todo!(),
-        tok!("pusho") => todo!(),
-        tok!("pushs") => todo!(),
-        tok!("rb") => todo!(),
-        tok!("rw") => todo!(),
-        tok!("redef") => todo!(),
-        tok!("rsreset") => todo!(),
-        tok!("rsset") => todo!(),
-        tok!("section") => todo!(),
-        tok!("setcharmap") => todo!(),
-        tok!("shift") => todo!(),
-        tok!("static_assert") => todo!(),
-        tok!("union") => todo!(),
-        tok!("warn") => todo!(),
+        tok!("align") => directives::parse_align(first_token, parse_ctx),
+        tok!("assert") => directives::parse_assert(first_token, parse_ctx),
+        tok!("break") => directives::parse_break(first_token, parse_ctx),
+        tok!("charmap") => directives::parse_charmap(first_token, parse_ctx),
+        tok!("db") => directives::parse_db(first_token, parse_ctx),
+        tok!("dl") => directives::parse_dl(first_token, parse_ctx),
+        tok!("ds") => directives::parse_ds(first_token, parse_ctx),
+        tok!("dw") => directives::parse_dw(first_token, parse_ctx),
+        tok!("endsection") => directives::parse_endsection(first_token, parse_ctx),
+        tok!("endl") => directives::parse_endl(first_token, parse_ctx),
+        tok!("endu") => directives::parse_endu(first_token, parse_ctx),
+        tok!("export") => directives::parse_export(first_token, parse_ctx),
+        tok!("fail") => directives::parse_fail(first_token, parse_ctx),
+        tok!("fatal") => directives::parse_fatal(first_token, parse_ctx),
+        tok!("incbin") => directives::parse_incbin(first_token, parse_ctx),
+        tok!("include") => directives::parse_include(first_token, parse_ctx),
+        tok!("load") => directives::parse_load(first_token, parse_ctx),
+        tok!("newcharmap") => directives::parse_newcharmap(first_token, parse_ctx),
+        tok!("nextu") => directives::parse_nextu(first_token, parse_ctx),
+        tok!("opt") => directives::parse_opt(first_token, parse_ctx),
+        tok!("popc") => directives::parse_popc(first_token, parse_ctx),
+        tok!("popo") => directives::parse_popo(first_token, parse_ctx),
+        tok!("pops") => directives::parse_pops(first_token, parse_ctx),
+        tok!("println") => directives::parse_println(first_token, parse_ctx),
+        tok!("print") => directives::parse_print(first_token, parse_ctx),
+        tok!("purge") => directives::parse_purge(first_token, parse_ctx),
+        tok!("pushc") => directives::parse_pushc(first_token, parse_ctx),
+        tok!("pusho") => directives::parse_pusho(first_token, parse_ctx),
+        tok!("pushs") => directives::parse_pushs(first_token, parse_ctx),
+        tok!("rb") => directives::parse_rb(first_token, parse_ctx),
+        tok!("rw") => directives::parse_rw(first_token, parse_ctx),
+        tok!("redef") => directives::parse_redef(first_token, parse_ctx),
+        tok!("rsreset") => directives::parse_rsreset(first_token, parse_ctx),
+        tok!("rsset") => directives::parse_rsset(first_token, parse_ctx),
+        tok!("section") => directives::parse_section(first_token, parse_ctx),
+        tok!("setcharmap") => directives::parse_setcharmap(first_token, parse_ctx),
+        tok!("shift") => directives::parse_shift(first_token, parse_ctx),
+        tok!("static_assert") => directives::parse_static_assert(first_token, parse_ctx),
+        tok!("union") => directives::parse_union(first_token, parse_ctx),
+        tok!("warn") => directives::parse_warn(first_token, parse_ctx),
 
         _ => {
             parse_ctx.report_syntax_error(Some(&first_token), |error, span| {
