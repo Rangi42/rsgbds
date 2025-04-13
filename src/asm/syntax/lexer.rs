@@ -17,7 +17,7 @@ use std::{cell::Cell, num::NonZeroUsize, ops::Range};
 
 use chrono::format::format;
 use compact_str::CompactString;
-use uncased::UncasedStr;
+use unicase::UniCase;
 
 use crate::{
     context_stack::{ContextStack, SourceContext, SourceNode, SourceRef, SourcesMut, Span},
@@ -667,7 +667,7 @@ fn read_ident(
     }
 
     if !is_raw {
-        if let Some(keyword) = KEYWORDS.get(name.as_str().into()) {
+        if let Some(keyword) = KEYWORDS.get(&UniCase::ascii(name.as_str())) {
             return keyword.clone();
         }
     }
@@ -1054,7 +1054,7 @@ fn read_interpolation(
                 return None;
             }
 
-            if !is_raw && KEYWORDS.contains_key(UncasedStr::new(name)) {
+            if !is_raw && KEYWORDS.contains_key(&UniCase::ascii(name)) {
                 params.error(start, |error, span| {
                     error
                         .with_message(format!("The name `{name}` is a reserved keyword"))

@@ -1,6 +1,6 @@
 use compact_str::CompactString;
 use phf::phf_map;
-use uncased::UncasedStr;
+use unicase::UniCase;
 
 use crate::{context_stack::Span, symbols::SymName};
 
@@ -44,10 +44,10 @@ macro_rules! define_tokens {
         // Workaround for rust-lang/rust#52234, from https://github.com/rust-lang/rust/pull/52234#issuecomment-976702997
         pub(crate) use tok;
 
-        pub const KEYWORDS: phf::Map<&UncasedStr, $enum_name> = phf_map! {$($(
+        pub const KEYWORDS: phf::Map<UniCase<&'static str>, $enum_name> = phf_map! {$($(
             // `let _ = $kw;` is useless, but it's necessary to make that metavariable intervene
             // and thus "filter" the tokens to only keep the keywords.
-            UncasedStr::new($descr) => { let _ = $kw; $enum_name::$token },
+            UniCase::ascii($descr) => { let _ = $kw; $enum_name::$token },
         )?)*};
     }
 }
