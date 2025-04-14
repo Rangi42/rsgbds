@@ -74,7 +74,7 @@ impl LexerState {
 
     #[must_use = "Do not increase the recursion depth if this function returns `true`!"]
     fn check_recursion_depth(&self, options: &Options) -> bool {
-        self.expansions.len() >= options.recursion_depth
+        self.expansions.len() >= options.runtime_opts.recursion_depth
     }
 
     fn begin_expansion(
@@ -302,9 +302,14 @@ pub fn next_token<'ctx_stack>(
                 break Token {
                     payload: match peek(params, true, true) {
                         Some('=') => tok!("%="),
-                        Some(c) if params.options.binary_digits.contains(&c) => tok!("number")(
-                            read_dyn_number(params, c, &params.options.binary_digits, start),
-                        ),
+                        Some(c) if params.options.runtime_opts.binary_digits.contains(&c) => {
+                            tok!("number")(read_dyn_number(
+                                params,
+                                c,
+                                &params.options.runtime_opts.binary_digits,
+                                start,
+                            ))
+                        }
                         _ => tok!("%"),
                     },
                     span: span(start, loc(params.src_ctx), ctx_stack, &mut sources),
@@ -323,11 +328,11 @@ pub fn next_token<'ctx_stack>(
                 consume_char(params.src_ctx, ch);
 
                 if let Some(first_char) = peek(params, true, true) {
-                    if params.options.gfx_chars.contains(&first_char) {
+                    if params.options.runtime_opts.gfx_chars.contains(&first_char) {
                         break make!(tok!("number")(read_dyn_number(
                             params,
                             first_char,
-                            &params.options.gfx_chars,
+                            &params.options.runtime_opts.gfx_chars,
                             start
                         )));
                     }
@@ -967,7 +972,7 @@ fn read_interpolation(
                 error
                     .with_message(format!(
                         "Recursion limit ({}) exceeded",
-                        params.options.recursion_depth
+                        params.options.runtime_opts.recursion_depth
                     ))
                     .with_label(
                         diagnostics::error_label(span)
@@ -1121,7 +1126,7 @@ fn read_interpolation(
         }
     }
     // TODO: would be nice if the depth was cumulated with the `context`'s own depth?
-    inner(params, params.options.recursion_depth)
+    inner(params, params.options.runtime_opts.recursion_depth)
 }
 
 fn peek(

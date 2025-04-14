@@ -74,6 +74,7 @@ rgbgfx = [
 [dependencies] # TODO: audit deps & features
 # TODO: use `thiserror` instead
 parse-display = { version = "0.9", default-features = false }
+thiserror = "2.0.12"
 try-from-discrim = "1.0"
 
 # The binaries' deps.

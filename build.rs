@@ -31,19 +31,22 @@ fn main() {
 struct Warning {
     name: String,
     kind: WarningKind,
-    meta: MetaWarnings,
 }
 
 #[derive(Debug)]
 enum WarningKind {
-    Boolean { default: bool },
-    Parametric { nb_levels: u8, default_level: u8 },
+    Boolean { meta_level: u8 },
+    Parametric { meta_levels: Vec<u8> },
 }
 
-#[derive(Debug, Default)]
-struct MetaWarnings {
-    all: bool,
-    extra: bool,
+const META_WARNINGS: [&str; 3] = ["all", "extra", "everything"];
+fn meta_warning_level(name: &str) -> u8 {
+    match name {
+        "all" => 1,
+        "extra" => 2,
+        "everything" => panic!("Please use `default = false` instead of `meta = everything`"),
+        _ => panic!("Invalid meta warning name \"{name}\""),
+    }
 }
 
 fn generate_warnings_mod() {
@@ -59,29 +62,34 @@ fn generate_warnings_mod() {
 pub struct WarningKind(#[doc(hidden)] pub usize);
 pub const NB_WARNINGS: usize = {};
 
-const DEFAULT_WARNINGS: [bool; NB_WARNINGS] = [",
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct MetaWarningKind(#[doc(hidden)] pub usize);
+
+const DEFAULT_WARNINGS: [MetaWarningKind; NB_WARNINGS] = [",
         warnings.iter().fold(0, |acc, warning| acc
-            + match warning.kind {
+            + match &warning.kind {
                 WarningKind::Boolean { .. } => 1,
-                WarningKind::Parametric { nb_levels, .. } => nb_levels,
+                WarningKind::Parametric { meta_levels, .. } => meta_levels.len(),
             }),
     )
     .unwrap();
     for warning in &warnings {
-        match warning.kind {
-            WarningKind::Boolean { default } => {
-                writeln!(&mut file, "    {default}, // {}", warning.name).unwrap();
+        match &warning.kind {
+            WarningKind::Boolean { meta_level } => {
+                writeln!(
+                    &mut file,
+                    "    MetaWarningKind({meta_level}), // {}",
+                    warning.name
+                )
+                .unwrap();
             }
-            WarningKind::Parametric {
-                nb_levels,
-                default_level,
-            } => {
-                for level in 1..=nb_levels {
+            WarningKind::Parametric { meta_levels } => {
+                for (level, meta_level) in meta_levels.iter().enumerate() {
                     writeln!(
                         &mut file,
-                        "    {}, // {}={level}",
-                        level <= default_level,
-                        warning.name
+                        "    MetaWarningKind({meta_level}), // {}={}",
+                        warning.name,
+                        level + 1
                     )
                     .unwrap();
                 }
@@ -92,12 +100,69 @@ const DEFAULT_WARNINGS: [bool; NB_WARNINGS] = [",
         &mut file,
         "];
 
+pub(crate) const SIMPLE_WARNINGS: [(&'static str, WarningKind); NB_SIMPLE_WARNINGS] = ["
+    )
+    .unwrap();
+    let mut nb_simple_warnings = 0;
+    let mut id = 0;
+    for warning in &warnings {
+        match &warning.kind {
+            WarningKind::Boolean { .. } => {
+                writeln!(&mut file, "\t(\"{}\", WarningKind({id})),", warning.name).unwrap();
+                nb_simple_warnings += 1;
+                id += 1;
+            }
+            WarningKind::Parametric { meta_levels } => {
+                id += meta_levels.len();
+            }
+        }
+    }
+
+    writeln!(
+        &mut file,
+        "];
+const NB_SIMPLE_WARNINGS: usize = {nb_simple_warnings};
+
+pub(crate) const PARAMETRIC_WARNINGS: [(&'static str, WarningKind, usize); NB_PARAMETRIC_WARNINGS] = ["
+    )
+    .unwrap();
+    let mut nb_parametric_warnings = 0;
+    for (id, warning) in warnings.iter().enumerate() {
+        if let WarningKind::Parametric { meta_levels } = &warning.kind {
+            writeln!(
+                &mut file,
+                "\t(\"{}\", WarningKind({id}), {}),",
+                warning.name,
+                meta_levels.len(),
+            )
+            .unwrap();
+            nb_parametric_warnings += 1;
+        }
+    }
+
+    writeln!(
+        &mut file,
+        "];
+const NB_PARAMETRIC_WARNINGS: usize = {nb_parametric_warnings};
+
+pub(crate) const NB_META_WARNINGS: usize = {};
+pub(crate) const META_WARNINGS: [&'static str; NB_META_WARNINGS] = [",
+        META_WARNINGS.len(),
+    )
+    .unwrap();
+    for &name in &META_WARNINGS {
+        writeln!(&mut file, "\t\"{name}\",").unwrap();
+    }
+    writeln!(
+        &mut file,
+        "];
+
 macro_rules! warning {{"
     )
     .unwrap();
     let mut i = 0;
     for warning in &warnings {
-        match warning.kind {
+        match &warning.kind {
             WarningKind::Boolean { .. } => {
                 writeln!(
                     &mut file,
@@ -107,12 +172,13 @@ macro_rules! warning {{"
                 .unwrap();
                 i += 1;
             }
-            WarningKind::Parametric { nb_levels, .. } => {
-                for level in 1..=nb_levels {
+            WarningKind::Parametric { meta_levels, .. } => {
+                for level in 0..meta_levels.len() {
                     writeln!(
                         &mut file,
-                        "    (\"{}={level}\") => {{ $crate::diagnostics::WarningKind({i}) }};",
-                        &warning.name
+                        "    (\"{}={}\") => {{ $crate::diagnostics::WarningKind({i}) }};",
+                        &warning.name,
+                        level + 1,
                     )
                     .unwrap();
                     i += 1;
@@ -132,7 +198,7 @@ impl std::fmt::Display for WarningKind {{
     .unwrap();
     let mut i = 0;
     for warning in &warnings {
-        match warning.kind {
+        match &warning.kind {
             WarningKind::Boolean { .. } => {
                 writeln!(
                     &mut file,
@@ -142,12 +208,13 @@ impl std::fmt::Display for WarningKind {{
                 .unwrap();
                 i += 1;
             }
-            WarningKind::Parametric { nb_levels, .. } => {
-                for level in 1..=nb_levels {
+            WarningKind::Parametric { meta_levels, .. } => {
+                for level in 0..meta_levels.len() {
                     writeln!(
                         &mut file,
-                        "            WarningKind({i}) => \"-W{}={level}\",",
-                        &warning.name
+                        "            WarningKind({i}) => \"-W{}={}\",",
+                        &warning.name,
+                        level + 1
                     )
                     .unwrap();
                     i += 1;
@@ -201,15 +268,13 @@ fn parse_all_warnings() -> Vec<Warning> {
         let warning = warning.expect("Error while listing `src/asm/warnings`");
         let path = warning.path();
 
-        let (name, kind, meta) = if warning
+        let (name, kind) = if warning
             .file_type()
             .expect("Failed to get file type")
             .is_dir()
         {
             // This is a parametric warning.
-            let mut nb_levels = 0u8;
-            let mut default_level = None;
-            let mut meta = None;
+            let mut meta_levels = vec![];
 
             for f in std::fs::read_dir(&path).expect("Failed to list parametric warning directory")
             {
@@ -217,34 +282,6 @@ fn parse_all_warnings() -> Vec<Warning> {
                 let name = f.file_name();
 
                 if name == "descr.mdoc" {
-                    let line = read_first_line(&f.path(), &mut line_buf);
-
-                    for directive in line.split(';') {
-                        let (name, value) = parse_directive(directive);
-                        match name {
-                            "default" => {
-                                if default_level
-                                    .replace(value.parse().unwrap_or_else(|err| {
-                                        panic!("Bad value for `default` directive: {err}")
-                                    }))
-                                    .is_some()
-                                {
-                                    panic!("`default` directive specified twice");
-                                }
-                            }
-                            "meta" => {
-                                if meta
-                                    .replace(value.parse().unwrap_or_else(|err| {
-                                        panic!("Bad value for `meta` directive: {err}")
-                                    }))
-                                    .is_some()
-                                {
-                                    panic!("`meta` directive specified twice");
-                                }
-                            }
-                            _ => panic!("Unknown directive `{name}`"),
-                        }
-                    }
                 } else {
                     // Parse the file name; it should be `<level>.mdoc`.
                     let level = name
@@ -255,30 +292,72 @@ fn parse_all_warnings() -> Vec<Warning> {
                             f.path().display(),
                         ))
                         .parse()
-                        .unwrap_or_else(|err| panic!("Invalid file name for {}: {err}", path.display()));
+                        .unwrap_or_else(|err| panic!("Invalid file name for {}: {err}", f.path().display()));
                     if level == 0 {
-                        panic!("Files in parametric warning directories cannot be named `0.mdoc`",);
-                    } else if level > nb_levels {
-                        nb_levels = level;
+                        panic!(
+                            "Files in parametric warning directories cannot be named `0.mdoc` ({})",
+                            f.path().display()
+                        );
+                    } else {
+                        let line = read_first_line(&f.path(), &mut line_buf);
+
+                        if meta_levels.len() < level {
+                            meta_levels.resize(level, u8::MAX);
+                        }
+                        for directive in line.split(';') {
+                            let (name, value) = parse_directive(directive);
+                            match name {
+                                "default" => {
+                                    if meta_levels[level - 1] != u8::MAX {
+                                        panic!(
+                                            "{}: default status specified twice",
+                                            f.path().display()
+                                        );
+                                    }
+                                    meta_levels[level - 1] =
+                                        if value.parse().unwrap_or_else(|err| {
+                                            panic!(
+                                                "{}: Bad value for `default` directive: {err}",
+                                                f.path().display()
+                                            )
+                                        }) {
+                                            0
+                                        } else {
+                                            META_WARNINGS.len() as u8
+                                        }
+                                }
+                                "meta" => {
+                                    if meta_levels[level - 1] != u8::MAX {
+                                        panic!(
+                                            "{}: default status specified twice",
+                                            f.path().display()
+                                        );
+                                    }
+                                    meta_levels[level - 1] = meta_warning_level(value);
+                                }
+                                _ => panic!("Unknown directive `{name}`"),
+                            }
+                        }
                     }
                 }
             }
 
-            if nb_levels < 2 {
+            if meta_levels.len() < 2 {
                 panic!(
                     "Please create at least `1.mdoc` and `2.mdoc` in `{}`",
                     path.display()
                 );
             }
+            for (i, slot) in meta_levels.iter().enumerate() {
+                if *slot == u8::MAX {
+                    panic!("{}/{i}.mdoc is missing", path.display());
+                }
+            }
+            // TODO: sanity checks, like all enabled levels being contiguous (and, generally, the specificity increasing)
 
-            let default_level = default_level.expect("Missing `default` directive");
             (
                 warning.file_name().to_string_lossy().into(),
-                WarningKind::Parametric {
-                    nb_levels,
-                    default_level,
-                },
-                meta,
+                WarningKind::Parametric { meta_levels },
             )
         } else {
             // This is a simple warning.
@@ -290,29 +369,29 @@ fn parse_all_warnings() -> Vec<Warning> {
                 .into();
 
             let line = read_first_line(&path, &mut line_buf);
-            let mut default = None;
-            let mut meta = None;
+            let mut meta_level = None;
 
             for directive in line.split(';') {
                 let (name, value) = parse_directive(directive);
                 match name {
                     "default" => {
-                        if default
-                            .replace(value.parse().unwrap_or_else(|err| {
-                                panic!("Bad value for `default` directive: {err}")
-                            }))
+                        if meta_level
+                            .replace(
+                                if value.parse().unwrap_or_else(|err| {
+                                    panic!("Bad value for `default` directive: {err}")
+                                }) {
+                                    0
+                                } else {
+                                    META_WARNINGS.len() as u8
+                                },
+                            )
                             .is_some()
                         {
                             panic!("`default` directive specified twice");
                         }
                     }
                     "meta" => {
-                        if meta
-                            .replace(value.parse().unwrap_or_else(|err| {
-                                panic!("Bad value for `meta` directive: {err}")
-                            }))
-                            .is_some()
-                        {
+                        if meta_level.replace(meta_warning_level(value)).is_some() {
                             panic!("`meta` directive specified twice");
                         }
                     }
@@ -320,42 +399,12 @@ fn parse_all_warnings() -> Vec<Warning> {
                 }
             }
 
-            let default = default.expect("Missing `default` directive");
-            (name, WarningKind::Boolean { default }, meta)
+            let meta_level = meta_level.expect("Missing `default` or `meta` directive");
+            (name, WarningKind::Boolean { meta_level })
         };
 
-        let meta = meta.unwrap_or(Default::default());
-        warnings.push(Warning { name, kind, meta });
+        warnings.push(Warning { name, kind });
     }
 
     warnings
-}
-
-impl FromStr for MetaWarnings {
-    type Err = Box<dyn Error>;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut this = Self {
-            all: false,
-            extra: false,
-        };
-
-        for name in s.split(',') {
-            match name.trim_matches(|c: char| c.is_ascii_whitespace()) {
-                "all" => {
-                    if std::mem::replace(&mut this.all, true) {
-                        return Err("`all` meta warning specified twice".into());
-                    }
-                }
-                "extra" => {
-                    if std::mem::replace(&mut this.extra, true) {
-                        return Err("`extra` meta warning specified twice".into());
-                    }
-                }
-                warning => return Err(format!("Unknown meta warning `{warning}`").into()),
-            }
-        }
-
-        Ok(this)
-    }
 }

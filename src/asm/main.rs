@@ -44,7 +44,7 @@ mod common;
 mod context_stack;
 use context_stack::{ContextStack, Span};
 mod diagnostics;
-use diagnostics::{WarningLevel, NB_WARNINGS};
+use diagnostics::{WarningLevel, WarningState, NB_META_WARNINGS, NB_WARNINGS};
 mod expr;
 mod format;
 mod macro_args;
@@ -56,21 +56,29 @@ mod syntax;
 
 #[derive(Debug, Clone)]
 pub struct Options {
-    binary_digits: [char; 2],
     export_all: bool,
-    gfx_chars: [char; 4],
     inc_paths: Vec<PathBuf>,
     dependfile: Option<PathBuf>,
     // TODO: `MG`, `MP`, `MT`, `MQ`
     output: Option<PathBuf>,
     preinclude: Option<PathBuf>,
+    inhibit_warnings: bool,
+    max_errors: usize,
+    runtime_opts: RuntimeOptions,
+    // TODO: maybe a `smallvec` instead? This never has more than one entry in practice.
+    runtime_opt_stack: Vec<RuntimeOptions>,
+}
+#[derive(Debug, Clone)]
+pub struct RuntimeOptions {
+    binary_digits: [char; 2],
+    gfx_chars: [char; 4],
     pad_value: u8,
     q_precision: u8,
     recursion_depth: usize,
-    inhibit_warnings: bool,
     // TODO: use some bitfield(s) instead?
-    warnings: [WarningLevel; NB_WARNINGS],
-    max_errors: usize,
+    warnings: [WarningState; NB_WARNINGS],
+    meta_warnings: [WarningState; NB_META_WARNINGS + 1],
+    warnings_are_errors: bool,
 }
 
 fn run(options: Options, input_path: PathBuf, defines: Vec<String>) -> Result<(), ExitCode> {

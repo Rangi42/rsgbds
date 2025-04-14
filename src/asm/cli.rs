@@ -11,6 +11,9 @@
 use std::{fmt::Display, path::PathBuf, str::FromStr};
 
 use clap::{ColorChoice, Parser};
+use thiserror::Error;
+
+use crate::diagnostics::{WarningKind, META_WARNINGS, SIMPLE_WARNINGS};
 
 use super::*;
 
@@ -29,8 +32,8 @@ use super::*;
 )]
 pub(super) struct Cli {
     /// The two characters to use for binary constants
-    #[arg(short, long, default_value_t = Chars(['0', '1']), value_name = "chars")]
-    binary_digits: Chars<2>,
+    #[arg(short, long, value_name = "chars")]
+    binary_digits: Option<String>,
     /// Controls when to use color
     #[arg(long, default_value_t = ColorChoice::Auto)]
     color: ColorChoice,
@@ -41,8 +44,8 @@ pub(super) struct Cli {
     #[arg(short, long)]
     export_all: bool,
     /// The four characters to use for character constants
-    #[arg(short, long, default_value_t = Chars(['0', '1', '2', '3']), value_name = "chars")]
-    gfx_chars: Chars<4>,
+    #[arg(short, long, value_name = "chars")]
+    gfx_chars: Option<String>,
     /// Add a new include path
     #[arg(short = 'I', long, value_name = "path")]
     inc_paths: Vec<PathBuf>,
@@ -57,14 +60,14 @@ pub(super) struct Cli {
     #[arg(short = 'P', long, value_name = "path")]
     preinclude: Option<PathBuf>,
     /// Use this as the default byte for `ds`
-    #[arg(short, long, default_value_t = 0, value_name = "byte", value_parser = crate::common::cli::parse_number::<u8>)]
-    pad_value: u8,
+    #[arg(short, long, value_name = "byte")]
+    pad_value: Option<String>,
     /// Use this as the default precision of fixed-point numbers
-    #[arg(short = 'Q', long, default_value_t = 16, value_name = "precision", value_parser = parse_precision)]
-    q_precision: u8,
+    #[arg(short = 'Q', long, value_name = "precision")]
+    q_precision: Option<String>,
     /// Recursion depth past which rgbasm will assume being in an infinite loop
-    #[arg(short, long, default_value_t = 64, value_name = "max depth")]
-    recursion_depth: usize,
+    #[arg(short, long, value_name = "max depth")]
+    recursion_depth: Option<String>,
     /// Enable or disable a warning
     #[arg(short = 'W', long, value_name = "flag")]
     warning: Vec<String>,
@@ -79,71 +82,278 @@ pub(super) struct Cli {
     input: PathBuf,
 }
 
-// TODO: validate the range
-fn parse_precision(arg: &str) -> Result<u8, std::num::ParseIntError> {
-    arg.strip_prefix('.').unwrap_or(arg).parse()
-}
-
-#[derive(Debug, Clone)]
-struct Chars<const N: usize>([char; N]);
-
-impl<const N: usize> FromStr for Chars<N> {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        (|| {
-            let mut c = s.chars();
-            let mut chars = [char::default(); N];
-            for (i, slot) in chars.iter_mut().enumerate() {
-                *slot = c.next().ok_or(i)?;
-            }
-
-            let rest = c.count();
-            if rest == 0 {
-                Ok(Self(chars))
-            } else {
-                Err(N + rest)
-            }
-        })()
-        .map_err(|got| format!("expected {N} characters, got {got}"))
-    }
-}
-
-impl<const N: usize> Display for Chars<N> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for c in &self.0 {
-            write!(f, "{c}")?;
-        }
-        Ok(())
-    }
-}
-
 impl Cli {
     pub(super) fn finish(self) -> Result<(Options, PathBuf, Vec<String>, Vec<String>), ()> {
         crate::common::cli::apply_color_choice(self.color);
 
-        let mut warnings = [WarningLevel::Default; NB_WARNINGS];
-        // TODO: parse warning flags
+        let mut runtime_opts = RuntimeOptions {
+            binary_digits: ['0', '1'],
+            gfx_chars: ['0', '1', '2', '3'],
+            pad_value: 0,
+            q_precision: 16,
+            recursion_depth: 64,
+            warnings: Default::default(),
+            meta_warnings: Default::default(),
+            warnings_are_errors: false,
+        };
+        runtime_opts.meta_warnings[0].state = WarningLevel::Enabled; // Level 0 is "default".
+        if let Some(digits) = self.binary_digits {
+            runtime_opts.parse_b(&digits);
+        }
+        if let Some(chars) = self.gfx_chars {
+            runtime_opts.parse_g(&chars);
+        }
+        if let Some(value) = self.pad_value {
+            runtime_opts.parse_p(&value);
+        }
+        if let Some(precision) = self.q_precision {
+            runtime_opts.parse_q(&precision);
+        }
+        if let Some(depth) = self.recursion_depth {
+            runtime_opts.parse_r(&depth);
+        }
+        for flag in &self.warning {
+            runtime_opts.parse_w(flag);
+        }
 
         Ok((
             Options {
-                binary_digits: self.binary_digits.0,
                 export_all: self.export_all,
-                gfx_chars: self.gfx_chars.0,
                 inc_paths: self.inc_paths,
                 dependfile: self.dependfile,
                 output: self.output,
                 preinclude: self.preinclude,
-                pad_value: self.pad_value,
-                q_precision: self.q_precision,
-                recursion_depth: self.recursion_depth,
                 inhibit_warnings: self.inhibit_warnings,
-                warnings,
                 max_errors: self.max_errors,
+                runtime_opts,
+                runtime_opt_stack: vec![],
             },
             self.input,
             self.defines,
             self.warning,
         ))
     }
+}
+
+impl RuntimeOptions {
+    fn parse_chars<E: From<DynCharParseErr>, const N: usize>(
+        arg: &str,
+        target: &mut [char; N],
+    ) -> Result<(), E> {
+        let mut chars = arg.chars();
+        let mut digits = [Default::default(); N];
+        for (i, slot) in digits.iter_mut().enumerate() {
+            *slot = chars.next().ok_or(DynCharParseErr::WrongCharCount(i))?;
+            // Only allow printable ASCII characters, to avoid surprising behaviours.
+            if !slot.is_ascii_graphic() {
+                return Err(DynCharParseErr::BadChar(*slot).into());
+            }
+        }
+        match chars.count() {
+            0 => {}
+            n => return Err(DynCharParseErr::WrongCharCount(N + n).into()),
+        }
+        *target = digits;
+        Ok(())
+    }
+    pub(crate) fn parse_b(&mut self, arg: &str) -> Result<(), BinDigitsParseErr> {
+        Self::parse_chars(arg, &mut self.binary_digits)
+    }
+    pub(crate) fn parse_g(&mut self, arg: &str) -> Result<(), GfxCharsParseErr> {
+        Self::parse_chars(arg, &mut self.gfx_chars)
+    }
+}
+#[derive(Debug)]
+enum DynCharParseErr {
+    WrongCharCount(usize),
+    BadChar(char),
+}
+#[derive(Debug, Error)]
+pub(crate) enum BinDigitsParseErr {
+    #[error("The argument must be exactly two characters long, not {0}")]
+    WrongCharCount(usize),
+    #[error("Only printable ASCII characters are allowed, not '{0}'")]
+    BadChar(char),
+}
+#[derive(Debug, Error)]
+pub(crate) enum GfxCharsParseErr {
+    #[error("The argument must be exactly four characters long, not {0}")]
+    WrongCharCount(usize),
+    #[error("Only printable ASCII characters are allowed, not '{0}'")]
+    BadChar(char),
+}
+impl From<DynCharParseErr> for BinDigitsParseErr {
+    fn from(value: DynCharParseErr) -> Self {
+        match value {
+            DynCharParseErr::WrongCharCount(n) => Self::WrongCharCount(n),
+            DynCharParseErr::BadChar(c) => Self::BadChar(c),
+        }
+    }
+}
+impl From<DynCharParseErr> for GfxCharsParseErr {
+    fn from(value: DynCharParseErr) -> Self {
+        match value {
+            DynCharParseErr::WrongCharCount(n) => Self::WrongCharCount(n),
+            DynCharParseErr::BadChar(c) => Self::BadChar(c),
+        }
+    }
+}
+
+impl RuntimeOptions {
+    pub(crate) fn parse_p(&mut self, arg: &str) -> Result<(), RecDepthParseErr> {
+        self.pad_value = crate::common::cli::parse_number(arg)?;
+        Ok(())
+    }
+}
+
+impl RuntimeOptions {
+    pub(crate) fn parse_q(&mut self, arg: &str) -> Result<(), FixPrecParseErr> {
+        match arg.strip_prefix('.').unwrap_or(arg).parse()? {
+            precision @ 1..=31 => {
+                self.q_precision = precision;
+                Ok(())
+            }
+            n => Err(FixPrecParseErr::OutOfRange(n)),
+        }
+    }
+}
+#[derive(Debug, Error)]
+pub(crate) enum FixPrecParseErr {
+    #[error("{0}")]
+    BadNum(#[from] std::num::ParseIntError),
+    #[error("Fixed-point precision must be between 1 and 31, not {0}")]
+    OutOfRange(u8),
+}
+
+impl RuntimeOptions {
+    pub(crate) fn parse_r(&mut self, arg: &str) -> Result<(), RecDepthParseErr> {
+        todo!()
+    }
+}
+#[derive(Debug, Error)]
+pub(crate) enum RecDepthParseErr {
+    #[error("{0}")]
+    BadNum(#[from] std::num::ParseIntError),
+}
+
+impl RuntimeOptions {
+    pub(crate) fn parse_w<'arg>(&mut self, arg: &'arg str) -> Result<(), WarningParseErr<'arg>> {
+        if arg == "error" {
+            // `-Werror` promotes warnings to errors.
+            self.warnings_are_errors = true;
+            return Ok(());
+        } else if arg == "no-error" {
+            // `-Wno-error` cancels the above.
+            self.warnings_are_errors = false;
+            return Ok(());
+        }
+
+        let (state, mut flag) = if let Some(suffix) = arg.strip_prefix("error=") {
+            // `-Werror=<flag>` enables the flag as an error.
+            (
+                WarningState {
+                    state: WarningLevel::Enabled,
+                    error: WarningLevel::Enabled,
+                },
+                suffix,
+            )
+        } else if let Some(suffix) = arg.strip_prefix("no-error=") {
+            // `-Wno-error=<flag>` prevents the flag from being an error,
+            // without affecting whether it is enabled.
+            (
+                WarningState {
+                    state: WarningLevel::Default,
+                    error: WarningLevel::Disabled,
+                },
+                suffix,
+            )
+        } else if let Some(suffix) = arg.strip_prefix("no-") {
+            // `-Wno-<flag>` disables the flag.
+            (
+                WarningState {
+                    state: WarningLevel::Disabled,
+                    error: WarningLevel::Default,
+                },
+                suffix,
+            )
+        } else {
+            // `-W<flag>` enables the flag.
+            (
+                WarningState {
+                    state: WarningLevel::Enabled,
+                    error: WarningLevel::Default,
+                },
+                arg,
+            )
+        };
+
+        // Check for an `=` parameter to process as a parametric warning.
+        // `-Wno-<flag>` and `-Wno-error=<flag>` negation cannot have an `=` parameter, but without a
+        // parameter, the 0 value will apply to all levels of a parametric warning.
+        let param = if let Some((root_flag, param)) = (state.state != WarningLevel::Enabled)
+            .then(|| flag.split_once('='))
+            .flatten()
+        {
+            flag = root_flag;
+            Some(param.parse()?)
+        } else {
+            None
+        };
+
+        // Try to match the flag against a parametric warning.
+        for &(name, WarningKind(id), nb_levels) in &diagnostics::PARAMETRIC_WARNINGS {
+            if flag == name {
+                let level = match param {
+                    None => 1, // TODO: allow specifying other defaults
+                    Some(level) => {
+                        if level > nb_levels {
+                            return Err(WarningParseErr::ParamOutOfRange(name, level, nb_levels));
+                        }
+                        level
+                    }
+                };
+
+                // Set the first <level> to enabled/error, and disable the rest.
+                for ofs in 0..nb_levels {
+                    let warning = &mut self.warnings[id + ofs];
+                    if ofs < level {
+                        warning.update(state);
+                    } else {
+                        warning.state = WarningLevel::Disabled;
+                    }
+                }
+                return Ok(());
+            }
+        }
+
+        // Try to match against a non-parametric warning, unless a parameter was given.
+        if param.is_none() {
+            // Try to match against a "meta" warning.
+            for (i, &meta_warning) in META_WARNINGS.iter().enumerate() {
+                if flag == meta_warning {
+                    self.meta_warnings[i + 1].update(state);
+                    return Ok(());
+                }
+            }
+
+            // Try to match against a "simple" warning.
+            for &(simple_warning, id) in &SIMPLE_WARNINGS {
+                if flag == simple_warning {
+                    self.warnings[id.0].update(state);
+                    return Ok(());
+                }
+            }
+        }
+
+        Err(WarningParseErr::Unknown(arg))
+    }
+}
+#[derive(Debug, Error)]
+pub(crate) enum WarningParseErr<'arg> {
+    #[error("Invalid warning level: {0}")]
+    BadLevel(#[from] std::num::ParseIntError),
+    #[error("`{1} is too large a parameter for `-W{0}`, the maximum is {2}")]
+    ParamOutOfRange(&'static str, usize, usize),
+    #[error("Unknown warning name `{0}`")]
+    Unknown(&'arg str),
 }
