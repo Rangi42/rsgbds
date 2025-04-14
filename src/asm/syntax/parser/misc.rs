@@ -1,8 +1,57 @@
 use compact_str::CompactString;
 
-use crate::{diagnostics, syntax::tokens::Token};
+use crate::{
+    diagnostics,
+    syntax::tokens::{tok, Token},
+};
 
 use super::{expr, string, ParseCtx};
+
+pub(super) fn parse_comma_list<
+    'ctx_stack,
+    T,
+    F: FnMut(
+        Option<Token<'ctx_stack>>,
+        &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
+    ) -> (Option<T>, Option<Token<'ctx_stack>>),
+>(
+    mut parse_element: F,
+    mut lookahead: Option<Token<'ctx_stack>>,
+    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
+) -> (Vec<T>, Option<Token<'ctx_stack>>) {
+    let mut elements = vec![];
+    loop {
+        let (maybe_elem, new_lookahead) = parse_element(lookahead, parse_ctx);
+        lookahead = new_lookahead;
+        let Some(element) = maybe_elem else {
+            break;
+        };
+        elements.push(element);
+
+        if !matches!(
+            lookahead,
+            Some(Token {
+                payload: tok!(","),
+                ..
+            })
+        ) {
+            break;
+        }
+        // Consume the comma.
+        lookahead = parse_ctx.next_token();
+        // Allow trailing commas.
+        if matches!(
+            lookahead,
+            Some(Token {
+                payload: tok!("end of line") | tok!(")"),
+                ..
+            })
+        ) {
+            break;
+        }
+    }
+    (elements, lookahead)
+}
 
 pub(super) enum StrOrNum {
     Num(i32),
@@ -12,6 +61,7 @@ pub(super) fn parse_str_or_const_expr<'ctx_stack>(
     first_token: Option<Token<'ctx_stack>>,
     parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
 ) -> (Option<StrOrNum>, Option<Token<'ctx_stack>>) {
+    // It's important to try this one first, as strings are valid numeric expressions.
     let (maybe_string, lookahead) = string::parse_string_expr(first_token, parse_ctx);
     if let Some(string) = maybe_string {
         return (Some(StrOrNum::String(string)), lookahead);
