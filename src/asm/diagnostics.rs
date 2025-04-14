@@ -108,7 +108,7 @@ pub fn warn<F: FnOnce(&mut ReportBuilder)>(
         } => return, // `-Wno-this`
         WarningState {
             error: WarningLevel::Enabled,
-            ..
+            state: WarningLevel::Default | WarningLevel::Enabled,
         } => ERROR_KIND, // `-Werror=this`
         WarningState {
             state: WarningLevel::Enabled,
@@ -126,7 +126,7 @@ pub fn warn<F: FnOnce(&mut ReportBuilder)>(
                 } => return, // `-Wno-meta`
                 WarningState {
                     error: WarningLevel::Enabled,
-                    ..
+                    state: WarningLevel::Default | WarningLevel::Enabled,
                 } => ERROR_KIND, // `-Werror=meta`
                 WarningState {
                     state: WarningLevel::Enabled,
