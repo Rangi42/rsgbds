@@ -7,11 +7,9 @@
  */
 
 use std::{
-    error::Error,
     fs::File,
     io::{BufRead, BufReader, Write},
     path::{Path, PathBuf},
-    str::FromStr,
 };
 
 fn main() {
@@ -65,12 +63,46 @@ pub const NB_WARNINGS: usize = {};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MetaWarningKind(#[doc(hidden)] pub usize);
 
-const DEFAULT_WARNINGS: [MetaWarningKind; NB_WARNINGS] = [",
+macro_rules! warning {{",
         warnings.iter().fold(0, |acc, warning| acc
             + match &warning.kind {
                 WarningKind::Boolean { .. } => 1,
                 WarningKind::Parametric { meta_levels, .. } => meta_levels.len(),
             }),
+    )
+    .unwrap();
+    let mut i = 0;
+    for warning in &warnings {
+        match &warning.kind {
+            WarningKind::Boolean { .. } => {
+                writeln!(
+                    &mut file,
+                    "    (\"{}\") => {{ $crate::diagnostics::WarningKind({i}) }};",
+                    &warning.name
+                )
+                .unwrap();
+                i += 1;
+            }
+            WarningKind::Parametric { meta_levels, .. } => {
+                for level in 0..meta_levels.len() {
+                    writeln!(
+                        &mut file,
+                        "    (\"{}={}\") => {{ $crate::diagnostics::WarningKind({i}) }};",
+                        &warning.name,
+                        level + 1,
+                    )
+                    .unwrap();
+                    i += 1;
+                }
+            }
+        }
+    }
+    writeln!(
+        &mut file,
+        "}}
+pub(crate) use warning;
+
+const DEFAULT_WARNINGS: [MetaWarningKind; NB_WARNINGS] = ["
     )
     .unwrap();
     for warning in &warnings {
@@ -104,17 +136,15 @@ pub(crate) const SIMPLE_WARNINGS: [(&'static str, WarningKind); NB_SIMPLE_WARNIN
     )
     .unwrap();
     let mut nb_simple_warnings = 0;
-    let mut id = 0;
     for warning in &warnings {
-        match &warning.kind {
-            WarningKind::Boolean { .. } => {
-                writeln!(&mut file, "\t(\"{}\", WarningKind({id})),", warning.name).unwrap();
-                nb_simple_warnings += 1;
-                id += 1;
-            }
-            WarningKind::Parametric { meta_levels } => {
-                id += meta_levels.len();
-            }
+        if let WarningKind::Boolean { .. } = &warning.kind {
+            writeln!(
+                &mut file,
+                "\t(\"{}\", warning!(\"{}\")),",
+                warning.name, warning.name,
+            )
+            .unwrap();
+            nb_simple_warnings += 1;
         }
     }
 
@@ -127,11 +157,12 @@ pub(crate) const PARAMETRIC_WARNINGS: [(&'static str, WarningKind, usize); NB_PA
     )
     .unwrap();
     let mut nb_parametric_warnings = 0;
-    for (id, warning) in warnings.iter().enumerate() {
+    for warning in &warnings {
         if let WarningKind::Parametric { meta_levels } = &warning.kind {
             writeln!(
                 &mut file,
-                "\t(\"{}\", WarningKind({id}), {}),",
+                "\t(\"{}\", warning!(\"{}=1\"), {}),",
+                warning.name,
                 warning.name,
                 meta_levels.len(),
             )
@@ -156,40 +187,6 @@ pub(crate) const META_WARNINGS: [&'static str; NB_META_WARNINGS] = [",
     writeln!(
         &mut file,
         "];
-
-macro_rules! warning {{"
-    )
-    .unwrap();
-    let mut i = 0;
-    for warning in &warnings {
-        match &warning.kind {
-            WarningKind::Boolean { .. } => {
-                writeln!(
-                    &mut file,
-                    "    (\"{}\") => {{ $crate::diagnostics::WarningKind({i}) }};",
-                    &warning.name
-                )
-                .unwrap();
-                i += 1;
-            }
-            WarningKind::Parametric { meta_levels, .. } => {
-                for level in 0..meta_levels.len() {
-                    writeln!(
-                        &mut file,
-                        "    (\"{}={}\") => {{ $crate::diagnostics::WarningKind({i}) }};",
-                        &warning.name,
-                        level + 1,
-                    )
-                    .unwrap();
-                    i += 1;
-                }
-            }
-        }
-    }
-    writeln!(
-        &mut file,
-        "}}
-pub(crate) use warning;
 
 impl std::fmt::Display for WarningKind {{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
