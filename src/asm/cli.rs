@@ -8,9 +8,9 @@
 
 #![deny(missing_docs)]
 
-use std::path::PathBuf;
+use std::{fmt::Display, path::PathBuf};
 
-use clap::{ColorChoice, Parser};
+use clap::{ColorChoice, CommandFactory, Parser};
 use thiserror::Error;
 
 use crate::diagnostics::{WarningKind, META_WARNINGS, SIMPLE_WARNINGS};
@@ -85,6 +85,7 @@ pub(super) struct Cli {
 impl Cli {
     pub(super) fn finish(self) -> Result<(Options, PathBuf, Vec<String>, Vec<String>), ()> {
         crate::common::cli::apply_color_choice(self.color);
+        let mut fail = false;
 
         let mut runtime_opts = RuntimeOptions {
             binary_digits: ['0', '1'],
@@ -98,40 +99,53 @@ impl Cli {
         };
         runtime_opts.meta_warnings[0].state = WarningLevel::Enabled; // Level 0 is "default".
         if let Some(digits) = self.binary_digits {
-            runtime_opts.parse_b(&digits);
+            handle_error(runtime_opts.parse_b(&digits), &mut fail);
         }
         if let Some(chars) = self.gfx_chars {
-            runtime_opts.parse_g(&chars);
+            handle_error(runtime_opts.parse_g(&chars), &mut fail);
         }
         if let Some(value) = self.pad_value {
-            runtime_opts.parse_p(&value);
+            handle_error(runtime_opts.parse_p(&value), &mut fail);
         }
         if let Some(precision) = self.q_precision {
-            runtime_opts.parse_q(&precision);
+            handle_error(runtime_opts.parse_q(&precision), &mut fail);
         }
         if let Some(depth) = self.recursion_depth {
-            runtime_opts.parse_r(&depth);
+            handle_error(runtime_opts.parse_r(&depth), &mut fail);
         }
         for flag in &self.warning {
-            runtime_opts.parse_w(flag);
+            handle_error(runtime_opts.parse_w(flag), &mut fail);
+        }
+        fn handle_error<E: Display>(r: Result<(), E>, fail: &mut bool) {
+            if let Err(error) = r {
+                Cli::command()
+                    .error(clap::error::ErrorKind::InvalidValue, error)
+                    .print()
+                    .unwrap();
+                *fail = true;
+            }
         }
 
-        Ok((
-            Options {
-                export_all: self.export_all,
-                inc_paths: self.inc_paths,
-                dependfile: self.dependfile,
-                output: self.output,
-                preinclude: self.preinclude,
-                inhibit_warnings: self.inhibit_warnings,
-                max_errors: self.max_errors,
-                runtime_opts,
-                runtime_opt_stack: vec![],
-            },
-            self.input,
-            self.defines,
-            self.warning,
-        ))
+        if fail {
+            Err(())
+        } else {
+            Ok((
+                Options {
+                    export_all: self.export_all,
+                    inc_paths: self.inc_paths,
+                    dependfile: self.dependfile,
+                    output: self.output,
+                    preinclude: self.preinclude,
+                    inhibit_warnings: self.inhibit_warnings,
+                    max_errors: self.max_errors,
+                    runtime_opts,
+                    runtime_opt_stack: vec![],
+                },
+                self.input,
+                self.defines,
+                self.warning,
+            ))
+        }
     }
 }
 
@@ -290,7 +304,7 @@ impl RuntimeOptions {
         // Check for an `=` parameter to process as a parametric warning.
         // `-Wno-<flag>` and `-Wno-error=<flag>` negation cannot have an `=` parameter, but without a
         // parameter, the 0 value will apply to all levels of a parametric warning.
-        let param = if let Some((root_flag, param)) = (state.state != WarningLevel::Enabled)
+        let param = if let Some((root_flag, param)) = (state.state == WarningLevel::Enabled)
             .then(|| flag.split_once('='))
             .flatten()
         {
@@ -352,7 +366,7 @@ impl RuntimeOptions {
 pub(crate) enum WarningParseErr<'arg> {
     #[error("Invalid warning level: {0}")]
     BadLevel(#[from] std::num::ParseIntError),
-    #[error("`{1} is too large a parameter for `-W{0}`, the maximum is {2}")]
+    #[error("{1} is too large a parameter for `-W{0}`, the maximum is {2}")]
     ParamOutOfRange(&'static str, usize, usize),
     #[error("Unknown warning name `{0}`")]
     Unknown(&'arg str),
