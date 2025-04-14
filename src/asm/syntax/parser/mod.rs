@@ -21,7 +21,6 @@ use compact_str::CompactString;
 use crate::{
     context_stack::{ContextStack, Span},
     diagnostics,
-    expr::Expr,
     macro_args::MacroArgs,
     source_store::{RawSpan, SourceHandle, SourceStore},
     symbols::Symbols,

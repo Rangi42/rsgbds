@@ -15,7 +15,6 @@ TODO: describe the "char stream" / remainder split more
 
 use std::{cell::Cell, num::NonZeroUsize, ops::Range};
 
-use chrono::format::format;
 use compact_str::CompactString;
 use unicase::UniCase;
 
@@ -23,8 +22,8 @@ use crate::{
     context_stack::{ContextStack, SourceContext, SourceNode, SourceRef, SourcesMut, Span},
     diagnostics,
     format::FormatSpec,
-    source_store::{RawSpan, ReportBuilder, SourceHandle, SourceStore},
-    symbols::{SymName, Symbols},
+    source_store::{RawSpan, ReportBuilder, SourceStore},
+    symbols::Symbols,
     syntax::tokens::{tok, Token, TokenPayload, KEYWORDS},
     Options,
 };

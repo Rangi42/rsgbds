@@ -5,7 +5,7 @@ use yansi::Color;
 
 use crate::{
     context_stack::{SourceNode, Span},
-    source_store::{RawSpan, Report, ReportBuilder, SourceHandle, SourceStore},
+    source_store::{RawSpan, Report, ReportBuilder, SourceStore},
     Options,
 };
 

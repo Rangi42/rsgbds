@@ -6,7 +6,7 @@
  * SPDX-License-Identifier: MPL-2.0
  */
 
-use std::{debug_assert, fs::File, io::Write, num::NonZeroU32, path::Path};
+use std::{debug_assert, fs::File, num::NonZeroU32, path::Path};
 
 use parse_display::Display;
 

@@ -8,7 +8,7 @@
 
 #![deny(missing_docs)]
 
-use std::{fmt::Display, path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 use clap::{ColorChoice, Parser};
 use thiserror::Error;

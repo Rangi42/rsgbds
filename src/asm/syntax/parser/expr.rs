@@ -1,10 +1,7 @@
-use rgbds::rpn::Rpn;
-
 use crate::{
-    context_stack::Span,
     diagnostics,
     expr::{BinOp, Expr, UnOp},
-    syntax::tokens::{tok, Token, TokenPayload},
+    syntax::tokens::{tok, Token},
 };
 
 use super::{expect_one_of, ParseCtx};
