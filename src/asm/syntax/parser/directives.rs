@@ -1,6 +1,6 @@
 use crate::syntax::tokens::{tok, Token};
 
-use super::{expr, misc, ParseCtx};
+use super::{expr, matches_tok, misc, ParseCtx};
 
 pub(super) fn parse_align<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
@@ -219,43 +219,42 @@ pub(super) fn parse_pops<'ctx_stack>(
     todo!()
 }
 
+fn parse_print_elem<'ctx_stack>(
+    first_token: Option<Token<'ctx_stack>>,
+    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
+) -> (Option<()>, Option<Token<'ctx_stack>>) {
+    let (expr, lookahead) = misc::parse_str_or_const_expr(first_token, parse_ctx);
+    match expr {
+        None => return (None, lookahead),
+        Some(misc::StrOrNum::Num(value)) => print!("${value:X}"),
+        Some(misc::StrOrNum::String(string)) => print!("{string}"),
+    };
+    (Some(()), lookahead)
+}
 pub(super) fn parse_println<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
     parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
 ) -> Option<Token<'ctx_stack>> {
-    fn parse_elem<'ctx_stack>(
-        first_token: Option<Token<'ctx_stack>>,
-        parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
-    ) -> (Option<()>, Option<Token<'ctx_stack>>) {
-        let (expr, lookahead) = misc::parse_str_or_const_expr(first_token, parse_ctx);
-        match expr {
-            None => return (None, lookahead),
-            Some(misc::StrOrNum::Num(value)) => print!("${value:X}"),
-            Some(misc::StrOrNum::String(string)) => print!("{string}"),
-        };
-        (Some(()), lookahead)
-    }
     let mut lookahead = parse_ctx.next_token();
     // Allow a lack of arguments.
-    if !matches!(
-        lookahead,
-        Some(Token {
-            payload: tok!("end of line"),
-            ..
-        })
-    ) {
-        let (_, new_lookahead) = misc::parse_comma_list(parse_elem, lookahead, parse_ctx);
+    if !matches_tok!(lookahead, "end of line") {
+        let (_, new_lookahead) = misc::parse_comma_list(parse_print_elem, lookahead, parse_ctx);
         lookahead = new_lookahead;
     }
     println!();
     lookahead
 }
-
 pub(super) fn parse_print<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
     parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
 ) -> Option<Token<'ctx_stack>> {
-    todo!()
+    let mut lookahead = parse_ctx.next_token();
+    // Allow a lack of arguments.
+    if !matches_tok!(lookahead, "end of line") {
+        let (_, new_lookahead) = misc::parse_comma_list(parse_print_elem, lookahead, parse_ctx);
+        lookahead = new_lookahead;
+    }
+    lookahead
 }
 
 pub(super) fn parse_purge<'ctx_stack>(

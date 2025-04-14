@@ -5,7 +5,7 @@ use crate::{
     syntax::tokens::{tok, Token},
 };
 
-use super::{expr, string, ParseCtx};
+use super::{expr, matches_tok, string, ParseCtx};
 
 pub(super) fn parse_comma_list<
     'ctx_stack,
@@ -28,25 +28,13 @@ pub(super) fn parse_comma_list<
         };
         elements.push(element);
 
-        if !matches!(
-            lookahead,
-            Some(Token {
-                payload: tok!(","),
-                ..
-            })
-        ) {
+        if !matches_tok!(lookahead, ",") {
             break;
         }
         // Consume the comma.
         lookahead = parse_ctx.next_token();
         // Allow trailing commas.
-        if matches!(
-            lookahead,
-            Some(Token {
-                payload: tok!("end of line") | tok!(")"),
-                ..
-            })
-        ) {
+        if matches_tok!(lookahead, "end of line" | ")") {
             break;
         }
     }

@@ -67,6 +67,13 @@ macro_rules! expect_one_of {
 }
 use expect_one_of; // Allow this macro to be used by children modules.
 
+macro_rules! matches_tok {
+    ($value:expr, $($name:tt)|+) => {
+        matches!($value, Some(Token { payload: $(tok!($name))|+, .. }))
+    };
+}
+use matches_tok;
+
 pub fn parse_file<'ctx_stack>(
     source: SourceHandle,
     ctx_stack: &'ctx_stack ContextStack,
