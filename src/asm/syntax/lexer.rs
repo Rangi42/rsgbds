@@ -264,19 +264,24 @@ pub fn next_token<'ctx_stack>(
             '!' => break make!(tok!("!"), '=' => tok!("!=")),
 
             '<' => {
-                break make!(tok!("<"), '=' => tok!("<="),
+                break make!(tok!("<"),
+                    '=' => tok!("<="),
                     '<' => break make!(tok!("<<"), '=' => tok!("<<=")),
                 )
             }
             '>' => {
-                break make!(tok!(">"), '=' => tok!(">="),
+                break make!(tok!(">"),
+                    '=' => tok!(">="),
                     '>' => break make!(tok!(">>"), '=' => tok!(">>="),
                         '>' => break make!(tok!(">>>"), '=' => tok!(">>>=")),
                     )
                 )
             }
             ':' => {
-                break make!(tok!(":"), ':' => tok!("::"), first_char @ ('-' | '+') => read_anon_label_ref(params, first_char))
+                break make!(tok!(":"),
+                    ':' => tok!("::"),
+                    first_char @ ('-' | '+') => read_anon_label_ref(params, first_char)
+                )
             }
 
             '0'..='9' => {
@@ -293,25 +298,29 @@ pub fn next_token<'ctx_stack>(
             }
 
             '&' => {
-                break make!(tok!("&"), '=' => tok!("&="), '&' => tok!("&&"), ch @ '0'..='7' => tok!("number")(read_number(params, ch, 8, start)));
+                break make!(tok!("&"),
+                    '=' => tok!("&="),
+                    '&' => tok!("&&"),
+                    ch @ '0'..='7' => tok!("number")(read_number(params, ch, 8, start))
+                );
             }
             '%' => {
-                consume_char(params.src_ctx, '%');
+                consume_char(params.src_ctx, ch);
 
-                break Token {
-                    payload: match peek(params, true, true) {
-                        Some('=') => tok!("%="),
-                        Some(c) if params.options.runtime_opts.binary_digits.contains(&c) => {
-                            tok!("number")(read_dyn_number(
-                                params,
-                                c,
-                                &params.options.runtime_opts.binary_digits,
-                                start,
-                            ))
-                        }
-                        _ => tok!("%"),
+                break match peek(params, true, true) {
+                    Some('=') => make!(tok!("%=")),
+                    Some(c) if params.options.runtime_opts.binary_digits.contains(&c) => {
+                        make!(tok!("number")(read_dyn_number(
+                            params,
+                            c,
+                            &params.options.runtime_opts.binary_digits,
+                            start,
+                        )))
+                    }
+                    _ => Token {
+                        payload: tok!("%"),
+                        span: span(start, loc(params.src_ctx), ctx_stack, &mut sources),
                     },
-                    span: span(start, loc(params.src_ctx), ctx_stack, &mut sources),
                 };
             }
             '$' => {
