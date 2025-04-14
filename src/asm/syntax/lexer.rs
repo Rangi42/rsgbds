@@ -699,13 +699,13 @@ fn read_ident(
     tok!("identifier")(params.symbols.intern_name(name))
 }
 
-pub fn next_token_raw(
-    ctx_stack: &ContextStack,
+pub fn next_token_raw<'ctx_stack>(
+    ctx_stack: &'ctx_stack ContextStack,
     source_store: &SourceStore,
     symbols: &mut Symbols,
     nb_errors_remaining: &Cell<usize>,
     options: &Options,
-) -> Option<CompactString> {
+) -> Option<(CompactString, Span<'ctx_stack>)> {
     let mut sources = ctx_stack.sources_mut();
     let (src_ctx, nodes) = sources.active_context_mut()?; // If there are no more contexts, no more tokens can be produced.
     let node = src_ctx.node(nodes);
@@ -737,6 +737,8 @@ pub fn next_token_raw(
     }
 
     let mut raw_elem = CompactString::default();
+    let start = loc(params.src_ctx);
+    let mut end = loc(params.src_ctx);
 
     let mut parens_depth = 0usize;
     let ended_on_comma = loop {
@@ -868,18 +870,23 @@ pub fn next_token_raw(
 
         match peek(&mut params, true, true) {
             // String literals inside of a raw element.
-            Some('"') => consume_string_literal(&mut params, false, &mut raw_elem),
+            Some('"') => {
+                consume_string_literal(&mut params, false, &mut raw_elem);
+                end = loc(params.src_ctx);
+            }
             // (Possibly) raw string literals inside of a raw element.
             Some('#') => {
                 consume!('#');
                 if peek(&mut params, true, true) == Some('"') {
                     consume_string_literal(&mut params, true, &mut raw_elem);
                 }
+                end = loc(params.src_ctx);
             }
 
             Some('(') => {
                 consume!('(');
                 parens_depth += 1;
+                end = loc(params.src_ctx);
             }
             Some(')') => {
                 consume!(')');
@@ -888,6 +895,7 @@ pub fn next_token_raw(
                 } else {
                     todo!() // Warn?
                 }
+                end = loc(params.src_ctx);
             }
 
             // Block comments inside of macro args.
@@ -907,7 +915,12 @@ pub fn next_token_raw(
             // Character escape.
             Some('\\') => todo!(),
 
-            Some(ch) => consume!(ch),
+            Some(ch) => {
+                consume!(ch);
+                if !ch.is_ascii_whitespace() {
+                    end = loc(params.src_ctx);
+                }
+            }
         }
     };
 
@@ -923,7 +936,7 @@ pub fn next_token_raw(
     );
 
     if ended_on_comma || !raw_elem.is_empty() {
-        Some(raw_elem)
+        Some((raw_elem, span(start, end, ctx_stack, &mut sources)))
     } else {
         None
     }

@@ -81,7 +81,7 @@ pub struct RuntimeOptions {
     warnings_are_errors: bool,
 }
 
-fn run(options: Options, input_path: PathBuf, defines: Vec<String>) -> Result<(), ExitCode> {
+fn run(mut options: Options, input_path: PathBuf, defines: Vec<String>) -> Result<(), ExitCode> {
     let mut sources = SourceStore::new();
     let mut context_stack = ContextStack::new();
     let remaining_errors = Cell::new(options.max_errors);
@@ -122,7 +122,7 @@ fn run(options: Options, input_path: PathBuf, defines: Vec<String>) -> Result<()
                     &sources,
                     &mut symbols,
                     &remaining_errors,
-                    &options,
+                    &mut options,
                 );
             }
         }
@@ -152,7 +152,7 @@ fn run(options: Options, input_path: PathBuf, defines: Vec<String>) -> Result<()
         &sources,
         &mut symbols,
         &remaining_errors,
-        &options,
+        &mut options,
     );
 
     if remaining_errors.get() == options.max_errors {

@@ -79,7 +79,7 @@ pub fn parse_file<'ctx_stack>(
     sources: &SourceStore,
     symbols: &mut Symbols<'ctx_stack>,
     nb_errors_remaining: &Cell<usize>,
-    options: &Options,
+    options: &mut Options,
 ) {
     let mut parse_ctx = ParseCtx {
         ctx_stack,
@@ -92,14 +92,7 @@ pub fn parse_file<'ctx_stack>(
     ctx_stack.sources_mut().push_file_context(source);
     while ctx_stack.sources_mut().active_context().is_some() {
         while let Some(first_token) = parse_ctx.next_token() {
-            parse_line(
-                first_token,
-                &mut parse_ctx,
-                sources,
-                nb_errors_remaining,
-                options,
-                ctx_stack,
-            );
+            parse_line(first_token, &mut parse_ctx, ctx_stack);
         }
 
         // We're done parsing from this context, so end it.
@@ -111,9 +104,6 @@ pub fn parse_file<'ctx_stack>(
 fn parse_line<'ctx_stack>(
     mut first_token: Token<'ctx_stack>,
     parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
-    sources: &SourceStore,
-    nb_errors_remaining: &Cell<usize>,
-    options: &Options,
     ctx_stack: &'ctx_stack ContextStack,
 ) {
     match &first_token.payload {
@@ -128,9 +118,9 @@ fn parse_line<'ctx_stack>(
                     );
                     error.set_help("Consider applying patches using `patch` or `git apply`");
                 },
-                sources,
-                nb_errors_remaining,
-                options,
+                parse_ctx.sources,
+                parse_ctx.nb_errors_remaining,
+                parse_ctx.options,
             );
             match parse_ctx.next_token() {
                 None => return,
@@ -196,7 +186,7 @@ fn parse_line<'ctx_stack>(
             // Macro call.
             // Get the macro's arguments.
             let args = Rc::new(MacroArgs::new(
-                std::iter::from_fn(|| parse_ctx.next_token_raw()).collect(),
+                std::iter::from_fn(|| parse_ctx.next_token_raw().map(|(arg, _span)| arg)).collect(),
             ));
 
             let name = parse_ctx.symbols.resolve(ident);
@@ -210,9 +200,9 @@ fn parse_line<'ctx_stack>(
                                 .with_message("Attempting to call the macro here"),
                         );
                     },
-                    sources,
-                    nb_errors_remaining,
-                    options,
+                    parse_ctx.sources,
+                    parse_ctx.nb_errors_remaining,
+                    parse_ctx.options,
                 ),
                 Some(Err(other)) => diagnostics::error(
                     &first_token.span,
@@ -225,9 +215,9 @@ fn parse_line<'ctx_stack>(
                                 .with_message("A symbol by this name was defined here"),
                         ]);
                     },
-                    sources,
-                    nb_errors_remaining,
-                    options,
+                    parse_ctx.sources,
+                    parse_ctx.nb_errors_remaining,
+                    parse_ctx.options,
                 ),
                 Some(Ok(slice)) => {
                     ctx_stack
@@ -430,7 +420,7 @@ struct ParseCtx<'ctx_stack, 'sources, 'symbols, 'nb_errs, 'options> {
     sources: &'sources SourceStore,
     symbols: &'symbols mut Symbols<'ctx_stack>,
     nb_errors_remaining: &'nb_errs Cell<usize>,
-    options: &'options Options,
+    options: &'options mut Options,
 }
 
 impl<'ctx_stack> ParseCtx<'ctx_stack, '_, '_, '_, '_> {
@@ -454,7 +444,7 @@ impl<'ctx_stack> ParseCtx<'ctx_stack, '_, '_, '_, '_> {
             self.options,
         )
     }
-    fn next_token_raw(&mut self) -> Option<CompactString> {
+    fn next_token_raw(&mut self) -> Option<(CompactString, Span<'ctx_stack>)> {
         lexer::next_token_raw(
             self.ctx_stack,
             self.sources,
