@@ -69,7 +69,7 @@ pub(super) fn parse_str_or_const_expr<'ctx_stack>(
             |error| {
                 error.set_message(format!("Syntax error: unexpected {}", lookahead.payload));
                 error.add_label(
-                    diagnostics::error_label(lookahead.span.resolve())
+                    diagnostics::error_label(&lookahead.span)
                         .with_message("Expected a numeric or string expression"),
                 );
             },

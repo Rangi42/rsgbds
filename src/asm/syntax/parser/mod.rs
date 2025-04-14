@@ -211,7 +211,7 @@ fn parse_line<'ctx_stack>(
                         error.add_labels([
                             diagnostics::error_label(&first_token.span)
                                 .with_message("Macro call here"),
-                            diagnostics::note_label(other.def_span().resolve())
+                            diagnostics::note_label(other.def_span())
                                 .with_message("A symbol by this name was defined here"),
                         ]);
                     },

@@ -340,7 +340,7 @@ pub(super) fn parse_warn<'ctx_stack>(
             &keyword.span,
             |warning| {
                 warning.set_message(message);
-                warning.add_label(diagnostics::warning_label(keyword.span.resolve()))
+                warning.add_label(diagnostics::warning_label(&keyword.span))
             },
             parse_ctx.sources,
             parse_ctx.nb_errors_remaining,
@@ -360,8 +360,7 @@ pub(super) fn parse_fail<'ctx_stack>(
             |error| {
                 error.set_message(message);
                 error.add_label(
-                    diagnostics::error_label(keyword.span.resolve())
-                        .with_message("Assembly aborted here"),
+                    diagnostics::error_label(&keyword.span).with_message("Assembly aborted here"),
                 );
             },
             parse_ctx.sources,
@@ -480,7 +479,7 @@ pub(super) fn parse_opt<'ctx_stack>(
             |error| {
                 error.set_message("Syntax error: missing option string");
                 error.add_label(
-                    diagnostics::error_label(keyword.span.resolve())
+                    diagnostics::error_label(&keyword.span)
                         .with_message("`OPT` must be followed by at least one option"),
                 );
             },
@@ -528,8 +527,7 @@ pub(super) fn parse_popo<'ctx_stack>(
             |error| {
                 error.set_message("Cannot pop from empty option stack");
                 error.add_label(
-                    diagnostics::error_label(keyword.span.resolve())
-                        .with_message("Attempting to pop here"),
+                    diagnostics::error_label(&keyword.span).with_message("Attempting to pop here"),
                 );
             },
             parse_ctx.sources,

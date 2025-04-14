@@ -286,9 +286,9 @@ impl<'ctx_stack> Symbols<'ctx_stack> {
                         self.names.resolve(name.0).unwrap()
                     ));
                     error.add_labels([
-                        diagnostics::note_label(existing.def_span().resolve())
+                        diagnostics::note_label(existing.def_span())
                             .with_message("The name is used here..."),
-                        diagnostics::error_label(definition.resolve())
+                        diagnostics::error_label(&definition)
                             .with_message("...so it's not available for this definition"),
                     ]);
                     error.set_help("If this is intentional, consider using `PURGE` to delete the old definition first");
