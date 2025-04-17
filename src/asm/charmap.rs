@@ -1,6 +1,9 @@
 use std::{
     cell::Cell,
-    collections::{hash_map::DefaultHasher, HashMap},
+    collections::{
+        hash_map::{DefaultHasher, Entry},
+        HashMap,
+    },
     hash::BuildHasherDefault,
 };
 
@@ -29,7 +32,6 @@ type Children = HashMap<char, usize, BuildHasherDefault<DefaultHasher>>;
 #[derive(Debug, Clone)]
 struct Node {
     children: Children,
-    parent_id: usize,
     mapping: Vec<i32>,
 }
 
@@ -62,6 +64,7 @@ impl<'ctx_stack> Charmaps<'ctx_stack> {
             ));
         }
         self.charmaps.push(Charmap::new(name, def_span));
+        self.active_charmap_id = self.charmaps.len() - 1;
         Ok(())
     }
     pub fn make_copy(
@@ -86,6 +89,7 @@ impl<'ctx_stack> Charmaps<'ctx_stack> {
             nodes: vec![],
             root_node: self.charmaps[i].root_node.clone(),
         });
+        self.active_charmap_id = self.charmaps.len() - 1;
         Ok(())
     }
     pub fn switch_to(&mut self, name: &str) -> Option<()> {
@@ -116,6 +120,28 @@ impl<'ctx_stack> Charmap<'ctx_stack> {
             nodes: vec![],
             root_node: HashMap::with_capacity_and_hasher(128, BuildHasherDefault::default()),
         }
+    }
+
+    pub fn add_mapping(&mut self, string: &str, values: Vec<i32>) -> Option<()> {
+        let mut chars = string.chars();
+        let mut node_id = *self.root_node.entry(chars.next()?).or_insert_with(|| {
+            self.nodes.push(Node::new());
+            self.nodes.len() - 1
+        });
+        for c in chars {
+            let next_node_id = self.nodes.len();
+            node_id = match self.nodes[node_id].children.entry(c) {
+                Entry::Occupied(entry) => *entry.get(),
+                Entry::Vacant(entry) => {
+                    entry.insert(next_node_id);
+                    self.nodes.push(Node::new());
+                    next_node_id
+                }
+            };
+        }
+        // TODO: warn if a mapping already exists
+        self.nodes[node_id].mapping = values;
+        Some(())
     }
 
     pub fn is_empty(&self) -> bool {
@@ -246,6 +272,15 @@ impl<'ctx_stack> CharmapError<'ctx_stack> {
                 error.set_message(format!("No charmap called \"{name}\" exists"));
                 error.add_label(diagnostics::error_label(span).with_message("Requested here"));
             }
+        }
+    }
+}
+
+impl Node {
+    fn new() -> Self {
+        Self {
+            children: Default::default(),
+            mapping: vec![],
         }
     }
 }

@@ -1,6 +1,6 @@
 use compact_str::CompactString;
 
-use crate::{context_stack::Span, syntax::tokens::Token};
+use crate::{context_stack::Span, diagnostics, syntax::tokens::Token};
 
 use super::{expect_one_of, tok, ParseCtx};
 
@@ -63,4 +63,29 @@ pub(super) fn parse_string_expr<'ctx_stack>(
             }
         }
     }
+}
+
+pub(super) fn expect_string_expr<'ctx_stack>(
+    first_token: Option<Token<'ctx_stack>>,
+    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+) -> (
+    Option<(CompactString, Span<'ctx_stack>)>,
+    Option<Token<'ctx_stack>>,
+) {
+    let (maybe_string, lookahead) = parse_string_expr(first_token, parse_ctx);
+    (
+        match maybe_string {
+            Some((string, span)) => Some((string, span)),
+            None => {
+                parse_ctx.report_syntax_error(lookahead.as_ref(), |error, span| {
+                    error.add_label(
+                        diagnostics::error_label(span)
+                            .with_message("Expected a string expression here"),
+                    )
+                });
+                None
+            }
+        },
+        lookahead,
+    )
 }

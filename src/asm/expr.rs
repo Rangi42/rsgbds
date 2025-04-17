@@ -268,7 +268,7 @@ impl UnOp {
 impl Error<'_> {
     pub fn report(&self, sources: &SourceStore, nb_errors_left: &Cell<usize>, options: &Options) {
         // Do not report these, as they stem from syntax errors, and thus are duplicates.
-        if matches!(self.kind, ErrKind::NoExpr) {
+        if self.is_nothing() {
             return;
         }
 
@@ -283,6 +283,10 @@ impl Error<'_> {
             nb_errors_left,
             options,
         )
+    }
+
+    pub fn is_nothing(&self) -> bool {
+        matches!(self.kind, ErrKind::NoExpr)
     }
 }
 impl ErrKind {

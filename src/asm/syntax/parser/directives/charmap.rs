@@ -1,12 +1,54 @@
 use crate::{diagnostics, syntax::tokens::Token};
 
-use super::super::{expect_one_of, tok, ParseCtx};
+use super::super::{expect_one_of, expr, misc, string, ParseCtx};
 
 pub(in super::super) fn parse_charmap<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
     parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
 ) -> Option<Token<'ctx_stack>> {
-    todo!()
+    let (maybe_string, lookahead) = string::expect_string_expr(parse_ctx.next_token(), parse_ctx);
+    let Some((string, span)) = maybe_string else {
+        return lookahead;
+    };
+    expect_one_of! { lookahead => {
+            |","| => {
+                let (values, lookahead) = misc::parse_comma_list(|lookahead, parse_ctx| {
+                    let (expr, lookahead) = expr::expect_numeric_expr(lookahead,parse_ctx);
+                    (
+                        match expr.try_const_eval() {
+                            Ok((value, _span)) => Some(value),
+                            Err(err) => if err.is_nothing() {
+                                None
+                            } else {
+                                parse_ctx.report_expr_error(err);
+                                Some(0)
+                            },
+                        },
+                        lookahead
+                    )
+                }, parse_ctx.next_token(), parse_ctx);
+                if parse_ctx.charmaps.active_charmap_mut().add_mapping(&string, values).is_none() {
+                    diagnostics::error(
+    &                    span,
+                        |error| {
+                            error.set_message("Cannot charmap an empty string");
+                            diagnostics::error_label(&span).with_message("This string shouldn't be empty");
+                        },
+                        parse_ctx.sources,
+                        parse_ctx.nb_errors_remaining,
+                        parse_ctx.options
+                    );
+                }
+                lookahead
+            },
+
+            else |other| => {
+                parse_ctx.report_syntax_error(other.as_ref(), |error, span| {
+                    error.add_label(diagnostics::error_label(span).with_message("Expected a comma here"));
+                });
+                other
+            }
+        }}
 }
 
 pub(in super::super) fn parse_newcharmap<'ctx_stack>(
