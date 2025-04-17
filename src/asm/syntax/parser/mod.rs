@@ -42,7 +42,7 @@ macro_rules! expect_one_of {
     ($payload:expr => {
         $( None => $if_none:expr, )?
         $( $( Token {$( $captured_fields:ident $(: $capture_pat:pat)? ),+} )? |$($kind:tt $(($fields:tt))?)/+| => $then:expr, )+
-        else |$unexpected:pat_param $(, $expected:pat_param)? $(,)?| => $handle_default:expr $(,)?
+        else |$unexpected:pat_param $(, $expected:pat_param)? $(,)?| => $handle_default:expr
     }) => {match $payload {
         $( None => $if_none, )?
         $( Some(Token {
@@ -73,6 +73,22 @@ macro_rules! matches_tok {
     };
 }
 use matches_tok;
+
+macro_rules! require {
+    ($payload:expr => $( Token {$( $captured_fields:ident ),+} @ )? |$($kind:tt $(($fields:tt))?)/+|
+        else |$unexpected:pat_param $(, $expected:pat_param)? $(,)?| $handle_default:expr
+    ) => {
+        let ($($($captured_fields,)+)? $($($fields,)?)+) = match $payload {
+            Some(Token {
+                payload: $( crate::syntax::tokens::tok!($kind $(($fields))?) )|+,
+                $($($captured_fields,)+)?
+                ..
+            }) => ($($($captured_fields,)+)? $($($fields,)?)+),
+            $unexpected => $handle_default,
+        };
+    }
+}
+use require;
 
 pub fn parse_file<'ctx_stack>(
     source: SourceHandle,
