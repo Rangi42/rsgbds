@@ -94,6 +94,14 @@ impl<'ctx_stack> Charmaps<'ctx_stack> {
     pub fn active_charmap_mut(&mut self) -> &mut Charmap<'ctx_stack> {
         &mut self.charmaps[self.active_charmap_id]
     }
+
+    pub fn push_active_charmap(&mut self) {
+        self.stack.push(self.active_charmap_id);
+    }
+    pub fn pop_active_charmap(&mut self) -> Option<()> {
+        self.active_charmap_id = self.stack.pop()?;
+        Some(())
+    }
 }
 impl<'ctx_stack> Charmap<'ctx_stack> {
     fn new(name: CompactString, def_span: Span<'ctx_stack>) -> Self {

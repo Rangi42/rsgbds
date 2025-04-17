@@ -420,7 +420,7 @@ fn reject_prior_label_def<'ctx_stack>(
 
 struct ParseCtx<'ctx_stack, 'charmaps, 'sources, 'symbols, 'nb_errs, 'options> {
     ctx_stack: &'ctx_stack ContextStack,
-    charmaps: &'charmaps Charmaps<'ctx_stack>,
+    charmaps: &'charmaps mut Charmaps<'ctx_stack>,
     sources: &'sources SourceStore,
     symbols: &'symbols mut Symbols<'ctx_stack>,
     nb_errors_remaining: &'nb_errs Cell<usize>,
