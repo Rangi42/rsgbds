@@ -71,7 +71,7 @@ rgbgfx = [
 	"dep:plumers",
 ]
 
-[dependencies] # TODO: audit deps & features
+[dependencies] # TODO: audit deps & features (`cargo machete`, `cargo bloat`)
 # TODO: use `thiserror` instead
 parse-display = { version = "0.9", default-features = false }
 thiserror = "2.0.12"

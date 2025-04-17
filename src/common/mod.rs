@@ -16,3 +16,8 @@ shadow_rs::shadow!(build);
 pub mod cli;
 pub mod dash_stdio;
 pub mod diagnostics;
+
+// https://doc.rust-lang.org/nightly/edition-guide/rust-2024/rpit-lifetime-capture.html#migrating-away-from-the-captures-trick
+#[doc(hidden)]
+pub trait Captures<T: ?Sized> {}
+impl<T: ?Sized, U: ?Sized> Captures<T> for U {}

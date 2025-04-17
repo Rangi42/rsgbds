@@ -19,6 +19,7 @@ use ariadne::ReportBuilder;
 use compact_str::CompactString;
 
 use crate::{
+    charmap::Charmaps,
     context_stack::{ContextStack, Span},
     diagnostics,
     macro_args::MacroArgs,
@@ -77,12 +78,14 @@ pub fn parse_file<'ctx_stack>(
     source: SourceHandle,
     ctx_stack: &'ctx_stack ContextStack,
     sources: &SourceStore,
+    charmaps: &mut Charmaps<'ctx_stack>,
     symbols: &mut Symbols<'ctx_stack>,
     nb_errors_remaining: &Cell<usize>,
     options: &mut Options,
 ) {
     let mut parse_ctx = ParseCtx {
         ctx_stack,
+        charmaps,
         sources,
         symbols,
         nb_errors_remaining,
@@ -103,7 +106,7 @@ pub fn parse_file<'ctx_stack>(
 
 fn parse_line<'ctx_stack>(
     mut first_token: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
+    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
     ctx_stack: &'ctx_stack ContextStack,
 ) {
     match &first_token.payload {
@@ -317,7 +320,7 @@ fn parse_line<'ctx_stack>(
         tok!("align") => directives::parse_align(first_token, parse_ctx),
         tok!("assert") => directives::output::parse_assert(first_token, parse_ctx),
         tok!("break") => directives::parse_break(first_token, parse_ctx),
-        tok!("charmap") => directives::parse_charmap(first_token, parse_ctx),
+        tok!("charmap") => directives::charmap::parse_charmap(first_token, parse_ctx),
         tok!("db") => directives::parse_db(first_token, parse_ctx),
         tok!("dl") => directives::parse_dl(first_token, parse_ctx),
         tok!("ds") => directives::parse_ds(first_token, parse_ctx),
@@ -331,16 +334,16 @@ fn parse_line<'ctx_stack>(
         tok!("incbin") => directives::parse_incbin(first_token, parse_ctx),
         tok!("include") => directives::parse_include(first_token, parse_ctx),
         tok!("load") => directives::parse_load(first_token, parse_ctx),
-        tok!("newcharmap") => directives::parse_newcharmap(first_token, parse_ctx),
+        tok!("newcharmap") => directives::charmap::parse_newcharmap(first_token, parse_ctx),
         tok!("nextu") => directives::parse_nextu(first_token, parse_ctx),
         tok!("opt") => directives::opt::parse_opt(first_token, parse_ctx),
-        tok!("popc") => directives::parse_popc(first_token, parse_ctx),
+        tok!("popc") => directives::charmap::parse_popc(first_token, parse_ctx),
         tok!("popo") => directives::opt::parse_popo(first_token, parse_ctx),
         tok!("pops") => directives::parse_pops(first_token, parse_ctx),
         tok!("println") => directives::output::parse_println(first_token, parse_ctx),
         tok!("print") => directives::output::parse_print(first_token, parse_ctx),
         tok!("purge") => directives::parse_purge(first_token, parse_ctx),
-        tok!("pushc") => directives::parse_pushc(first_token, parse_ctx),
+        tok!("pushc") => directives::charmap::parse_pushc(first_token, parse_ctx),
         tok!("pusho") => directives::opt::parse_pusho(first_token, parse_ctx),
         tok!("pushs") => directives::parse_pushs(first_token, parse_ctx),
         tok!("rb") => directives::parse_rb(first_token, parse_ctx),
@@ -349,7 +352,7 @@ fn parse_line<'ctx_stack>(
         tok!("rsreset") => directives::parse_rsreset(first_token, parse_ctx),
         tok!("rsset") => directives::parse_rsset(first_token, parse_ctx),
         tok!("section") => directives::parse_section(first_token, parse_ctx),
-        tok!("setcharmap") => directives::parse_setcharmap(first_token, parse_ctx),
+        tok!("setcharmap") => directives::charmap::parse_setcharmap(first_token, parse_ctx),
         tok!("shift") => directives::parse_shift(first_token, parse_ctx),
         tok!("static_assert") => directives::output::parse_static_assert(first_token, parse_ctx),
         tok!("union") => directives::parse_union(first_token, parse_ctx),
@@ -391,7 +394,7 @@ fn parse_line<'ctx_stack>(
 }
 
 fn reject_prior_label_def<'ctx_stack>(
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_>,
+    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
     label_span: Option<Span<'ctx_stack>>,
     directive_span: &Span<'ctx_stack>,
     directive_name: &str,
@@ -415,15 +418,16 @@ fn reject_prior_label_def<'ctx_stack>(
     }
 }
 
-struct ParseCtx<'ctx_stack, 'sources, 'symbols, 'nb_errs, 'options> {
+struct ParseCtx<'ctx_stack, 'charmaps, 'sources, 'symbols, 'nb_errs, 'options> {
     ctx_stack: &'ctx_stack ContextStack,
+    charmaps: &'charmaps Charmaps<'ctx_stack>,
     sources: &'sources SourceStore,
     symbols: &'symbols mut Symbols<'ctx_stack>,
     nb_errors_remaining: &'nb_errs Cell<usize>,
     options: &'options mut Options,
 }
 
-impl<'ctx_stack> ParseCtx<'ctx_stack, '_, '_, '_, '_> {
+impl<'ctx_stack> ParseCtx<'ctx_stack, '_, '_, '_, '_, '_> {
     fn next_token(&mut self) -> Option<Token<'ctx_stack>> {
         lexer::next_token(
             true,

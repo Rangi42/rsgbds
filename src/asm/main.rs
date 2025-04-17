@@ -26,7 +26,7 @@ use sysexits::ExitCode;
 fn main() -> ExitCode {
     // `Cli::finish()` also calls `crate::common::cli::apply_color_choice`.
     let (options, input_path, defines, warnings) =
-        match crate::common::cli::setup_and_parse_args().and_then(Cli::finish) {
+        match crate::common::cli::setup_and_parse_args().and_then(cli::Cli::finish) {
             Ok(cli) => cli,
             Err(()) => return ExitCode::Usage,
         };
@@ -36,8 +36,9 @@ fn main() -> ExitCode {
         .unwrap_or(ExitCode::Ok)
 }
 
+mod charmap;
+use charmap::Charmaps;
 mod cli;
-use cli::*;
 #[allow(dead_code)] // rgbasm doesn't use `dash_stdio`.
 #[path = "../common/mod.rs"]
 mod common;
@@ -83,9 +84,10 @@ pub struct RuntimeOptions {
 
 fn run(mut options: Options, input_path: PathBuf, defines: Vec<String>) -> Result<(), ExitCode> {
     let mut sources = SourceStore::new();
-    let mut context_stack = ContextStack::new();
+    let context_stack = ContextStack::new();
     let remaining_errors = Cell::new(options.max_errors);
 
+    let mut charmaps = Charmaps::new();
     let mut symbols = Symbols::new();
     for mut define in defines {
         let (name, value): (_, CompactString) = match define.split_once('=') {
@@ -120,6 +122,7 @@ fn run(mut options: Options, input_path: PathBuf, defines: Vec<String>) -> Resul
                     handle,
                     &context_stack,
                     &sources,
+                    &mut charmaps,
                     &mut symbols,
                     &remaining_errors,
                     &mut options,
@@ -150,6 +153,7 @@ fn run(mut options: Options, input_path: PathBuf, defines: Vec<String>) -> Resul
         handle,
         &context_stack,
         &sources,
+        &mut charmaps,
         &mut symbols,
         &remaining_errors,
         &mut options,
