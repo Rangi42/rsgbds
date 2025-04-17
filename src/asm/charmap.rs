@@ -68,7 +68,7 @@ impl<'ctx_stack> Charmaps<'ctx_stack> {
         &mut self,
         name: CompactString,
         def_span: Span<'ctx_stack>,
-        target_name: CompactString,
+        target_name: &str,
     ) -> Result<(), CharmapError> {
         if let Some(i) = self.find_charmap(&name) {
             return Err(CharmapError::Conflict(
@@ -77,8 +77,8 @@ impl<'ctx_stack> Charmaps<'ctx_stack> {
                 self.charmaps[i].def_span.clone(),
             ));
         }
-        let Some(i) = self.find_charmap(&target_name) else {
-            return Err(CharmapError::NoSuchCharmap(target_name, def_span));
+        let Some(i) = self.find_charmap(target_name) else {
+            return Err(CharmapError::NoSuchCharmap(target_name.into(), def_span));
         };
         self.charmaps.push(Charmap {
             def_span,
@@ -225,6 +225,12 @@ pub enum CharmapError<'ctx_stack> {
     NoSuchCharmap(CompactString, Span<'ctx_stack>),
 }
 impl<'ctx_stack> CharmapError<'ctx_stack> {
+    pub fn diag_span(&self) -> &Span<'ctx_stack> {
+        match self {
+            CharmapError::Conflict(_, span, _) => span,
+            CharmapError::NoSuchCharmap(_, span) => span,
+        }
+    }
     pub fn make_diag(&self, error: &mut crate::source_store::ReportBuilder) {
         match self {
             CharmapError::Conflict(name, this_def, existing) => {

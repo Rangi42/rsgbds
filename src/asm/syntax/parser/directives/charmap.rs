@@ -1,6 +1,6 @@
 use crate::{diagnostics, syntax::tokens::Token};
 
-use super::super::{expect_one_of, ParseCtx};
+use super::super::{expect_one_of, tok, ParseCtx};
 
 pub(in super::super) fn parse_charmap<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
@@ -13,7 +13,70 @@ pub(in super::super) fn parse_newcharmap<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
     parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
 ) -> Option<Token<'ctx_stack>> {
-    todo!()
+    expect_one_of! { parse_ctx.next_token() => {
+        Token { span: def_span } |"identifier"(ident)| => {
+            let charmap_name = parse_ctx.symbols.resolve(ident).into();
+
+            expect_one_of! { parse_ctx.next_token() => {
+                |","| => {
+                    expect_one_of! { parse_ctx.next_token() => {
+                        Token { span } |"identifier"(ident)| => {
+                            let target_name = parse_ctx.symbols.resolve(ident);
+                            if let Err(err) = parse_ctx.charmaps.make_copy(charmap_name, def_span, target_name) {
+                                diagnostics::error(
+                                    err.diag_span(),
+                                    |error| {
+                                        err.make_diag(error);
+                                    },
+                                    parse_ctx.sources,
+                                    parse_ctx.nb_errors_remaining,
+                                    parse_ctx.options
+                                );
+                            }
+
+                            parse_ctx.next_token()
+                        },
+
+                        else |other| => {
+                            parse_ctx.report_syntax_error(other.as_ref(), |error, span| {
+                                error.add_label(
+                                    diagnostics::error_label(span)
+                                        .with_message("Expected a charmap name here")
+                                );
+                            });
+                            other
+                        }
+                    }}
+                },
+
+                else |other| => {
+                    if let Err(err) = parse_ctx.charmaps.make_new(charmap_name, def_span) {
+                        diagnostics::error(
+                            err.diag_span(),
+                            |error| {
+                                err.make_diag(error);
+                            },
+                            parse_ctx.sources,
+                            parse_ctx.nb_errors_remaining,
+                            parse_ctx.options
+                        )
+                    }
+
+                    other
+                }
+            }}
+        },
+
+        else |other| => {
+            parse_ctx.report_syntax_error(other.as_ref(), |error, span| {
+                error.add_label(
+                    diagnostics::error_label(span)
+                        .with_message("Expected a charmap name here")
+                );
+            });
+            other
+        }
+    }}
 }
 
 pub(in super::super) fn parse_setcharmap<'ctx_stack>(
@@ -28,7 +91,10 @@ pub(in super::super) fn parse_setcharmap<'ctx_stack>(
                     &span,
                     |error| {
                         error.set_message(format!("No charmap named \"{charmap_name}\" exists"));
-                        error.add_label(diagnostics::error_label(&span).with_message("Cannot switch to this charmap"));
+                        error.add_label(
+                            diagnostics::error_label(&span)
+                                .with_message("Cannot switch to this charmap")
+                        );
                     },
                     parse_ctx.sources,
                     parse_ctx.nb_errors_remaining,
@@ -38,9 +104,13 @@ pub(in super::super) fn parse_setcharmap<'ctx_stack>(
 
             parse_ctx.next_token()
         },
+
         else |other| => {
             parse_ctx.report_syntax_error(other.as_ref(), |error, span| {
-                error.add_label(diagnostics::error_label(span).with_message("Expected a charmap name here"));
+                error.add_label(
+                    diagnostics::error_label(span)
+                        .with_message("Expected a charmap name here")
+                );
             });
             other
         }
@@ -61,7 +131,10 @@ pub(in super::super) fn parse_pushc<'ctx_stack>(
                     &span,
                     |error| {
                         error.set_message(format!("No charmap named \"{charmap_name}\" exists"));
-                        error.add_label(diagnostics::error_label(&span).with_message("Cannot switch to this charmap"));
+                        error.add_label(
+                            diagnostics::error_label(&span)
+                                .with_message("Cannot switch to this charmap")
+                        );
                     },
                     parse_ctx.sources,
                     parse_ctx.nb_errors_remaining,
@@ -71,6 +144,7 @@ pub(in super::super) fn parse_pushc<'ctx_stack>(
 
             parse_ctx.next_token()
         },
+
         else |other| => other
     }}
 }

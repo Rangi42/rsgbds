@@ -41,13 +41,13 @@ mod string;
 macro_rules! expect_one_of {
     ($payload:expr => {
         $( None => $if_none:expr, )?
-        $( $( Token {$( $captured_fields:ident ),+} )? |$($kind:tt $(($fields:tt))?)/+| => $then:expr, )+
+        $( $( Token {$( $captured_fields:ident $(: $capture_pat:pat)? ),+} )? |$($kind:tt $(($fields:tt))?)/+| => $then:expr, )+
         else |$unexpected:pat_param $(, $expected:pat_param)? $(,)?| => $handle_default:expr $(,)?
     }) => {match $payload {
         $( None => $if_none, )?
         $( Some(Token {
             payload: $( $crate::syntax::tokens::tok!($kind $(($fields))?) )|+,
-            $($($captured_fields,)+)?
+            $($($captured_fields $(: $capture_pat)?,)+)?
             ..
         }) => $then, )+
         $unexpected => {
