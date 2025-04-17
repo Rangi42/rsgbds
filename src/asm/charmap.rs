@@ -88,6 +88,11 @@ impl<'ctx_stack> Charmaps<'ctx_stack> {
         });
         Ok(())
     }
+    pub fn switch_to(&mut self, name: &str) -> Option<()> {
+        // TODO: if the charmap doesn't exist, suggest closely-named ones
+        self.active_charmap_id = self.find_charmap(name)?;
+        Some(())
+    }
     pub fn active_charmap(&self) -> &Charmap<'ctx_stack> {
         &self.charmaps[self.active_charmap_id]
     }
