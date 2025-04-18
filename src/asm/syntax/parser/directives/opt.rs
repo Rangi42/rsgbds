@@ -2,12 +2,12 @@ use std::fmt::Display;
 
 use crate::{diagnostics, syntax::tokens::Token};
 
-use super::super::{ParseCtx, Span};
+use super::super::{parse_ctx, Span};
 
 fn process_option<'ctx_stack>(
     string: &str,
     span: Span<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) {
     match string.chars().next() {
         Some('b') => handle_error(
@@ -70,7 +70,7 @@ fn process_option<'ctx_stack>(
     fn handle_error<'ctx_stack, E: Display>(
         r: Result<(), E>,
         span: &Span<'ctx_stack>,
-        parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+        parse_ctx: &mut parse_ctx!('ctx_stack),
     ) {
         if let Err(err) = r {
             diagnostics::error(
@@ -88,7 +88,7 @@ fn process_option<'ctx_stack>(
 
 pub(in super::super) fn parse_opt<'ctx_stack>(
     keyword: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     match parse_ctx.next_token_raw() {
         None => diagnostics::error(
@@ -117,7 +117,7 @@ pub(in super::super) fn parse_opt<'ctx_stack>(
 
 pub(in super::super) fn parse_pusho<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     // Save the options before modifying any of them.
     parse_ctx
@@ -135,7 +135,7 @@ pub(in super::super) fn parse_pusho<'ctx_stack>(
 
 pub(in super::super) fn parse_popo<'ctx_stack>(
     keyword: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     match parse_ctx.options.runtime_opt_stack.pop() {
         Some(runtime_opts) => parse_ctx.options.runtime_opts = runtime_opts,

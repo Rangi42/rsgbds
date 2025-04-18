@@ -5,19 +5,19 @@ use crate::{
     syntax::tokens::{tok, Token},
 };
 
-use super::{expr, matches_tok, string, ParseCtx};
+use super::{expr, matches_tok, parse_ctx, string};
 
 pub(super) fn parse_comma_list<
     'ctx_stack,
     T,
     F: FnMut(
         Option<Token<'ctx_stack>>,
-        &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+        &mut parse_ctx!('ctx_stack),
     ) -> (Option<T>, Option<Token<'ctx_stack>>),
 >(
     mut parse_element: F,
     mut lookahead: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> (Vec<T>, Option<Token<'ctx_stack>>) {
     let mut elements = vec![];
     loop {
@@ -47,7 +47,7 @@ pub(super) enum StrOrNum {
 }
 pub(super) fn parse_str_or_const_expr<'ctx_stack>(
     first_token: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> (Option<StrOrNum>, Option<Token<'ctx_stack>>) {
     // It's important to try this one first, as strings are valid numeric expressions.
     let (maybe_string, lookahead) = string::parse_string_expr(first_token, parse_ctx);

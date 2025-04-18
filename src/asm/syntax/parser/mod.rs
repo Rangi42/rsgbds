@@ -23,6 +23,7 @@ use crate::{
     context_stack::{ContextStack, Span},
     diagnostics,
     macro_args::MacroArgs,
+    section::Sections,
     source_store::{RawSpan, SourceHandle, SourceStore},
     symbols::Symbols,
     syntax::{
@@ -93,6 +94,7 @@ use require;
 pub fn parse_file<'ctx_stack>(
     source: SourceHandle,
     ctx_stack: &'ctx_stack ContextStack,
+    sections: &mut Sections<'ctx_stack>,
     sources: &SourceStore,
     charmaps: &mut Charmaps<'ctx_stack>,
     symbols: &mut Symbols<'ctx_stack>,
@@ -102,6 +104,7 @@ pub fn parse_file<'ctx_stack>(
     let mut parse_ctx = ParseCtx {
         ctx_stack,
         charmaps,
+        sections,
         sources,
         symbols,
         nb_errors_remaining,
@@ -122,7 +125,7 @@ pub fn parse_file<'ctx_stack>(
 
 fn parse_line<'ctx_stack>(
     mut first_token: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
     ctx_stack: &'ctx_stack ContextStack,
 ) {
     match &first_token.payload {
@@ -410,7 +413,7 @@ fn parse_line<'ctx_stack>(
 }
 
 fn reject_prior_label_def<'ctx_stack>(
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
     label_span: Option<Span<'ctx_stack>>,
     directive_span: &Span<'ctx_stack>,
     directive_name: &str,
@@ -434,16 +437,26 @@ fn reject_prior_label_def<'ctx_stack>(
     }
 }
 
-struct ParseCtx<'ctx_stack, 'charmaps, 'sources, 'symbols, 'nb_errs, 'options> {
+struct ParseCtx<'ctx_stack, 'charmaps, 'sections, 'sources, 'symbols, 'nb_errs, 'options> {
     ctx_stack: &'ctx_stack ContextStack,
     charmaps: &'charmaps mut Charmaps<'ctx_stack>,
+    sections: &'sections mut Sections<'ctx_stack>,
     sources: &'sources SourceStore,
     symbols: &'symbols mut Symbols<'ctx_stack>,
     nb_errors_remaining: &'nb_errs Cell<usize>,
     options: &'options mut Options,
 }
+macro_rules! parse_ctx {
+    () => {
+        $crate::syntax::parser::ParseCtx<'_, '_, '_, '_, '_, '_, '_>
+    };
+    ($ctx_stack:lifetime) => {
+        $crate::syntax::parser::ParseCtx<$ctx_stack, '_, '_, '_, '_, '_, '_>
+    };
+}
+use parse_ctx;
 
-impl<'ctx_stack> ParseCtx<'ctx_stack, '_, '_, '_, '_, '_> {
+impl<'ctx_stack> parse_ctx!('ctx_stack) {
     fn next_token(&mut self) -> Option<Token<'ctx_stack>> {
         lexer::next_token(
             true,

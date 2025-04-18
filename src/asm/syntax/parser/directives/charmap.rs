@@ -1,10 +1,10 @@
 use crate::{diagnostics, syntax::tokens::Token};
 
-use super::super::{expect_one_of, expr, misc, require, string, ParseCtx};
+use super::super::{expr, misc, parse_ctx, require, string};
 
 pub(in super::super) fn parse_charmap<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     let (maybe_string, lookahead) = string::expect_string_expr(parse_ctx.next_token(), parse_ctx);
     let Some((string, span)) = maybe_string else {
@@ -57,7 +57,7 @@ pub(in super::super) fn parse_charmap<'ctx_stack>(
 
 pub(in super::super) fn parse_newcharmap<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     require! { parse_ctx.next_token() => Token { span } @ |"identifier"(ident)| else |other| {
         parse_ctx.report_syntax_error(other.as_ref(), |error, span| {
@@ -117,7 +117,7 @@ pub(in super::super) fn parse_newcharmap<'ctx_stack>(
 
 pub(in super::super) fn parse_setcharmap<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     require! { parse_ctx.next_token() => Token { span } @ |"identifier"(ident)| else |other| {
         parse_ctx.report_syntax_error(other.as_ref(), |error, span| {
@@ -149,7 +149,7 @@ pub(in super::super) fn parse_setcharmap<'ctx_stack>(
 
 pub(in super::super) fn parse_pushc<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     parse_ctx.charmaps.push_active_charmap();
 
@@ -178,7 +178,7 @@ pub(in super::super) fn parse_pushc<'ctx_stack>(
 
 pub(in super::super) fn parse_popc<'ctx_stack>(
     keyword: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     if parse_ctx.charmaps.pop_active_charmap().is_none() {
         diagnostics::error(

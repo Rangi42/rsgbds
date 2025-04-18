@@ -10,7 +10,7 @@ use crate::{
     Options,
 };
 
-use super::{expect_one_of, string, ParseCtx};
+use super::{expect_one_of, parse_ctx, string};
 
 // The implementation strategy is a Pratt parser.
 //
@@ -18,14 +18,14 @@ use super::{expect_one_of, string, ParseCtx};
 // [2]: https://martin.janiczek.cz/2023/07/03/demystifying-pratt-parsers.html
 pub(super) fn parse_numeric_expr<'ctx_stack>(
     lookahead: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> (Option<Expr<'ctx_stack>>, Option<Token<'ctx_stack>>) {
     parse_subexpr(lookahead, parse_ctx, 0)
 }
 
 fn parse_subexpr<'ctx_stack>(
     lookahead: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
     min_binding_power: u8,
 ) -> (Option<Expr<'ctx_stack>>, Option<Token<'ctx_stack>>) {
     let (mut lhs, mut token) = expect_one_of!(lookahead => {
@@ -146,14 +146,14 @@ fn parse_subexpr<'ctx_stack>(
 
 pub(super) fn expect_numeric_expr<'ctx_stack>(
     lookahead: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> (Expr<'ctx_stack>, Option<Token<'ctx_stack>>) {
     expect_subexpr(lookahead, parse_ctx, 0)
 }
 
 fn expect_subexpr<'ctx_stack>(
     lookahead: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
     min_binding_power: u8,
 ) -> (Expr<'ctx_stack>, Option<Token<'ctx_stack>>) {
     let (res, lookahead) = parse_subexpr(lookahead, parse_ctx, min_binding_power);

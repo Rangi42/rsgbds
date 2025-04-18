@@ -21,6 +21,7 @@ use std::{
 };
 
 use compact_str::CompactString;
+use section::Sections;
 use sysexits::ExitCode;
 
 fn main() -> ExitCode {
@@ -49,6 +50,7 @@ use diagnostics::{WarningLevel, WarningState, NB_META_WARNINGS, NB_WARNINGS};
 mod expr;
 mod format;
 mod macro_args;
+mod section;
 mod source_store;
 use source_store::{SourceHandle, SourceStore};
 mod symbols;
@@ -88,6 +90,7 @@ fn run(mut options: Options, input_path: PathBuf, defines: Vec<String>) -> Resul
     let remaining_errors = Cell::new(options.max_errors);
 
     let mut charmaps = Charmaps::new();
+    let mut sections = Sections::new();
     let mut symbols = Symbols::new();
     for mut define in defines {
         let (name, value): (_, CompactString) = match define.split_once('=') {
@@ -121,6 +124,7 @@ fn run(mut options: Options, input_path: PathBuf, defines: Vec<String>) -> Resul
                 syntax::parser::parse_file(
                     handle,
                     &context_stack,
+                    &mut sections,
                     &sources,
                     &mut charmaps,
                     &mut symbols,
@@ -152,6 +156,7 @@ fn run(mut options: Options, input_path: PathBuf, defines: Vec<String>) -> Resul
     syntax::parser::parse_file(
         handle,
         &context_stack,
+        &mut sections,
         &sources,
         &mut charmaps,
         &mut symbols,

@@ -15,6 +15,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Charmaps<'ctx_stack> {
+    // TODO: consider using an `IndexMap` instead
     charmaps: Vec<Charmap<'ctx_stack>>,
     active_charmap_id: usize,
     // TODO: consider using `smallvec` or such, since this is hardly ever more than 1.

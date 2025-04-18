@@ -1,10 +1,10 @@
 use crate::{diagnostics, syntax::tokens::Token};
 
-use super::super::{matches_tok, misc, string, tok, ParseCtx};
+use super::super::{matches_tok, misc, parse_ctx, string, tok};
 
 fn parse_print_elem<'ctx_stack>(
     first_token: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> (Option<()>, Option<Token<'ctx_stack>>) {
     let (expr, lookahead) = misc::parse_str_or_const_expr(first_token, parse_ctx);
     match expr {
@@ -16,7 +16,7 @@ fn parse_print_elem<'ctx_stack>(
 }
 pub(in super::super) fn parse_println<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     let mut lookahead = parse_ctx.next_token();
     // Allow a lack of arguments.
@@ -29,7 +29,7 @@ pub(in super::super) fn parse_println<'ctx_stack>(
 }
 pub(in super::super) fn parse_print<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     let mut lookahead = parse_ctx.next_token();
     // Allow a lack of arguments.
@@ -42,7 +42,7 @@ pub(in super::super) fn parse_print<'ctx_stack>(
 
 pub(in super::super) fn parse_warn<'ctx_stack>(
     keyword: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     let (maybe_message, lookahead) = string::parse_string_expr(parse_ctx.next_token(), parse_ctx);
     if let Some((message, _span)) = maybe_message {
@@ -62,7 +62,7 @@ pub(in super::super) fn parse_warn<'ctx_stack>(
 }
 pub(in super::super) fn parse_fail<'ctx_stack>(
     keyword: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     let (maybe_message, lookahead) = string::parse_string_expr(parse_ctx.next_token(), parse_ctx);
     if let Some((message, _span)) = maybe_message {
@@ -85,14 +85,14 @@ pub(in super::super) fn parse_fail<'ctx_stack>(
 
 pub(in super::super) fn parse_assert<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     todo!()
 }
 
 pub(in super::super) fn parse_static_assert<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     todo!()
 }

@@ -2,11 +2,11 @@ use compact_str::CompactString;
 
 use crate::{context_stack::Span, diagnostics, syntax::tokens::Token};
 
-use super::{expect_one_of, tok, ParseCtx};
+use super::{expect_one_of, parse_ctx, tok};
 
 pub(super) fn parse_string_expr<'ctx_stack>(
     first_token: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> (
     Option<(CompactString, Span<'ctx_stack>)>,
     Option<Token<'ctx_stack>>,
@@ -67,7 +67,7 @@ pub(super) fn parse_string_expr<'ctx_stack>(
 
 pub(super) fn expect_string_expr<'ctx_stack>(
     first_token: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut ParseCtx<'ctx_stack, '_, '_, '_, '_, '_>,
+    parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> (
     Option<(CompactString, Span<'ctx_stack>)>,
     Option<Token<'ctx_stack>>,
