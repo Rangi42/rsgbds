@@ -44,7 +44,7 @@ pub(in super::super) fn parse_warn<'ctx_stack>(
     keyword: Token<'ctx_stack>,
     parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
-    let (maybe_message, lookahead) = string::parse_string_expr(parse_ctx.next_token(), parse_ctx);
+    let (maybe_message, lookahead) = string::expect_string_expr(parse_ctx.next_token(), parse_ctx);
     if let Some((message, _span)) = maybe_message {
         diagnostics::warn(
             diagnostics::warning!("user"),
@@ -64,7 +64,7 @@ pub(in super::super) fn parse_fail<'ctx_stack>(
     keyword: Token<'ctx_stack>,
     parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
-    let (maybe_message, lookahead) = string::parse_string_expr(parse_ctx.next_token(), parse_ctx);
+    let (maybe_message, lookahead) = string::expect_string_expr(parse_ctx.next_token(), parse_ctx);
     if let Some((message, _span)) = maybe_message {
         diagnostics::error(
             &keyword.span,
