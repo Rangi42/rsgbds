@@ -1,6 +1,6 @@
 use crate::{diagnostics, syntax::tokens::Token};
 
-use super::super::{matches_tok, misc, parse_ctx, string, tok};
+use super::super::{expect_one_of, matches_tok, misc, parse_ctx, string, tok};
 
 fn parse_print_elem<'ctx_stack>(
     first_token: Option<Token<'ctx_stack>>,
@@ -63,8 +63,19 @@ pub(in super::super) fn parse_warn<'ctx_stack>(
 pub(in super::super) fn parse_fail<'ctx_stack>(
     keyword: Token<'ctx_stack>,
     parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+) {
     let (maybe_message, lookahead) = string::expect_string_expr(parse_ctx.next_token(), parse_ctx);
+
+    expect_one_of! {lookahead => {
+        None => {},
+        |"end of line"| => {},
+        else |unexpected| => {
+            parse_ctx.report_syntax_error(unexpected.as_ref(), |error, span| {
+                error.add_label(diagnostics::error_label(span).with_message("Expected nothing else on this line"))
+            });
+        }
+    }};
+
     if let Some((message, _span)) = maybe_message {
         diagnostics::error(
             &keyword.span,
@@ -79,8 +90,6 @@ pub(in super::super) fn parse_fail<'ctx_stack>(
             parse_ctx.options,
         );
     }
-    todo!(); // Abort parsing *somehow*.
-    lookahead
 }
 
 pub(in super::super) fn parse_assert<'ctx_stack>(

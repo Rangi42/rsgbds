@@ -114,7 +114,9 @@ pub fn parse_file<'ctx_stack>(
     ctx_stack.sources_mut().push_file_context(source);
     while ctx_stack.sources_mut().active_context().is_some() {
         while let Some(first_token) = parse_ctx.next_token() {
-            parse_line(first_token, &mut parse_ctx, ctx_stack);
+            let Some(()) = parse_line(first_token, &mut parse_ctx, ctx_stack) else {
+                return;
+            };
         }
 
         // We're done parsing from this context, so end it.
@@ -127,7 +129,7 @@ fn parse_line<'ctx_stack>(
     mut first_token: Token<'ctx_stack>,
     parse_ctx: &mut parse_ctx!('ctx_stack),
     ctx_stack: &'ctx_stack ContextStack,
-) {
+) -> Option<()> {
     match &first_token.payload {
         tok!("+") | tok!("-") => {
             diagnostics::error(
@@ -145,7 +147,7 @@ fn parse_line<'ctx_stack>(
                 parse_ctx.options,
             );
             match parse_ctx.next_token() {
-                None => return,
+                None => return Some(()),
                 Some(token) => first_token = token,
             };
         }
@@ -172,7 +174,7 @@ fn parse_line<'ctx_stack>(
                     );
                     match parse_ctx.next_token() {
                         Some(token) => first_token = token,
-                        None => return,
+                        None => return Some(()),
                     };
                 },
                 |"::"| => {
@@ -187,7 +189,7 @@ fn parse_line<'ctx_stack>(
                     );
                     match parse_ctx.next_token() {
                         Some(token) => first_token = token,
-                        None => return,
+                        None => return Some(()),
                     };
                 },
                 else |token, _expected| => {
@@ -348,7 +350,10 @@ fn parse_line<'ctx_stack>(
         tok!("endl") => directives::parse_endl(first_token, parse_ctx),
         tok!("endu") => directives::parse_endu(first_token, parse_ctx),
         tok!("export") => directives::parse_export(first_token, parse_ctx),
-        tok!("fail") => directives::output::parse_fail(first_token, parse_ctx),
+        tok!("fail") => {
+            directives::output::parse_fail(first_token, parse_ctx);
+            return None;
+        }
         tok!("fatal") => directives::parse_fatal(first_token, parse_ctx),
         tok!("incbin") => directives::parse_incbin(first_token, parse_ctx),
         tok!("include") => directives::parse_include(first_token, parse_ctx),
@@ -409,7 +414,9 @@ fn parse_line<'ctx_stack>(
                 error.add_label(diagnostics::error_label(span).with_message("Expected nothing else on this line"))
             });
         }
-    })
+    });
+
+    Some(())
 }
 
 fn reject_prior_label_def<'ctx_stack>(
