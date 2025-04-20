@@ -7,15 +7,13 @@
  */
 
 //! Convenience functionality shared between the RGBDS executables.
-//!
-//! This is not intended for downstream consumers of RGBDS' API,
-//! so none of this is covered by SemVer.
 
 pub mod argfile;
 shadow_rs::shadow!(build);
 pub mod cli;
 pub mod dash_stdio;
 pub mod diagnostics;
+pub mod section;
 
 // https://doc.rust-lang.org/nightly/edition-guide/rust-2024/rpit-lifetime-capture.html#migrating-away-from-the-captures-trick
 #[doc(hidden)]

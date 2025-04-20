@@ -58,21 +58,7 @@ pub(super) fn parse_else<'ctx_stack>(
     todo!()
 }
 
-pub(super) fn parse_endsection<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
-    todo!()
-}
-
 pub(super) fn parse_endc<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
-    todo!()
-}
-
-pub(super) fn parse_endl<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
     parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
@@ -142,13 +128,6 @@ pub(super) fn parse_include<'ctx_stack>(
     todo!()
 }
 
-pub(super) fn parse_load<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
-    todo!()
-}
-
 pub(super) fn parse_macro<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
     parse_ctx: &mut parse_ctx!('ctx_stack),
@@ -163,21 +142,7 @@ pub(super) fn parse_nextu<'ctx_stack>(
     todo!()
 }
 
-pub(super) fn parse_pops<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
-    todo!()
-}
-
 pub(super) fn parse_purge<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
-    todo!()
-}
-
-pub(super) fn parse_pushs<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
     parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
@@ -226,13 +191,6 @@ pub(super) fn parse_rsset<'ctx_stack>(
     todo!()
 }
 
-pub(super) fn parse_section<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
-    todo!()
-}
-
 pub(super) fn parse_shift<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
     parse_ctx: &mut parse_ctx!('ctx_stack),
@@ -250,3 +208,4 @@ pub(super) fn parse_union<'ctx_stack>(
 pub(super) mod charmap;
 pub(super) mod opt;
 pub(super) mod output;
+pub(super) mod section;

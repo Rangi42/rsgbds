@@ -69,8 +69,8 @@ macro_rules! expect_one_of {
 use expect_one_of; // Allow this macro to be used by children modules.
 
 macro_rules! matches_tok {
-    ($value:expr, $($name:tt)|+) => {
-        matches!($value, Some(Token { payload: $(tok!($name))|+, .. }))
+    ($value:expr, $($name:tt $(($field:pat))?)|+) => {
+        matches!($value, Some(Token { payload: $($crate::syntax::parser::tok!($name $(($field))?))|+, .. }))
     };
 }
 use matches_tok;
@@ -346,8 +346,8 @@ fn parse_line<'ctx_stack>(
         tok!("dl") => directives::parse_dl(first_token, parse_ctx),
         tok!("ds") => directives::parse_ds(first_token, parse_ctx),
         tok!("dw") => directives::parse_dw(first_token, parse_ctx),
-        tok!("endsection") => directives::parse_endsection(first_token, parse_ctx),
-        tok!("endl") => directives::parse_endl(first_token, parse_ctx),
+        tok!("endsection") => directives::section::parse_endsection(first_token, parse_ctx),
+        tok!("endl") => directives::section::parse_endl(first_token, parse_ctx),
         tok!("endu") => directives::parse_endu(first_token, parse_ctx),
         tok!("export") => directives::parse_export(first_token, parse_ctx),
         tok!("fail") => {
@@ -357,25 +357,25 @@ fn parse_line<'ctx_stack>(
         tok!("fatal") => directives::parse_fatal(first_token, parse_ctx),
         tok!("incbin") => directives::parse_incbin(first_token, parse_ctx),
         tok!("include") => directives::parse_include(first_token, parse_ctx),
-        tok!("load") => directives::parse_load(first_token, parse_ctx),
+        tok!("load") => directives::section::parse_load(first_token, parse_ctx),
         tok!("newcharmap") => directives::charmap::parse_newcharmap(first_token, parse_ctx),
         tok!("nextu") => directives::parse_nextu(first_token, parse_ctx),
         tok!("opt") => directives::opt::parse_opt(first_token, parse_ctx),
         tok!("popc") => directives::charmap::parse_popc(first_token, parse_ctx),
         tok!("popo") => directives::opt::parse_popo(first_token, parse_ctx),
-        tok!("pops") => directives::parse_pops(first_token, parse_ctx),
+        tok!("pops") => directives::section::parse_pops(first_token, parse_ctx),
         tok!("println") => directives::output::parse_println(first_token, parse_ctx),
         tok!("print") => directives::output::parse_print(first_token, parse_ctx),
         tok!("purge") => directives::parse_purge(first_token, parse_ctx),
         tok!("pushc") => directives::charmap::parse_pushc(first_token, parse_ctx),
         tok!("pusho") => directives::opt::parse_pusho(first_token, parse_ctx),
-        tok!("pushs") => directives::parse_pushs(first_token, parse_ctx),
+        tok!("pushs") => directives::section::parse_pushs(first_token, parse_ctx),
         tok!("rb") => directives::parse_rb(first_token, parse_ctx),
         tok!("rw") => directives::parse_rw(first_token, parse_ctx),
         tok!("redef") => directives::parse_redef(first_token, parse_ctx),
         tok!("rsreset") => directives::parse_rsreset(first_token, parse_ctx),
         tok!("rsset") => directives::parse_rsset(first_token, parse_ctx),
-        tok!("section") => directives::parse_section(first_token, parse_ctx),
+        tok!("section") => directives::section::parse_section(first_token, parse_ctx),
         tok!("setcharmap") => directives::charmap::parse_setcharmap(first_token, parse_ctx),
         tok!("shift") => directives::parse_shift(first_token, parse_ctx),
         tok!("static_assert") => directives::output::parse_static_assert(first_token, parse_ctx),
