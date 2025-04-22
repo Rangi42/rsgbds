@@ -1,9 +1,6 @@
 use compact_str::CompactString;
 
-use crate::{
-    diagnostics,
-    syntax::tokens::{tok, Token},
-};
+use crate::{diagnostics, syntax::tokens::Token};
 
 use super::{expr, matches_tok, parse_ctx, string};
 

@@ -1,6 +1,6 @@
 use crate::{diagnostics, syntax::tokens::Token};
 
-use super::super::{expect_one_of, matches_tok, misc, parse_ctx, string, tok};
+use super::super::{expect_one_of, matches_tok, misc, parse_ctx, string};
 
 fn parse_print_elem<'ctx_stack>(
     first_token: Option<Token<'ctx_stack>>,

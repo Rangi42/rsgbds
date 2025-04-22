@@ -95,7 +95,7 @@ pub fn parse_file<'ctx_stack>(
     source: SourceHandle,
     ctx_stack: &'ctx_stack ContextStack,
     sections: &mut Sections<'ctx_stack>,
-    sources: &SourceStore,
+    sources: &mut SourceStore,
     charmaps: &mut Charmaps<'ctx_stack>,
     symbols: &mut Symbols<'ctx_stack>,
     nb_errors_remaining: &Cell<usize>,
@@ -256,7 +256,7 @@ fn parse_line<'ctx_stack>(
         // These are not valid after a label.
         tok!("macro") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "macro");
-            directives::parse_macro(first_token, parse_ctx)
+            directives::context::parse_macro(first_token, parse_ctx)
         }
         tok!("endm") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "endm");
@@ -264,11 +264,11 @@ fn parse_line<'ctx_stack>(
         }
         tok!("rept") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "rept");
-            directives::parse_rept(first_token, parse_ctx)
+            directives::context::parse_rept(first_token, parse_ctx)
         }
         tok!("for") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "for");
-            directives::parse_for(first_token, parse_ctx)
+            directives::context::parse_for(first_token, parse_ctx)
         }
         tok!("endr") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "endr");
@@ -356,7 +356,7 @@ fn parse_line<'ctx_stack>(
         }
         tok!("fatal") => directives::parse_fatal(first_token, parse_ctx),
         tok!("incbin") => directives::parse_incbin(first_token, parse_ctx),
-        tok!("include") => directives::parse_include(first_token, parse_ctx),
+        tok!("include") => directives::context::parse_include(first_token, parse_ctx),
         tok!("load") => directives::section::parse_load(first_token, parse_ctx),
         tok!("newcharmap") => directives::charmap::parse_newcharmap(first_token, parse_ctx),
         tok!("nextu") => directives::parse_nextu(first_token, parse_ctx),
@@ -448,7 +448,7 @@ struct ParseCtx<'ctx_stack, 'charmaps, 'sections, 'sources, 'symbols, 'nb_errs, 
     ctx_stack: &'ctx_stack ContextStack,
     charmaps: &'charmaps mut Charmaps<'ctx_stack>,
     sections: &'sections mut Sections<'ctx_stack>,
-    sources: &'sources SourceStore,
+    sources: &'sources mut SourceStore,
     symbols: &'symbols mut Symbols<'ctx_stack>,
     nb_errors_remaining: &'nb_errs Cell<usize>,
     options: &'options mut Options,

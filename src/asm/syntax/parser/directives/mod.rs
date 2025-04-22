@@ -100,13 +100,6 @@ pub(super) fn parse_fatal<'ctx_stack>(
     todo!()
 }
 
-pub(super) fn parse_for<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
-    todo!()
-}
-
 pub(super) fn parse_if<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
     parse_ctx: &mut parse_ctx!('ctx_stack),
@@ -115,20 +108,6 @@ pub(super) fn parse_if<'ctx_stack>(
 }
 
 pub(super) fn parse_incbin<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
-    todo!()
-}
-
-pub(super) fn parse_include<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
-    todo!()
-}
-
-pub(super) fn parse_macro<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
     parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
@@ -170,13 +149,6 @@ pub(super) fn parse_redef<'ctx_stack>(
     todo!()
 }
 
-pub(super) fn parse_rept<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
-    todo!()
-}
-
 pub(super) fn parse_rsreset<'ctx_stack>(
     _keyword: Token<'ctx_stack>,
     parse_ctx: &mut parse_ctx!('ctx_stack),
@@ -206,6 +178,7 @@ pub(super) fn parse_union<'ctx_stack>(
 }
 
 pub(super) mod charmap;
+pub(super) mod context;
 pub(super) mod opt;
 pub(super) mod output;
 pub(super) mod section;
