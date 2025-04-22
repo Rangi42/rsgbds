@@ -243,13 +243,13 @@ fn parse_section_attrs<'ctx_stack>(
                 };
                 // If there is already a constraint, it must match at the same offset.
                 if let Err(err) = attrs.address.merge(AddrConstraint::Align(align, align_ofs), 0) {
+                    let (msg, label_msg) = err.details();
                     diagnostics::error(
                         &align_span,
                         |error| {
-                            error.set_message("Conflicting alignment constraint");
+                            error.set_message(msg);
                             error.add_label(
-                                diagnostics::error_label(&align_span)
-                                    .with_message("TODO")
+                                diagnostics::error_label(&align_span).with_message(label_msg)
                             );
                         },
                         parse_ctx.sources,
@@ -259,7 +259,7 @@ fn parse_section_attrs<'ctx_stack>(
                 };
 
                 expect_one_of! { lookahead => {
-                    |","| => lookahead = parse_ctx.next_token(),
+                    |"]"| => lookahead = parse_ctx.next_token(),
                     else |other| => {
                         parse_ctx.report_syntax_error(other.as_ref(), |error, span| {
                             error.add_label(

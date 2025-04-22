@@ -8,6 +8,8 @@
 
 //! Convenience functionality shared between the RGBDS executables.
 
+use std::fmt::Display;
+
 pub mod argfile;
 shadow_rs::shadow!(build);
 pub mod cli;
@@ -19,3 +21,35 @@ pub mod section;
 #[doc(hidden)]
 pub trait Captures<T: ?Sized> {}
 impl<T: ?Sized, U: ?Sized> Captures<T> for U {}
+
+#[derive(Debug, Clone, Copy)]
+pub enum S {
+    One,
+    Other,
+}
+macro_rules! impl_from {
+    ($t:ty) => {
+        impl From<$t> for S {
+            fn from(value: $t) -> Self {
+                match value {
+                    1 => Self::One,
+                    _ => Self::Other,
+                }
+            }
+        }
+    };
+}
+impl_from!(u8);
+impl_from!(u16);
+impl_from!(u32);
+impl_from!(u64);
+impl_from!(u128);
+impl_from!(usize);
+impl Display for S {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Self::Other = self {
+            f.write_str("s")?;
+        }
+        Ok(())
+    }
+}
