@@ -5,7 +5,7 @@ use crate::diagnostics;
 use super::super::{expect_one_of, expr, matches_tok, parse_ctx, require, string, Token};
 
 pub(in super::super) fn parse_include<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
+    keyword: Token<'ctx_stack>,
     parse_ctx: &mut parse_ctx!('ctx_stack),
 ) -> Option<Token<'ctx_stack>> {
     let (maybe_string, mut lookahead) =
@@ -26,7 +26,10 @@ pub(in super::super) fn parse_include<'ctx_stack>(
     if let Some((string, span)) = maybe_string {
         let path = string.as_ref();
         match parse_ctx.sources.load_file(path) {
-            Ok(source) => parse_ctx.ctx_stack.sources_mut().push_file_context(source),
+            Ok(source) => parse_ctx
+                .ctx_stack
+                .sources_mut()
+                .push_file_context(source, &keyword.span),
             Err(err) => diagnostics::error(
                 &span,
                 |error| {

@@ -111,7 +111,9 @@ pub fn parse_file<'ctx_stack>(
         options,
     };
 
-    ctx_stack.sources_mut().push_file_context(source);
+    ctx_stack
+        .sources_mut()
+        .push_file_context(source, &Span::COMMAND_LINE);
     while ctx_stack.sources_mut().active_context().is_some() {
         while let Some(first_token) = parse_ctx.next_token() {
             let Some(()) = parse_line(first_token, &mut parse_ctx, ctx_stack) else {
@@ -243,11 +245,12 @@ fn parse_line<'ctx_stack>(
                     parse_ctx.nb_errors_remaining,
                     parse_ctx.options,
                 ),
-                Some(Ok(slice)) => {
-                    ctx_stack
-                        .sources_mut()
-                        .push_macro_context(name.into(), slice, args)
-                }
+                Some(Ok(slice)) => ctx_stack.sources_mut().push_macro_context(
+                    name.into(),
+                    slice,
+                    args,
+                    &first_token.span,
+                ),
             }
 
             parse_ctx.next_token()

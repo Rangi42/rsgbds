@@ -45,7 +45,7 @@ pub struct LexerState {
 }
 
 #[derive(Debug)]
-struct Expansion {
+pub struct Expansion {
     name: Option<CompactString>,
     contents: CompactString,
     cursor: usize,
@@ -71,6 +71,7 @@ impl LexerState {
         self.active_expansion().unwrap_or(&source[self.cursor..])
     }
 
+    // TODO: combine the lexer recursion depth with the context stack depth
     #[must_use = "Do not increase the recursion depth if this function returns `true`!"]
     fn check_recursion_depth(&self, options: &Options) -> bool {
         self.expansions.len() >= options.runtime_opts.recursion_depth

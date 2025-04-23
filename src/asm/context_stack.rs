@@ -34,8 +34,8 @@ pub struct SourceNode {
     ///
     /// Implicitly holds a reference to the corresponding [`SourceNode`].
     /// Not using [`SourceRef`] to avoid making the [`ContextStack`] self-referential.
-    parent_id: Option<NonZeroUsize>,
-    kind: SourceKind,
+    pub parent: Option<(NonZeroUsize, Range<usize>)>,
+    pub kind: SourceKind,
 }
 
 #[derive(Debug)]
@@ -194,8 +194,7 @@ mod source_ref {
 
     impl<'stack> SourceRef<'stack> {
         pub fn new(stack: &'stack ContextStack, src_idx: NonZeroUsize) -> Self {
-            stack.sources_mut()[src_idx].ref_count += 1;
-            Self(stack, src_idx)
+            Self::new_via(stack, src_idx, &mut stack.sources_mut())
         }
 
         pub fn new_via(
@@ -209,6 +208,11 @@ mod source_ref {
 
         pub fn get(&self) -> SourceGuard {
             SourceGuard(self.0.sources(), self.1)
+        }
+
+        pub fn raw_ref(&self, sources: &mut SourcesMut<'_>) -> NonZeroUsize {
+            sources[self.1].ref_count += 1;
+            self.1
         }
     }
 
@@ -242,6 +246,12 @@ mod source_ref {
             &self.0[self.1]
         }
     }
+
+    impl SourceGuard<'_> {
+        pub fn sources(&self) -> &Sources<'_> {
+            &self.0
+        }
+    }
 }
 pub use source_ref::*;
 
@@ -259,6 +269,10 @@ impl Index<NonZeroUsize> for Sources<'_> {
 impl Sources<'_> {
     pub fn active_context(&self) -> Option<&SourceContext> {
         self.0.contexts.last()
+    }
+
+    pub fn node_of(&self, context: &SourceContext) -> &SourceNode {
+        &self[context.source_id]
     }
 }
 
@@ -296,12 +310,13 @@ impl SourcesMut<'_> {
         node_kind: SourceKind,
         has_new_unique_id: bool,
         macro_args: Option<Rc<MacroArgs>>,
+        parent_span: &Span,
     ) {
         let context = self.active_context();
         let unique_id_str = if has_new_unique_id {
             Some(CompactString::default())
         } else {
-            context.and_then(|ctx| ctx.unique_id_str.clone())
+            context.and_then(|ctx| ctx.unique_id_str.as_ref()).cloned()
         };
         let macro_args = macro_args.or_else(|| {
             if let Some(SourceContext {
@@ -316,9 +331,13 @@ impl SourcesMut<'_> {
         });
 
         let parent_id = context.map(|ctx| ctx.source_id); // TODO: increment its ref count
+        let parent = parent_span
+            .src
+            .as_ref()
+            .map(|source_ref| (source_ref.raw_ref(self), parent_span.byte_span.clone()));
         self.0.nodes.push(SourceNode {
             ref_count: 1, // Implicitly referenced due to being the active node.
-            parent_id,
+            parent,
             kind: node_kind,
         });
         let source_id = NonZeroUsize::new(self.0.nodes.len()).unwrap();
@@ -331,8 +350,8 @@ impl SourcesMut<'_> {
         });
     }
 
-    pub fn push_file_context(&mut self, source: SourceHandle) {
-        self.push_context(SourceKind::File(source), false, None);
+    pub fn push_file_context(&mut self, source: SourceHandle, span: &Span<'_>) {
+        self.push_context(SourceKind::File(source), false, None, span);
     }
 
     pub fn push_macro_context(
@@ -340,6 +359,7 @@ impl SourcesMut<'_> {
         name: CompactString,
         slice: &SourceSlice,
         args: Rc<MacroArgs>,
+        span: &Span<'_>,
     ) {
         let (file, slice) = slice.as_raw();
         self.push_context(
@@ -350,6 +370,7 @@ impl SourcesMut<'_> {
             },
             true,
             Some(args),
+            span,
         );
     }
 
@@ -362,6 +383,7 @@ impl SourcesMut<'_> {
         //     todo!();
         // }
 
+        // TODO: unref the source node?
         self.0.contexts.pop();
     }
 }
