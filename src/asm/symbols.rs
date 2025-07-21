@@ -6,32 +6,26 @@ use rustc_hash::{FxBuildHasher, FxHashMap};
 use string_interner::{backend::StringBackend, symbol::SymbolU32, StringInterner};
 
 use crate::{
-    context_stack::Span,
     diagnostics,
     format::FormatSpec,
     macro_args::MacroArgs,
-    source_store::{SourceSlice, SourceStore},
-    Options,
+    sources::{NormalSpan, Span},
+    Identifier, Identifiers, Options,
 };
 
-type Symbol = SymbolU32;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SymName(Symbol);
-type SymbolNames = StringInterner<StringBackend<Symbol>, FxBuildHasher>;
-type SymMap<'ctx_stack> = FxHashMap<SymName, SymbolData<'ctx_stack>>;
+type SymMap = FxHashMap<Identifier, SymbolData>;
 
 // TODO: consider using a `Vec<Option<SymbolData>>` instead of a hash map?
 #[derive(Debug)]
-pub struct Symbols<'ctx_stack> {
-    names: SymbolNames,
-    symbols: SymMap<'ctx_stack>,
-    scope: Option<SymName>,
+pub struct Symbols {
+    symbols: SymMap,
+    scope: Option<Identifier>,
 }
 
 #[derive(Debug)]
-pub enum SymbolData<'ctx_stack> {
+pub enum SymbolData {
     User {
-        definition: Span<'ctx_stack>,
+        definition: Span,
         kind: SymbolKind,
         exported: bool,
     },
@@ -45,29 +39,28 @@ pub enum SymbolData<'ctx_stack> {
     DotDot,
 
     /// Placeholder left over after purging a symbol, to improve error messages.
-    Deleted(Span<'ctx_stack>),
+    Deleted(Span),
 }
 
 #[derive(Debug)]
 pub enum SymbolKind {
     Numeric { value: i32, mutable: bool },
     String(CompactString),
-    Macro(SourceSlice),
+    Macro(NormalSpan),
     Label, // TODO
     Ref,
 }
 
-impl<'ctx_stack> Symbols<'ctx_stack> {
-    pub fn new() -> Self {
+impl Symbols {
+    pub fn new(identifiers: &mut Identifiers) -> Self {
         let mut this = Self {
-            names: SymbolNames::new(),
             symbols: FxHashMap::with_hasher(FxBuildHasher),
             scope: None,
         };
 
         let mut def_builtin = |name, kind| {
-            let name_sym = this.names.get_or_intern_static(name);
-            let res = this.symbols.insert(SymName(name_sym), kind);
+            let name_sym = identifiers.get_or_intern_static(name);
+            let res = this.symbols.insert(name_sym, kind);
             debug_assert!(res.is_none());
         };
         let numeric = |value, mutable| SymbolData::Builtin(SymbolKind::Numeric { value, mutable });
@@ -156,26 +149,12 @@ impl<'ctx_stack> Symbols<'ctx_stack> {
         this
     }
 
-    pub fn intern_name<S: AsRef<str>>(&mut self, name: S) -> SymName {
-        SymName(self.names.get_or_intern(name))
+    pub fn find(&self, name: &Identifier) -> Option<&SymbolData> {
+        self.symbols.get(name)
     }
 
-    pub fn get_interned_name<S: AsRef<str>>(&mut self, name: S) -> Option<SymName> {
-        self.names.get(name).map(SymName)
-    }
-
-    pub fn resolve(&self, name: SymName) -> &str {
-        self.names.resolve(name.0).unwrap()
-    }
-
-    fn find<S: AsRef<str>>(&mut self, name: S) -> Option<&SymbolData<'_>> {
-        self.names
-            .get(name)
-            .and_then(|sym| self.symbols.get(&SymName(sym)))
-    }
-
-    pub fn find_macro_interned(&self, name: &SymName) -> Option<Result<&SourceSlice, &SymbolData>> {
-        match self.symbols.get(name) {
+    pub fn find_macro(&self, name: &Identifier) -> Option<Result<&NormalSpan, &SymbolData>> {
+        match self.find(name) {
             Some(SymbolData::User {
                 kind: SymbolKind::Macro(slice),
                 ..
@@ -185,18 +164,14 @@ impl<'ctx_stack> Symbols<'ctx_stack> {
         }
     }
 
-    pub fn find_interned(&self, name: &SymName) -> Option<&SymbolData<'_>> {
-        self.symbols.get(name)
-    }
-
-    pub fn format_as<'sym: 'ctx_stack>(
+    pub fn format_as<'sym>(
         &'sym self,
-        name: Option<SymName>,
+        name: Option<Identifier>,
         fmt: &FormatSpec,
         buf: &mut CompactString,
         macro_args: Option<&MacroArgs>,
-    ) -> Result<(), FormatError<'ctx_stack, 'sym>> {
-        let Some(sym) = name.and_then(|name| self.find_interned(&name)) else {
+    ) -> Result<(), FormatError<'sym>> {
+        let Some(sym) = name.and_then(|name| self.find(&name)) else {
             return Err(FormatError::NotFound);
         };
         if let Some(value) = sym.get_number(macro_args) {
@@ -213,12 +188,12 @@ impl<'ctx_stack> Symbols<'ctx_stack> {
     }
 
     fn try_define_symbol<'map>(
-        symbols: &'map mut SymMap<'ctx_stack>,
-        name: SymName,
-        definition: Span<'ctx_stack>,
+        symbols: &'map mut SymMap,
+        name: Identifier,
+        definition: Span,
         kind: SymbolKind,
         exported: bool,
-    ) -> Result<(), (&'map mut SymbolData<'ctx_stack>, Span<'ctx_stack>)> {
+    ) -> Result<(), (&'map mut SymbolData, Span)> {
         use std::collections::hash_map::Entry;
 
         match symbols.entry(name) {
@@ -263,11 +238,11 @@ impl<'ctx_stack> Symbols<'ctx_stack> {
 
     fn define_symbol(
         &mut self,
-        name: SymName,
-        definition: Span<'ctx_stack>,
+        name: Identifier,
+        identifiers: &Identifiers,
+        definition: Span,
         payload: SymbolKind,
         exported: bool,
-        sources: &SourceStore,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
@@ -283,7 +258,7 @@ impl<'ctx_stack> Symbols<'ctx_stack> {
                 |error| {
                     error.set_message(format!(
                         "A symbol called \"{}\" already exists",
-                        self.names.resolve(name.0).unwrap()
+                        identifiers.resolve(name).unwrap()
                     ));
                     error.add_labels([
                         diagnostics::note_label(existing.def_span())
@@ -293,28 +268,27 @@ impl<'ctx_stack> Symbols<'ctx_stack> {
                     ]);
                     error.set_help("If this is intentional, consider using `PURGE` to delete the old definition first");
                 },
-                sources,
                 nb_errors_left,
                 options,
             )
         }
     }
 
-    pub fn define_string_interned(
+    pub fn define_string(
         &mut self,
-        name: SymName,
-        definition: Span<'ctx_stack>,
+        name: Identifier,
+        identifiers: &Identifiers,
+        definition: Span,
         string: CompactString,
-        sources: &SourceStore,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
         self.define_symbol(
             name,
+            identifiers,
             definition,
             SymbolKind::String(string),
             false,
-            sources,
             nb_errors_left,
             options,
         );
@@ -322,36 +296,36 @@ impl<'ctx_stack> Symbols<'ctx_stack> {
 
     pub fn define_label(
         &mut self,
-        name: SymName,
-        definition: Span<'ctx_stack>,
+        name: Identifier,
+        identifiers: &Identifiers,
+        definition: Span,
         exported: bool,
-        sources: &SourceStore,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
         self.define_symbol(
             name,
+            identifiers,
             definition,
             SymbolKind::Label,
             exported,
-            sources,
             nb_errors_left,
             options,
         )
     }
 }
 
-pub enum FormatError<'ctx_stack, 'sym> {
+pub enum FormatError<'sym> {
     NotFound,
-    Deleted(&'sym Span<'ctx_stack>),
+    Deleted(&'sym Span),
     BadKind,
 }
 
-impl<'ctx_stack> SymbolData<'ctx_stack> {
-    pub fn def_span(&self) -> &Span<'ctx_stack> {
+impl SymbolData {
+    pub fn def_span(&self) -> &Span {
         match self {
             Self::User { definition, .. } => definition,
-            _ => &Span::BUILTIN,
+            _ => &Span::Builtin,
         }
     }
 

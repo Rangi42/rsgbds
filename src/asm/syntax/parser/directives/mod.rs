@@ -2,178 +2,103 @@ use crate::syntax::tokens::Token;
 
 use super::parse_ctx;
 
-pub(super) fn parse_align<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_align(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_break<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_break(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_db<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_db(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_dl<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_dl(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_ds<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_ds(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_dw<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_dw(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_elif<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_elif(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_else<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_else(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_endc<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_endc(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_endm<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_endm(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_endr<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_endr(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_endu<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_endu(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_export<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_export(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_fatal<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_fatal(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_if<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_if(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_incbin<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_incbin(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_nextu<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_nextu(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_purge<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_purge(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_rb<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_rb(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_rw<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_rw(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_redef<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_redef(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_rsreset<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_rsreset(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_rsset<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_rsset(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_shift<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_shift(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_union<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(super) fn parse_union(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 

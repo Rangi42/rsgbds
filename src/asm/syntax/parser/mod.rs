@@ -13,24 +13,22 @@ The extra boilerplate is counter-balanced by how much the aforementioned workaro
 [rgbasm-lalrpop]: https://github.com/ISSOtm/rsgbds/blob/4cd81e2920b71b335f4be744adcc3f307bdd5fd7/src/asm/language/parser.lalrpop
 */
 
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, path::Path, rc::Rc};
 
-use ariadne::ReportBuilder;
 use compact_str::CompactString;
 
 use crate::{
     charmap::Charmaps,
-    context_stack::{ContextStack, Span},
-    diagnostics,
+    diagnostics::{self, ReportBuilder, WarningKind},
     macro_args::MacroArgs,
     section::Sections,
-    source_store::{RawSpan, SourceHandle, SourceStore},
+    sources::{Source, Span},
     symbols::Symbols,
     syntax::{
         lexer,
         tokens::{tok, Token},
     },
-    Options,
+    Identifiers, Options,
 };
 
 mod directives;
@@ -41,18 +39,15 @@ mod string;
 
 macro_rules! expect_one_of {
     ($payload:expr => {
-        $( None => $if_none:expr, )?
-        $( $( Token {$( $captured_fields:ident $(: $capture_pat:pat)? ),+} )? |$($kind:tt $(($fields:tt))?)/+| => $then:expr, )+
+        $( $( Token {$( $captured_fields:ident $(: $capture_pat:pat)? ),+} )? |$($kind:tt $(($($fields:tt),+))?)/+| => $then:expr, )+
         else |$unexpected:pat_param $(, $expected:pat_param)? $(,)?| => $handle_default:expr
     }) => {match $payload {
-        $( None => $if_none, )?
-        $( Some(Token {
-            payload: $( $crate::syntax::tokens::tok!($kind $(($fields))?) )|+,
+        $( Token {
+            payload: $( $crate::syntax::tokens::tok!($kind $(($($fields),+))?) )|+,
             $($($captured_fields $(: $capture_pat)?,)+)?
             ..
-        }) => $then, )+
+        } => $then, )+
         $unexpected => {
-            // TODO: handle `if_none`, adding "end of file" to the list
             expect_one_of!(@expected [$($( $kind )+),+] $($expected)?); // Internal call.
             $handle_default
         }
@@ -70,134 +65,135 @@ use expect_one_of; // Allow this macro to be used by children modules.
 
 macro_rules! matches_tok {
     ($value:expr, $($name:tt $(($field:pat))?)|+) => {
-        matches!($value, Some(Token { payload: $($crate::syntax::parser::tok!($name $(($field))?))|+, .. }))
+        matches!($value, Token { payload: $($crate::syntax::parser::tok!($name $(($field))?))|+, .. })
     };
 }
 use matches_tok;
 
 macro_rules! require {
-    ($payload:expr => $( Token {$( $captured_fields:ident ),+} @ )? |$($kind:tt $(($fields:tt))?)/+|
+    ($payload:expr => $( Token {$( $captured_fields:ident ),+} @ )? |$($kind:tt $(($($fields:tt),+))?)/+|
         else |$unexpected:pat_param $(, $expected:pat_param)? $(,)?| $handle_default:expr
     ) => {
-        let ($($($captured_fields,)+)? $($($fields,)?)+) = match $payload {
-            Some(Token {
-                payload: $( crate::syntax::tokens::tok!($kind $(($fields))?) )|+,
+        let ($($($captured_fields,)+)? $($($($fields),+,)?)+) = match $payload {
+            Token {
+                payload: $( crate::syntax::tokens::tok!($kind $(($($fields),+))?) )|+,
                 $($($captured_fields,)+)?
                 ..
-            }) => ($($($captured_fields,)+)? $($($fields,)?)+),
+            } => ($($($captured_fields,)+)? $($($($fields),+,)?)+),
             $unexpected => $handle_default,
         };
     }
 }
 use require;
 
-pub fn parse_file<'ctx_stack>(
-    source: SourceHandle,
-    ctx_stack: &'ctx_stack ContextStack,
-    sections: &mut Sections<'ctx_stack>,
-    sources: &mut SourceStore,
-    charmaps: &mut Charmaps<'ctx_stack>,
-    symbols: &mut Symbols<'ctx_stack>,
+pub fn parse_file(
+    path: &Path,
+    identifiers: &mut Identifiers,
+    sections: &mut Sections,
+    charmaps: &mut Charmaps,
+    symbols: &mut Symbols,
     nb_errors_remaining: &Cell<usize>,
     options: &mut Options,
 ) {
+    let file = match Source::load_file(path) {
+        Ok(file) => file,
+        Err(err) => {
+            diagnostics::error(
+                &Span::CommandLine,
+                |error| {
+                    error.set_message(format!("Failed to open \"{}\"", path.display()));
+                    error.add_note(err);
+                },
+                &nb_errors_remaining,
+                &options,
+            );
+            return;
+        }
+    };
+
     let mut parse_ctx = ParseCtx {
-        ctx_stack,
+        lexer: Lexer::new(),
+        macro_args: Vec::with_capacity(1),
+        identifiers,
         charmaps,
         sections,
-        sources,
         symbols,
         nb_errors_remaining,
         options,
     };
+    parse_ctx.lexer.push_file(file, None);
 
-    ctx_stack
-        .sources_mut()
-        .push_file_context(source, &Span::COMMAND_LINE);
-    while ctx_stack.sources_mut().active_context().is_some() {
-        while let Some(first_token) = parse_ctx.next_token() {
-            let Some(()) = parse_line(first_token, &mut parse_ctx, ctx_stack) else {
+    loop {
+        loop {
+            let first_token = parse_ctx.next_token();
+            if matches_tok!(first_token, "end of input") {
+                break;
+            }
+            let Some(()) = parse_line(first_token, &mut parse_ctx) else {
+                // Fatal error!
                 return;
             };
         }
 
         // We're done parsing from this context, so end it.
         // (This will make REPT/FOR loop if possible, and pop everything else.)
-        ctx_stack.sources_mut().end_current_context();
+        if !parse_ctx.lexer.pop_context() {
+            break;
+        }
     }
 }
 
-fn parse_line<'ctx_stack>(
-    mut first_token: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-    ctx_stack: &'ctx_stack ContextStack,
-) -> Option<()> {
+fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()> {
     match &first_token.payload {
         tok!("+") | tok!("-") => {
-            diagnostics::error(
-                &first_token.span,
-                |error| {
-                    error.set_message("Leftover diff marker");
-                    error.add_label(
-                        diagnostics::error_label(&first_token.span)
-                            .with_message("Extraneous character here"),
-                    );
-                    error.set_help("Consider applying patches using `patch` or `git apply`");
-                },
-                parse_ctx.sources,
-                parse_ctx.nb_errors_remaining,
-                parse_ctx.options,
-            );
-            match parse_ctx.next_token() {
-                None => return Some(()),
-                Some(token) => first_token = token,
-            };
+            parse_ctx.error(&first_token.span, |error| {
+                error.set_message("Leftover diff marker");
+                error.add_label(
+                    diagnostics::error_label(&first_token.span)
+                        .with_message("Extraneous character here"),
+                );
+                error.set_help("Consider applying patches using `patch` or `git apply`");
+            });
+            first_token = parse_ctx.next_token();
         }
         // TODO: handle Git conflict markers
         _ => {}
     }
 
     let mut label_span = None;
-    if let tok!("identifier"(ident)) = first_token.payload {
+    if let tok!("identifier"(ident, is_followed_by_colon)) = first_token.payload {
         // Identifiers at the beginning of the line can be two things.
         // Either a label name, if it's *directly* followed by a colon; or the name of a macro.
-        if parse_ctx.is_next_char_a_colon() {
+        if is_followed_by_colon {
             expect_one_of!(parse_ctx.next_token() => {
-                None => unreachable!(),
                 |":"| => {
                     label_span = Some(first_token.span.clone());
                     parse_ctx.symbols.define_label(
                         ident,
+                        parse_ctx.identifiers,
                         first_token.span,
                         false,
-                        parse_ctx.sources,
                         parse_ctx.nb_errors_remaining,
                         parse_ctx.options
                     );
-                    match parse_ctx.next_token() {
-                        Some(token) => first_token = token,
-                        None => return Some(()),
-                    };
+                    first_token= parse_ctx.next_token();
                 },
                 |"::"| => {
                     label_span = Some(first_token.span.clone());
                     parse_ctx.symbols.define_label(
                         ident,
+                        parse_ctx.identifiers,
                         first_token.span,
                         true,
-                        parse_ctx.sources,
                         parse_ctx.nb_errors_remaining,
                         parse_ctx.options
                     );
-                    match parse_ctx.next_token() {
-                        Some(token) => first_token = token,
-                        None => return Some(()),
-                    };
+                    first_token= parse_ctx.next_token();
                 },
                 else |token, _expected| => {
                     // Try continuing the parse with this token as the first in the line.
                     // We know the token can't be empty, because the lexer just reported that its next character would be a colon.
-                    first_token = token.unwrap();
+                    first_token = token;
                 }
             });
         }
@@ -206,51 +202,40 @@ fn parse_line<'ctx_stack>(
     }
 
     let eol_token = match first_token.payload {
-        tok!("end of line") => Some(first_token), // Empty line.
+        tok!("end of line") | tok!("end of input") => first_token, // Empty line.
 
-        tok!("identifier"(ident)) => {
+        tok!("identifier"(ident, _)) => {
             // Macro call.
             // Get the macro's arguments.
-            let args = Rc::new(MacroArgs::new(
-                std::iter::from_fn(|| parse_ctx.next_token_raw().map(|(arg, _span)| arg)).collect(),
-            ));
+            let args =
+                std::iter::from_fn(|| parse_ctx.next_token_raw().map(|(arg, _span)| arg)).collect();
 
-            let name = parse_ctx.symbols.resolve(ident);
-            match parse_ctx.symbols.find_macro_interned(&ident) {
-                None => diagnostics::error(
-                    &first_token.span,
-                    |error| {
-                        error.set_message(format!("Macro `{name}` does not exist"));
-                        error.add_label(
-                            diagnostics::error_label(&first_token.span)
-                                .with_message("Attempting to call the macro here"),
-                        );
-                    },
-                    parse_ctx.sources,
-                    parse_ctx.nb_errors_remaining,
-                    parse_ctx.options,
-                ),
-                Some(Err(other)) => diagnostics::error(
-                    &first_token.span,
-                    |error| {
-                        error.set_message(format!("`{name}` is not a macro"));
-                        error.add_labels([
-                            diagnostics::error_label(&first_token.span)
-                                .with_message("Macro call here"),
-                            diagnostics::note_label(other.def_span())
-                                .with_message("A symbol by this name was defined here"),
-                        ]);
-                    },
-                    parse_ctx.sources,
-                    parse_ctx.nb_errors_remaining,
-                    parse_ctx.options,
-                ),
-                Some(Ok(slice)) => ctx_stack.sources_mut().push_macro_context(
-                    name.into(),
-                    slice,
-                    args,
-                    &first_token.span,
-                ),
+            let name = parse_ctx.identifiers.resolve(ident).unwrap();
+            match parse_ctx.symbols.find_macro(&ident) {
+                None => parse_ctx.error(&first_token.span, |error| {
+                    error.set_message(format!("Macro `{name}` does not exist"));
+                    error.add_label(
+                        diagnostics::error_label(&first_token.span)
+                            .with_message("Attempting to call the macro here"),
+                    );
+                }),
+                Some(Err(other)) => parse_ctx.error(&first_token.span, |error| {
+                    error.set_message(format!("`{name}` is not a macro"));
+                    error.add_labels([
+                        diagnostics::error_label(&first_token.span).with_message("Macro call here"),
+                        diagnostics::note_label(other.def_span())
+                            .with_message("A symbol by this name was defined here"),
+                    ]);
+                }),
+                Some(Ok(slice)) => {
+                    let Span::Normal(span) = first_token.span else {
+                        unreachable!();
+                    };
+                    parse_ctx
+                        .lexer
+                        .push_macro(slice.clone(), Rc::new(span.clone()));
+                    parse_ctx.macro_args.push(args);
+                }
             }
 
             parse_ctx.next_token()
@@ -386,7 +371,7 @@ fn parse_line<'ctx_stack>(
         tok!("warn") => directives::output::parse_warn(first_token, parse_ctx),
 
         _ => {
-            parse_ctx.report_syntax_error(Some(&first_token), |error, span| {
+            parse_ctx.report_syntax_error(&first_token, |error, span| {
                 error.add_label(
                     diagnostics::error_label(span)
                         .with_message("Expected an instruction or a directive here"),
@@ -395,25 +380,21 @@ fn parse_line<'ctx_stack>(
 
             // Discard the rest of the line.
             loop {
-                match parse_ctx.next_token() {
-                    None => break None,
-                    Some(
-                        token @ Token {
-                            payload: tok!("end of line"),
-                            ..
-                        },
-                    ) => break Some(token),
-                    Some(_) => {}
+                if let token @ Token {
+                    payload: tok!("end of line") | tok!("end of input"),
+                    ..
+                } = parse_ctx.next_token()
+                {
+                    break token;
                 }
             }
         }
     };
 
     expect_one_of!(eol_token => {
-        None => {},
-        |"end of line"| => {},
+        |"end of line" / "end of input"| => {},
         else |unexpected| => {
-            parse_ctx.report_syntax_error(unexpected.as_ref(), |error, span| {
+            parse_ctx.report_syntax_error(&unexpected, |error, span| {
                 error.add_label(diagnostics::error_label(span).with_message("Expected nothing else on this line"))
             });
         }
@@ -422,137 +403,91 @@ fn parse_line<'ctx_stack>(
     Some(())
 }
 
-fn reject_prior_label_def<'ctx_stack>(
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-    label_span: Option<Span<'ctx_stack>>,
-    directive_span: &Span<'ctx_stack>,
+fn reject_prior_label_def(
+    parse_ctx: &mut parse_ctx!(),
+    label_span: Option<Span>,
+    directive_span: &Span,
     directive_name: &str,
 ) {
     if let Some(span) = label_span {
-        diagnostics::error(
-            &span,
-            |error| {
-                error.set_message("A label is not allowed here");
-                error.add_labels([
-                    diagnostics::error_label(&span)
-                        .with_message("This label cannot be on the same line..."),
-                    diagnostics::note_label(directive_span)
-                        .with_message(format!("...as a `{directive_name}` directive")),
-                ]);
-            },
-            parse_ctx.sources,
-            parse_ctx.nb_errors_remaining,
-            parse_ctx.options,
-        )
+        parse_ctx.error(&span, |error| {
+            error.set_message("A label is not allowed here");
+            error.add_labels([
+                diagnostics::error_label(&span)
+                    .with_message("This label cannot be on the same line..."),
+                diagnostics::note_label(directive_span)
+                    .with_message(format!("...as a `{directive_name}` directive")),
+            ]);
+        })
     }
 }
 
-struct ParseCtx<'ctx_stack, 'charmaps, 'sections, 'sources, 'symbols, 'nb_errs, 'options> {
-    ctx_stack: &'ctx_stack ContextStack,
-    charmaps: &'charmaps mut Charmaps<'ctx_stack>,
-    sections: &'sections mut Sections<'ctx_stack>,
-    sources: &'sources mut SourceStore,
-    symbols: &'symbols mut Symbols<'ctx_stack>,
+struct ParseCtx<'idents, 'charmaps, 'sections, 'symbols, 'nb_errs, 'options> {
+    lexer: Lexer,
+    identifiers: &'idents mut Identifiers,
+    macro_args: Vec<MacroArgs>,
+    charmaps: &'charmaps mut Charmaps,
+    sections: &'sections mut Sections,
+    symbols: &'symbols mut Symbols,
     nb_errors_remaining: &'nb_errs Cell<usize>,
     options: &'options mut Options,
 }
 macro_rules! parse_ctx {
     () => {
-        $crate::syntax::parser::ParseCtx<'_, '_, '_, '_, '_, '_, '_>
-    };
-    ($ctx_stack:lifetime) => {
-        $crate::syntax::parser::ParseCtx<$ctx_stack, '_, '_, '_, '_, '_, '_>
+        $crate::syntax::parser::ParseCtx<'_, '_, '_, '_, '_, '_>
     };
 }
 use parse_ctx;
 
-impl<'ctx_stack> parse_ctx!('ctx_stack) {
-    fn next_token(&mut self) -> Option<Token<'ctx_stack>> {
-        lexer::next_token(
-            true,
-            self.ctx_stack,
-            self.sources,
+use super::lexer::Lexer;
+
+impl parse_ctx!() {
+    fn next_token(&mut self) -> Token {
+        self.lexer.next_token(
+            self.identifiers,
             self.symbols,
+            self.macro_args.last(),
             self.nb_errors_remaining,
             self.options,
         )
     }
-    fn next_token_unexpanded(&mut self) -> Option<Token<'ctx_stack>> {
-        lexer::next_token(
-            false,
-            self.ctx_stack,
-            self.sources,
+    fn next_token_raw(&mut self) -> Option<(CompactString, Span)> {
+        self.lexer.next_token_raw(
+            self.identifiers,
             self.symbols,
-            self.nb_errors_remaining,
-            self.options,
-        )
-    }
-    fn next_token_raw(&mut self) -> Option<(CompactString, Span<'ctx_stack>)> {
-        lexer::next_token_raw(
-            self.ctx_stack,
-            self.sources,
-            self.symbols,
+            self.macro_args.last(),
             self.nb_errors_remaining,
             self.options,
         )
     }
 
-    fn is_next_char_a_colon(&mut self) -> bool {
-        lexer::is_next_char_a_colon(
-            self.ctx_stack,
-            self.sources,
-            self.symbols,
-            self.nb_errors_remaining,
-            self.options,
-        )
+    fn extended_to(&self, span: &Span, token: &Token) -> Span {
+        span.merged_with(&token.span)
     }
 
-    fn current_span(&self) -> Span<'ctx_stack> {
-        lexer::current_span(self.ctx_stack)
+    fn error<'span, F: FnOnce(&mut ReportBuilder<'span>)>(&self, span: &'span Span, callback: F) {
+        diagnostics::error(span, callback, self.nb_errors_remaining, self.options);
     }
-    fn extended_to(
+    fn report_syntax_error<'span, F: FnOnce(&mut ReportBuilder<'span>, &'span Span)>(
         &self,
-        span: &Span<'ctx_stack>,
-        token: Option<&Token<'ctx_stack>>,
-    ) -> Span<'ctx_stack> {
-        match token {
-            Some(tok) => span.merged_with(&tok.span),
-            None => span.merged_with(&self.current_span()),
-        }
-    }
-
-    fn report_syntax_error<F: FnOnce(&mut ReportBuilder<'_, RawSpan>, &Span)>(
-        &self,
-        token: Option<&Token>,
+        token: &'span Token,
         callback: F,
     ) {
-        match token {
-            Some(Token { payload, span }) => diagnostics::error(
-                span,
-                |error| {
-                    error.set_message(format!("Syntax error: unexpected {payload}"));
-                    callback(error, span);
-                },
-                self.sources,
-                self.nb_errors_remaining,
-                self.options,
-            ),
-            None => {
-                let span = self.current_span();
-                diagnostics::error(
-                    &span,
-                    |error| {
-                        error.set_message("Syntax error: unexpected end of input");
-                        callback(error, &span);
-                    },
-                    self.sources,
-                    self.nb_errors_remaining,
-                    self.options,
-                );
-            }
-        }
+        self.error(&token.span, |error| {
+            error.set_message(format!("Syntax error: unexpected {}", &token.payload));
+            callback(error, &token.span);
+        })
     }
-    fn report_expr_error(&self, error: crate::expr::Error<'ctx_stack>) {
-        error.report(self.sources, self.nb_errors_remaining, self.options);
+    fn report_expr_error(&self, error: crate::expr::Error) {
+        error.report(self.nb_errors_remaining, self.options);
+    }
+
+    fn warn<'span, F: FnOnce(&mut ReportBuilder<'span>)>(
+        &self,
+        id: WarningKind,
+        span: &'span Span,
+        callback: F,
+    ) {
+        diagnostics::warn(id, span, callback, self.nb_errors_remaining, self.options);
     }
 }

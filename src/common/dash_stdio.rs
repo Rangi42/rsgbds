@@ -115,10 +115,10 @@ struct BinFileName(Source<&'static str>);
 impl Cache<String> for BinFileName {
     type Storage = &'static str;
 
-    fn fetch(
-        &mut self,
-        _id: &String,
-    ) -> Result<&Source<Self::Storage>, Box<dyn std::fmt::Debug + '_>> {
+    fn fetch<'ret, 'cache: 'ret, 'id: 'ret>(
+        &'cache mut self,
+        _id: &'id String,
+    ) -> Result<&'ret Source<Self::Storage>, Box<dyn std::fmt::Debug + 'cache>> {
         Ok(&self.0)
     }
 

@@ -1,32 +1,30 @@
 use std::cell::Cell;
 
 use crate::{
-    context_stack::Span,
     diagnostics,
-    source_store::SourceStore,
-    symbols::SymName,
+    sources::Span,
     syntax::tokens::{tok, TokenPayload},
-    Options,
+    Identifier, Options,
 };
 
 #[derive(Debug)]
-pub struct Expr<'ctx_stack> {
+pub struct Expr {
     /// This is never empty for a valid expression; however, syntax errors yield bogus [`Expr`]s
     /// that have this list be empty.
     // TODO: use `smallvec` or something, it will most often contain few elements
-    payload: Vec<Op<'ctx_stack>>,
+    payload: Vec<Op>,
 }
 
 #[derive(Debug)]
-struct Op<'ctx_stack> {
-    span: Span<'ctx_stack>,
+struct Op {
+    span: Span,
     kind: OpKind,
 }
 
 #[derive(Debug)]
 enum OpKind {
     Number(i32),
-    Symbol(SymName),
+    Symbol(Identifier),
     Binary(BinOp),
     Unary(UnOp),
     /// Placeholder of sorts.
@@ -34,8 +32,8 @@ enum OpKind {
 }
 
 #[derive(Debug)]
-pub struct Error<'ctx_stack> {
-    span: Span<'ctx_stack>,
+pub struct Error {
+    span: Span,
     kind: ErrKind,
 }
 
@@ -50,26 +48,26 @@ enum ErrKind {
     NoExpr,
 }
 
-impl<'ctx_stack> Expr<'ctx_stack> {
-    fn from_terminal(op: Op<'ctx_stack>) -> Self {
+impl Expr {
+    fn from_terminal(op: Op) -> Self {
         Self { payload: vec![op] }
     }
 
-    pub fn nothing(span: Span<'ctx_stack>) -> Self {
+    pub fn nothing(span: Span) -> Self {
         Self::from_terminal(Op {
             span,
             kind: OpKind::Nothing,
         })
     }
 
-    pub fn number(number: i32, span: Span<'ctx_stack>) -> Self {
+    pub fn number(number: i32, span: Span) -> Self {
         Self::from_terminal(Op {
             span,
             kind: OpKind::Number(number),
         })
     }
 
-    pub fn symbol(name: SymName, span: Span<'ctx_stack>) -> Self {
+    pub fn symbol(name: Identifier, span: Span) -> Self {
         Self::from_terminal(Op {
             span,
             kind: OpKind::Symbol(name),
@@ -77,7 +75,7 @@ impl<'ctx_stack> Expr<'ctx_stack> {
     }
 }
 
-impl<'ctx_stack> Expr<'ctx_stack> {
+impl Expr {
     pub fn binary_op(mut self, operator: BinOp, mut other: Self) -> Self {
         let (Some(lhs), Some(rhs)) = (self.payload.last(), other.payload.last()) else {
             self.payload.clear();
@@ -95,7 +93,7 @@ impl<'ctx_stack> Expr<'ctx_stack> {
         self
     }
 
-    pub fn unary_op(mut self, operator: UnOp, op_span: Span<'ctx_stack>) -> Self {
+    pub fn unary_op(mut self, operator: UnOp, op_span: Span) -> Self {
         if let Some(last) = self.payload.last() {
             self.payload.push(Op {
                 kind: OpKind::Unary(operator),
@@ -106,9 +104,9 @@ impl<'ctx_stack> Expr<'ctx_stack> {
     }
 }
 
-impl<'ctx_stack> Expr<'ctx_stack> {
+impl Expr {
     // TODO: there may be more than one reason!
-    pub fn try_const_eval(&self) -> Result<(i32, Span<'ctx_stack>), Error<'ctx_stack>> {
+    pub fn try_const_eval(&self) -> Result<(i32, Span), Error> {
         debug_assert!(!self.payload.is_empty());
         let mut eval_stack = vec![];
         for op in &self.payload {
@@ -136,7 +134,7 @@ impl<'ctx_stack> Expr<'ctx_stack> {
         eval_stack.pop().unwrap()
     }
 
-    pub fn first_span(&self) -> &Span<'ctx_stack> {
+    pub fn first_span(&self) -> &Span {
         &self.payload[0].span
     }
 }
@@ -163,11 +161,11 @@ fn from_bool(b: bool) -> i32 {
 }
 
 impl BinOp {
-    fn const_eval<'ctx_stack>(
+    fn const_eval(
         &self,
-        lhs: Result<(i32, Span<'ctx_stack>), Error<'ctx_stack>>,
-        rhs: Result<(i32, Span<'ctx_stack>), Error<'ctx_stack>>,
-    ) -> Result<(i32, Span<'ctx_stack>), Error<'ctx_stack>> {
+        lhs: Result<(i32, Span), Error>,
+        rhs: Result<(i32, Span), Error>,
+    ) -> Result<(i32, Span), Error> {
         // Most operators are "greedy", and require both operands to be known in order to be
         // const-evaluable themselves.
         macro_rules! greedy {
@@ -249,11 +247,11 @@ impl BinOp {
 }
 
 impl UnOp {
-    fn const_eval<'ctx_stack>(
+    fn const_eval(
         &self,
-        value: Result<(i32, Span<'ctx_stack>), Error<'ctx_stack>>,
-        operator_span: &Span<'ctx_stack>,
-    ) -> Result<(i32, Span<'ctx_stack>), Error<'ctx_stack>> {
+        value: Result<(i32, Span), Error>,
+        operator_span: &Span,
+    ) -> Result<(i32, Span), Error> {
         let map =
             |f: fn(i32) -> i32| value.map(|(num, span)| (f(num), operator_span.merged_with(&span)));
         match self {
@@ -265,8 +263,8 @@ impl UnOp {
     }
 }
 
-impl Error<'_> {
-    pub fn report(&self, sources: &SourceStore, nb_errors_left: &Cell<usize>, options: &Options) {
+impl Error {
+    pub fn report(&self, nb_errors_left: &Cell<usize>, options: &Options) {
         // Do not report these, as they stem from syntax errors, and thus are duplicates.
         if self.is_nothing() {
             return;
@@ -279,7 +277,6 @@ impl Error<'_> {
                 error.set_message(message);
                 error.add_label(diagnostics::error_label(&self.span).with_message(label_message))
             },
-            sources,
             nb_errors_left,
             options,
         )

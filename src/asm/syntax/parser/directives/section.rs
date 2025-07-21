@@ -9,10 +9,10 @@ use crate::{
 
 use super::super::{expect_one_of, expr, matches_tok, parse_ctx, require, string};
 
-fn parse_section_attrs<'ctx_stack>(
-    first_token: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> (SectionAttrs, CompactString, Option<Token<'ctx_stack>>) {
+fn parse_section_attrs(
+    first_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (SectionAttrs, CompactString, Token) {
     let mut attrs = SectionAttrs {
         kind: SectionKind::Normal,
         mem_region: MemRegion::Rom0, // Dummy that doesn't matter.
@@ -39,7 +39,7 @@ fn parse_section_attrs<'ctx_stack>(
     };
 
     require! { lookahead => |","| else |other| {
-        parse_ctx.report_syntax_error(other.as_ref(), |error,span| {
+        parse_ctx.report_syntax_error(&other, |error,span| {
             error.add_label(diagnostics::error_label(span).with_message("Expected a comma here"));
         });
     }};
@@ -78,7 +78,7 @@ fn parse_section_attrs<'ctx_stack>(
             parse_ctx.next_token()
         },
         else |other, expected| => {
-            parse_ctx.report_syntax_error(other.as_ref(), |error,span| {
+            parse_ctx.report_syntax_error(&other, |error,span| {
                 error.add_label(diagnostics::error_label(span).with_message("Expected TODO here"))
             });
 
@@ -86,7 +86,7 @@ fn parse_section_attrs<'ctx_stack>(
             // Otherwise, consume the rest of the line (to avoid reporting an extraneous syntax error), and abort.
             if !matches_tok!(other, "," | "[" | "number"(_) | "bank" | "align") {
                 let mut lookahead = other;
-                while lookahead.is_some() && !matches_tok!(lookahead, "end of line") {
+                while !matches_tok!(lookahead, "end of input" | "end of line") {
                     lookahead = parse_ctx.next_token();
                 }
                 return (attrs, name, lookahead);
@@ -109,7 +109,7 @@ fn parse_section_attrs<'ctx_stack>(
         };
 
         require! { after_expr => |"]"| else |other| {
-            parse_ctx.report_syntax_error(other.as_ref(), |error, span| {
+            parse_ctx.report_syntax_error(&other, |error, span| {
                 error.set_message("Missing `]` after the section's address");
                 error.add_label(
                     diagnostics::error_label(span)
@@ -125,7 +125,7 @@ fn parse_section_attrs<'ctx_stack>(
     while matches_tok!(lookahead, ",") {
         lookahead = parse_ctx.next_token();
         // Allow a trailing comma.
-        if lookahead.is_none() || matches_tok!(lookahead, "end of line") {
+        if matches_tok!(lookahead, "end of input" | "end of line") {
             break;
         }
 
@@ -134,7 +134,7 @@ fn parse_section_attrs<'ctx_stack>(
                 expect_one_of! { parse_ctx.next_token() => {
                     |"["| => lookahead = parse_ctx.next_token(),
                     else |other| => {
-                        parse_ctx.report_syntax_error(other.as_ref(), |error, span| {
+                        parse_ctx.report_syntax_error(&other, |error, span| {
                             error.add_label(
                                 diagnostics::error_label(span)
                                     .with_message("The previous section attribute must be followed by a number between braces")
@@ -156,7 +156,7 @@ fn parse_section_attrs<'ctx_stack>(
                 expect_one_of! { after_expr => {
                     |"]"| => lookahead = parse_ctx.next_token(),
                     else |other| => {
-                        parse_ctx.report_syntax_error(other.as_ref(), |error, span| {
+                        parse_ctx.report_syntax_error(&other, |error, span| {
                             error.add_label(
                                 diagnostics::error_label(span)
                                     .with_message("Missing closing brace after the previous section attribute")
@@ -171,7 +171,7 @@ fn parse_section_attrs<'ctx_stack>(
                 expect_one_of! { parse_ctx.next_token() => {
                     |"["| => lookahead = parse_ctx.next_token(),
                     else |other| => {
-                        parse_ctx.report_syntax_error(other.as_ref(), |error, span| {
+                        parse_ctx.report_syntax_error(&other, |error, span| {
                             error.add_label(
                                 diagnostics::error_label(span)
                                     .with_message("The previous section attribute must be followed by one or two numbers between braces")
@@ -184,19 +184,13 @@ fn parse_section_attrs<'ctx_stack>(
                 let (expr, after_expr) = expr::expect_numeric_expr(lookahead, parse_ctx);
                 let align = match expr.try_const_eval() {
                     Ok((value, span)) => if (value as u32) > 16 {
-                        diagnostics::error(
-                            &span,
-                            |error| {
-                                error.set_message("Specified alignment is larger than 16");
-                                error.add_label(
-                                    diagnostics::error_label(&span)
-                                        .with_message(format!("This expression evaluates to {value}"))
-                                );
-                            },
-                            parse_ctx.sources,
-                            parse_ctx.nb_errors_remaining,
-                            parse_ctx.options
-                        );
+                        parse_ctx.error(&span, |error| {
+                            error.set_message("Specified alignment is larger than 16");
+                            error.add_label(
+                                diagnostics::error_label(&span)
+                                    .with_message(format!("This expression evaluates to {value}"))
+                            );
+                        });
                         16
                     } else {
                         value as u8
@@ -215,18 +209,13 @@ fn parse_section_attrs<'ctx_stack>(
                     maybe_expr.map_or(0, |expr| {
                         match expr.try_const_eval() {
                             Ok((value, span)) => if (value as u32) >= (1 << align) {
-                                diagnostics::error(
-                                    &span, |error| {
-                                        error.set_message("Alignment offset is larger than the alignment");
-                                        error.add_label(
-                                            diagnostics::error_label(&span)
-                                                .with_message(format!("This expression evaluates to {value}, which is larger than 1 << {align}"))
-                                        );
-                                    },
-                                    parse_ctx.sources,
-                                    parse_ctx.nb_errors_remaining,
-                                    parse_ctx.options
-                                );
+                                parse_ctx.error(&span, |error| {
+                                    error.set_message("Alignment offset is larger than the alignment");
+                                    error.add_label(
+                                        diagnostics::error_label(&span)
+                                            .with_message(format!("This expression evaluates to {value}, which is larger than 1 << {align}"))
+                                    );
+                                });
                                 (1 << align) - 1
                             } else {
                                 value as u16
@@ -244,7 +233,7 @@ fn parse_section_attrs<'ctx_stack>(
                 // If there is already a constraint, it must match at the same offset.
                 if let Err(err) = attrs.address.merge(AddrConstraint::Align(align, align_ofs), 0) {
                     let (msg, label_msg) = err.details();
-                    diagnostics::error(
+                    parse_ctx.error(
                         &align_span,
                         |error| {
                             error.set_message(msg);
@@ -252,16 +241,13 @@ fn parse_section_attrs<'ctx_stack>(
                                 diagnostics::error_label(&align_span).with_message(label_msg)
                             );
                         },
-                        parse_ctx.sources,
-                        parse_ctx.nb_errors_remaining,
-                        parse_ctx.options
                     );
                 };
 
                 expect_one_of! { lookahead => {
                     |"]"| => lookahead = parse_ctx.next_token(),
                     else |other| => {
-                        parse_ctx.report_syntax_error(other.as_ref(), |error, span| {
+                        parse_ctx.report_syntax_error(&other, |error, span| {
                             error.add_label(
                                 diagnostics::error_label(span)
                                     .with_message("Missing closing brace after the previous section attribute")
@@ -273,7 +259,7 @@ fn parse_section_attrs<'ctx_stack>(
             },
 
             else |other| => {
-                parse_ctx.report_syntax_error(other.as_ref(), |error, span| {
+                parse_ctx.report_syntax_error(&other, |error, span| {
                     error.add_label(
                         diagnostics::error_label(span)
                             .with_message("Expected a section attribute here (TODO)")
@@ -290,10 +276,7 @@ fn parse_section_attrs<'ctx_stack>(
 
     (attrs, name, lookahead)
 }
-pub(in super::super) fn parse_section<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(in super::super) fn parse_section(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     let (attrs, name, lookahead) = parse_section_attrs(parse_ctx.next_token(), parse_ctx);
 
     let active_section = parse_ctx.sections.create_if_not_exists(name, attrs);
@@ -302,49 +285,31 @@ pub(in super::super) fn parse_section<'ctx_stack>(
     lookahead
 }
 
-pub(in super::super) fn parse_endsection<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(in super::super) fn parse_endsection(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     parse_ctx.sections.active_section = None;
 
     parse_ctx.next_token()
 }
 
-pub(in super::super) fn parse_load<'ctx_stack>(
-    keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(in super::super) fn parse_load(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     let (attrs, name, lookahead) = parse_section_attrs(parse_ctx.next_token(), parse_ctx);
 
     let new_active_section = parse_ctx.sections.create_if_not_exists(name, attrs);
     let Some((data_section, symbol_section)) = parse_ctx.sections.active_section.as_mut() else {
-        diagnostics::error(
-            &keyword.span,
-            |error| {
-                error.set_message("`LOAD` used outside of a section");
-            },
-            parse_ctx.sources,
-            parse_ctx.nb_errors_remaining,
-            parse_ctx.options,
-        );
+        parse_ctx.error(&keyword.span, |error| {
+            error.set_message("`LOAD` used outside of a section");
+        });
 
         return lookahead;
     };
     if new_active_section.points_to_same_as(data_section) {
-        diagnostics::error(
-            &keyword.span,
-            |error| {
-                error.set_message("`LOAD` cannot designate the active section");
-                error.add_label(
-                    diagnostics::error_label(&keyword.span)
-                        .with_message("Section \"{}\" is active here"),
-                );
-            },
-            parse_ctx.sources,
-            parse_ctx.nb_errors_remaining,
-            parse_ctx.options,
-        );
+        parse_ctx.error(&keyword.span, |error| {
+            error.set_message("`LOAD` cannot designate the active section");
+            error.add_label(
+                diagnostics::error_label(&keyword.span)
+                    .with_message("Section \"{}\" is active here"),
+            );
+        });
 
         return lookahead;
     }
@@ -353,52 +318,33 @@ pub(in super::super) fn parse_load<'ctx_stack>(
     lookahead
 }
 
-pub(in super::super) fn parse_endl<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(in super::super) fn parse_endl(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     if let Some((data_section, symbol_section)) = parse_ctx.sections.active_section.as_mut() {
         if !data_section.points_to_same_as(symbol_section) {
             // End the `LOAD` block.
             *symbol_section = data_section.clone();
         } else {
-            diagnostics::error(
-                &_keyword.span,
-                |error| {
-                    error.set_message("`ENDL` used outside of a `LOAD` block");
-                    error.add_label(
-                        diagnostics::error_label(&_keyword.span)
-                            .with_message("This directive is invalid"),
-                    );
-                },
-                parse_ctx.sources,
-                parse_ctx.nb_errors_remaining,
-                parse_ctx.options,
-            );
-        }
-    } else {
-        diagnostics::error(
-            &_keyword.span,
-            |error| {
-                error.set_message("`ENDL` used outside of a section");
+            parse_ctx.error(&_keyword.span, |error| {
+                error.set_message("`ENDL` used outside of a `LOAD` block");
                 error.add_label(
                     diagnostics::error_label(&_keyword.span)
                         .with_message("This directive is invalid"),
                 );
-            },
-            parse_ctx.sources,
-            parse_ctx.nb_errors_remaining,
-            parse_ctx.options,
-        );
+            });
+        }
+    } else {
+        parse_ctx.error(&_keyword.span, |error| {
+            error.set_message("`ENDL` used outside of a section");
+            error.add_label(
+                diagnostics::error_label(&_keyword.span).with_message("This directive is invalid"),
+            );
+        });
     }
 
     parse_ctx.next_token()
 }
 
-pub(in super::super) fn parse_pushs<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(in super::super) fn parse_pushs(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     parse_ctx.sections.push_active_section();
 
     let lookahead = parse_ctx.next_token();
@@ -415,21 +361,12 @@ pub(in super::super) fn parse_pushs<'ctx_stack>(
     lookahead
 }
 
-pub(in super::super) fn parse_pops<'ctx_stack>(
-    keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(in super::super) fn parse_pops(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     if parse_ctx.sections.pop_active_section().is_none() {
-        diagnostics::error(
-            &keyword.span,
-            |error| {
-                error.set_message("No entries in the section stack");
-                error.add_label(diagnostics::error_label(&keyword.span).with_message("Cannot pop"));
-            },
-            parse_ctx.sources,
-            parse_ctx.nb_errors_remaining,
-            parse_ctx.options,
-        )
+        parse_ctx.error(&keyword.span, |error| {
+            error.set_message("No entries in the section stack");
+            error.add_label(diagnostics::error_label(&keyword.span).with_message("Cannot pop"));
+        })
     }
 
     parse_ctx.next_token()

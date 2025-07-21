@@ -2,40 +2,39 @@ use std::cell::Cell;
 
 use crate::{
     charmap::{CharMapping, Charmap},
-    context_stack::Span,
     diagnostics,
     expr::{BinOp, Expr, UnOp},
-    source_store::SourceStore,
+    sources::Span,
     syntax::tokens::{tok, Token},
     Options,
 };
 
-use super::{expect_one_of, parse_ctx, string};
+use super::{expect_one_of, matches_tok, parse_ctx, string};
 
 // The implementation strategy is a Pratt parser.
 //
 // [1]: https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html
 // [2]: https://martin.janiczek.cz/2023/07/03/demystifying-pratt-parsers.html
-pub(super) fn parse_numeric_expr<'ctx_stack>(
-    lookahead: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> (Option<Expr<'ctx_stack>>, Option<Token<'ctx_stack>>) {
+pub(super) fn parse_numeric_expr(
+    lookahead: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Expr>, Token) {
     parse_subexpr(lookahead, parse_ctx, 0)
 }
 
-fn parse_subexpr<'ctx_stack>(
-    lookahead: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
+fn parse_subexpr(
+    lookahead: Token,
+    parse_ctx: &mut parse_ctx!(),
     min_binding_power: u8,
-) -> (Option<Expr<'ctx_stack>>, Option<Token<'ctx_stack>>) {
+) -> (Option<Expr>, Token) {
     let (mut lhs, mut token) = expect_one_of!(lookahead => {
         Token { span } |"("| => {
             // The inner expression's minimum power is reset, due to the parens' grouping behavior.
             let (expr, lookahead) = expect_subexpr(parse_ctx.next_token(),parse_ctx, 0);
-            let (lookahead, end_span) = expect_one_of!(lookahead => {
-                Token { span } |")"| => (parse_ctx.next_token(), span),
+            let lookahead = expect_one_of!(lookahead => {
+                |")"| => parse_ctx.next_token(),
                 else |unexpected| => {
-                    parse_ctx.report_syntax_error(unexpected.as_ref(), |error, cur_span| {
+                    parse_ctx.report_syntax_error(&unexpected, |error, cur_span| {
                         error.set_message("Syntax error: unclosed parenthesis");
                         error.add_labels([
                             diagnostics::error_label(&span)
@@ -44,7 +43,7 @@ fn parse_subexpr<'ctx_stack>(
                                 .with_message("...before this point"),
                         ]);
                     });
-                    (unexpected, parse_ctx.current_span()) // TODO: no, bad. This should span until the last token in the subexpr!
+                    unexpected
                 }
             });
             (expr, lookahead)
@@ -54,9 +53,9 @@ fn parse_subexpr<'ctx_stack>(
             let lookahead = parse_ctx.next_token();
             (Expr::number(number, span), lookahead)
         },
-        Token { span } |"identifier"(ident)| => {
+        Token { span } |"identifier"(ident, _)| => {
             let lookahead = parse_ctx.next_token();
-            if matches!(lookahead, Some(Token { payload: tok!("("), .. })) {
+            if matches_tok!(lookahead, "(") {
                 todo!(); // Function call.
             } else {
                 (Expr::symbol(ident, span), lookahead)
@@ -81,50 +80,46 @@ fn parse_subexpr<'ctx_stack>(
                     &string,
                     &span,
                     charmap,
-                    parse_ctx.sources,
                     parse_ctx.nb_errors_remaining,
                     parse_ctx.options,
                 ) {
                     Ok(value) => (Expr::number(value, span), lookahead),
                     Err(nb_values) => {
-                        diagnostics::error(
+                        parse_ctx.error(
                             &span,
                             |error| {
                                 error.set_message("Invalid string-to-number conversion");
                                 error.add_label(diagnostics::error_label(&span)
                                     .with_message(format!("This string encodes to {nb_values} charmap units instead of 1")));
                             },
-                            parse_ctx.sources,
-                            parse_ctx.nb_errors_remaining,
-                            parse_ctx.options
                         );
                         (Expr::nothing(span), lookahead)
                     }
                 }
             } else {
-                let Some(op_token) = lookahead else {
-                    return (None, None);
-                };
+                if matches_tok!(lookahead, "end of input") {
+                    return (None, lookahead);
+                }
 
-                let Some(operator) = UnOp::from_token(&op_token.payload) else {
-                    return (None, Some(op_token));
+                let Some(operator) = UnOp::from_token(&lookahead.payload) else {
+                    return (None, lookahead);
                 };
 
                 let ((), right_power) = operator.binding_power();
-                let (rhs, lookahead) = expect_subexpr(parse_ctx.next_token(), parse_ctx, right_power);
-                (rhs.unary_op(operator, op_token.span), lookahead)
+                let (rhs, next_token) = expect_subexpr(parse_ctx.next_token(), parse_ctx, right_power);
+                (rhs.unary_op(operator, lookahead.span), next_token)
             }
         }
     });
 
     let lookahead = loop {
         // If at end of input, the expression is over.
-        let Some(op_token) = token else {
-            break None;
+        if matches_tok!(token, "end of input") {
+            break token;
         };
         // If the next token is not a binary operator, stop parsing the expression.
-        let Some(operator) = BinOp::from_token(&op_token.payload) else {
-            break Some(op_token);
+        let Some(operator) = BinOp::from_token(&token.payload) else {
+            break token;
         };
         let (left_power, right_power) = operator.binding_power();
         // Compare the binding powers surrounding the last "atom" (left = `min_binding_power`,
@@ -132,7 +127,7 @@ fn parse_subexpr<'ctx_stack>(
         // If said "atom" is bound more tightly to its left than to its right,
         // "wrap up" the current expression.
         if left_power < min_binding_power {
-            break Some(op_token);
+            break token;
         }
 
         let (rhs, lookahead) = expect_subexpr(parse_ctx.next_token(), parse_ctx, right_power);
@@ -144,22 +139,19 @@ fn parse_subexpr<'ctx_stack>(
     (Some(lhs), lookahead)
 }
 
-pub(super) fn expect_numeric_expr<'ctx_stack>(
-    lookahead: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> (Expr<'ctx_stack>, Option<Token<'ctx_stack>>) {
+pub(super) fn expect_numeric_expr(lookahead: Token, parse_ctx: &mut parse_ctx!()) -> (Expr, Token) {
     expect_subexpr(lookahead, parse_ctx, 0)
 }
 
-fn expect_subexpr<'ctx_stack>(
-    lookahead: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
+fn expect_subexpr(
+    lookahead: Token,
+    parse_ctx: &mut parse_ctx!(),
     min_binding_power: u8,
-) -> (Expr<'ctx_stack>, Option<Token<'ctx_stack>>) {
+) -> (Expr, Token) {
     let (res, lookahead) = parse_subexpr(lookahead, parse_ctx, min_binding_power);
     (
         res.unwrap_or_else(|| {
-            parse_ctx.report_syntax_error(lookahead.as_ref(), |error, span| {
+            parse_ctx.report_syntax_error(&lookahead, |error, span| {
                 error.add_label(
                     diagnostics::error_label(span)
                         .with_message("Expected a number or an expression here"),
@@ -167,20 +159,16 @@ fn expect_subexpr<'ctx_stack>(
             });
             // If no expression has been parsed, then the lookahead must point to a non-expression
             // token, which is suitable for an "expression expected here" error.
-            Expr::nothing(match lookahead.as_ref() {
-                Some(token) => token.span.clone(),
-                None => parse_ctx.current_span(),
-            })
+            Expr::nothing(lookahead.span.clone())
         }),
         lookahead,
     )
 }
 
-fn convert_string_to_numeric<'ctx_stack>(
+fn convert_string_to_numeric(
     string: &str,
-    span: &Span<'ctx_stack>,
-    charmap: &Charmap<'ctx_stack>,
-    sources: &SourceStore,
+    span: &Span,
+    charmap: &Charmap,
     nb_errors_left: &Cell<usize>,
     options: &Options,
 ) -> Result<i32, usize> {
@@ -199,7 +187,7 @@ fn convert_string_to_numeric<'ctx_stack>(
                 }
             }
             CharMapping::Passthrough(c) => {
-                charmap.warn_on_passthrough(c, span, sources, nb_errors_left, options);
+                charmap.warn_on_passthrough(c, span, nb_errors_left, options);
                 Ok(c as u32 as i32)
             }
         },

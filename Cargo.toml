@@ -30,6 +30,8 @@ rgbasm = [
 	# Specific deps.
 	"dep:chrono",
 	"dep:compact_str",
+	"dep:derive_more",
+	"dep:displaydoc",
 	"dep:indexmap",
 	"dep:phf",
 	"dep:rustc-hash",
@@ -86,6 +88,10 @@ cfg-if = { version = "1.0", optional = true }
 chrono = { version = "0.4.40", optional = true }
 clap = { version = "4.4", features = ["derive", "wrap_help"], optional = true }
 compact_str = { version = "0.9.0", optional = true }
+derive_more = { version = "0.99.20", default-features = false, features = [
+	"display",
+], optional = true }
+displaydoc = { version = "0.2.5", optional = true }
 funty = { version = "2.0", optional = true }
 indexmap = { version = "2.9.0", optional = true }
 os_info = { version = "3.10", default-features = false, optional = true }
@@ -124,7 +130,7 @@ libtest-mimic = "0.8.1"
 snapbox = { version = "0.6.21", features = ["path", "cmd"] }
 
 [patch.crates-io]
-ariadne = { git = "https://github.com/ISSOtm/ariadne.git", branch = "write_refactor" }
+ariadne = { git = "https://github.com/ISSOtm/ariadne.git", branch = "rgbds" }
 
 [[bin]]
 name = "rgbasm"

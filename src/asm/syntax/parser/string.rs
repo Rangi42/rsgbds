@@ -1,16 +1,13 @@
 use compact_str::CompactString;
 
-use crate::{context_stack::Span, diagnostics, syntax::tokens::Token};
+use crate::{diagnostics, sources::Span, syntax::tokens::Token};
 
 use super::{expect_one_of, parse_ctx, tok};
 
-pub(super) fn parse_string_expr<'ctx_stack>(
-    first_token: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> (
-    Option<(CompactString, Span<'ctx_stack>)>,
-    Option<Token<'ctx_stack>>,
-) {
+pub(super) fn parse_string_expr(
+    first_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<(CompactString, Span)>, Token) {
     expect_one_of! {
         first_token => {
             Token { span } |"string"(string)| => {
@@ -49,14 +46,14 @@ pub(super) fn parse_string_expr<'ctx_stack>(
             |"section"| => {
                 todo!();
             },
-            Token { span } |"identifier"(ident)| => {
+            Token { span } |"identifier"(ident, has_colon)| => {
                 // If the identifier resolves to a string symbol, then it expands to its value.
-                if let Some(sym) = parse_ctx.symbols.find_interned(&ident) {
+                if let Some(sym) = parse_ctx.symbols.find(&ident) {
                     if let Some(string) = sym.get_string() {
                         return (Some((string, span)), parse_ctx.next_token())
                     }
                 }
-                (None, Some(Token { payload: tok!("identifier")(ident), span }))
+                (None, Token { payload: tok!("identifier")(ident, has_colon), span })
             },
             else |unexpected| => {
                 (None, unexpected)
@@ -65,19 +62,16 @@ pub(super) fn parse_string_expr<'ctx_stack>(
     }
 }
 
-pub(super) fn expect_string_expr<'ctx_stack>(
-    first_token: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> (
-    Option<(CompactString, Span<'ctx_stack>)>,
-    Option<Token<'ctx_stack>>,
-) {
+pub(super) fn expect_string_expr(
+    first_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<(CompactString, Span)>, Token) {
     let (maybe_string, lookahead) = parse_string_expr(first_token, parse_ctx);
     (
         match maybe_string {
             Some((string, span)) => Some((string, span)),
             None => {
-                parse_ctx.report_syntax_error(lookahead.as_ref(), |error, span| {
+                parse_ctx.report_syntax_error(&lookahead, |error, span| {
                     error.add_label(
                         diagnostics::error_label(span)
                             .with_message("Expected a string expression here"),

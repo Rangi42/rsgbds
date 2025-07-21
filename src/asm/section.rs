@@ -4,22 +4,22 @@ use rustc_hash::FxBuildHasher;
 
 use crate::{
     common::{section::MemRegion, S},
-    context_stack::Span,
     expr::Expr,
+    sources::Span,
 };
 
 #[derive(Debug)]
-pub struct Sections<'ctx_stack> {
-    sections: IndexMap<CompactString, Section<'ctx_stack>, FxBuildHasher>,
+pub struct Sections {
+    sections: IndexMap<CompactString, Section, FxBuildHasher>,
     /// The first is the “data” section, the second is the “symbol” section.
     pub active_section: Option<(ActiveSection, ActiveSection)>,
     section_stack: Vec<Option<(ActiveSection, ActiveSection)>>,
 }
 
 #[derive(Debug)]
-pub struct Section<'ctx_stack> {
+pub struct Section {
     attrs: SectionAttrs,
-    patches: Vec<Patch<'ctx_stack>>,
+    patches: Vec<Patch>,
     // TODO: the rest of the fucking owl
 }
 #[derive(Debug)]
@@ -49,9 +49,9 @@ pub struct ActiveSection {
 }
 
 #[derive(Debug)]
-struct Patch<'ctx_stack> {
-    span: Span<'ctx_stack>,
-    expr: Expr<'ctx_stack>,
+struct Patch {
+    span: Span,
+    expr: Expr,
     kind: PatchKind,
 }
 #[derive(Debug)]
@@ -61,7 +61,7 @@ enum PatchKind {
     Long,
 }
 
-impl<'ctx_stack> Sections<'ctx_stack> {
+impl Sections {
     pub fn new() -> Self {
         Self {
             sections: IndexMap::with_hasher(FxBuildHasher),

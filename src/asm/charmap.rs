@@ -9,22 +9,20 @@ use std::{
 
 use compact_str::CompactString;
 
-use crate::{
-    common::Captures, context_stack::Span, diagnostics, source_store::SourceStore, Options,
-};
+use crate::{common::Captures, diagnostics, sources::Span, Options};
 
 #[derive(Debug)]
-pub struct Charmaps<'ctx_stack> {
+pub struct Charmaps {
     // TODO: consider using an `IndexMap` instead
-    charmaps: Vec<Charmap<'ctx_stack>>,
+    charmaps: Vec<Charmap>,
     active_charmap_id: usize,
     // TODO: consider using `smallvec` or such, since this is hardly ever more than 1.
     stack: Vec<usize>,
 }
 
 #[derive(Debug)]
-pub struct Charmap<'ctx_stack> {
-    def_span: Span<'ctx_stack>,
+pub struct Charmap {
+    def_span: Span,
     name: CompactString,
     nodes: Vec<Node>,
     root_node: Children,
@@ -38,10 +36,10 @@ struct Node {
 
 const DEFAULT_CHARMAP_NAME: &str = "main";
 
-impl<'ctx_stack> Charmaps<'ctx_stack> {
+impl Charmaps {
     pub fn new() -> Self {
         Self {
-            charmaps: vec![Charmap::new(DEFAULT_CHARMAP_NAME.into(), Span::BUILTIN)],
+            charmaps: vec![Charmap::new(DEFAULT_CHARMAP_NAME.into(), Span::Builtin)],
             active_charmap_id: 0,
             stack: vec![],
         }
@@ -52,11 +50,7 @@ impl<'ctx_stack> Charmaps<'ctx_stack> {
             .iter()
             .position(|charmap| name == charmap.name)
     }
-    pub fn make_new(
-        &mut self,
-        name: CompactString,
-        def_span: Span<'ctx_stack>,
-    ) -> Result<(), CharmapError> {
+    pub fn make_new(&mut self, name: CompactString, def_span: Span) -> Result<(), CharmapError> {
         if let Some(i) = self.find_charmap(&name) {
             return Err(CharmapError::Conflict(
                 name,
@@ -71,7 +65,7 @@ impl<'ctx_stack> Charmaps<'ctx_stack> {
     pub fn make_copy(
         &mut self,
         name: CompactString,
-        def_span: Span<'ctx_stack>,
+        def_span: Span,
         target_name: &str,
     ) -> Result<(), CharmapError> {
         if let Some(i) = self.find_charmap(&name) {
@@ -98,10 +92,10 @@ impl<'ctx_stack> Charmaps<'ctx_stack> {
         self.active_charmap_id = self.find_charmap(name)?;
         Some(())
     }
-    pub fn active_charmap(&self) -> &Charmap<'ctx_stack> {
+    pub fn active_charmap(&self) -> &Charmap {
         &self.charmaps[self.active_charmap_id]
     }
-    pub fn active_charmap_mut(&mut self) -> &mut Charmap<'ctx_stack> {
+    pub fn active_charmap_mut(&mut self) -> &mut Charmap {
         &mut self.charmaps[self.active_charmap_id]
     }
 
@@ -113,8 +107,8 @@ impl<'ctx_stack> Charmaps<'ctx_stack> {
         Some(())
     }
 }
-impl<'ctx_stack> Charmap<'ctx_stack> {
-    fn new(name: CompactString, def_span: Span<'ctx_stack>) -> Self {
+impl Charmap {
+    fn new(name: CompactString, def_span: Span) -> Self {
         Self {
             def_span,
             name,
@@ -152,8 +146,7 @@ impl<'ctx_stack> Charmap<'ctx_stack> {
     pub fn warn_on_passthrough(
         &self,
         c: char,
-        span: &Span<'ctx_stack>,
-        sources: &SourceStore,
+        span: &Span,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
@@ -167,7 +160,6 @@ impl<'ctx_stack> Charmap<'ctx_stack> {
                     warning
                         .add_label(diagnostics::warning_label(span).with_message("In this string"));
                 },
-                sources,
                 nb_errors_left,
                 options,
             );
@@ -185,7 +177,6 @@ impl<'ctx_stack> Charmap<'ctx_stack> {
                     warning
                         .add_label(diagnostics::warning_label(span).with_message("In this string"));
                 },
-                sources,
                 nb_errors_left,
                 options,
             );
@@ -200,8 +191,8 @@ impl<'ctx_stack> Charmap<'ctx_stack> {
     }
 }
 #[derive(Debug)]
-struct Encoder<'ctx_stack, 'charmap, 'string>(&'charmap Charmap<'ctx_stack>, &'string str);
-impl<'charmap> Iterator for Encoder<'_, 'charmap, '_> {
+struct Encoder<'charmap, 'string>(&'charmap Charmap, &'string str);
+impl<'charmap> Iterator for Encoder<'charmap, '_> {
     type Item = CharMapping<'charmap>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -247,18 +238,18 @@ impl CharMapping<'_> {
 }
 
 #[derive(Debug)]
-pub enum CharmapError<'ctx_stack> {
-    Conflict(CompactString, Span<'ctx_stack>, Span<'ctx_stack>),
-    NoSuchCharmap(CompactString, Span<'ctx_stack>),
+pub enum CharmapError {
+    Conflict(CompactString, Span, Span),
+    NoSuchCharmap(CompactString, Span),
 }
-impl<'ctx_stack> CharmapError<'ctx_stack> {
-    pub fn diag_span(&self) -> &Span<'ctx_stack> {
+impl CharmapError {
+    pub fn diag_span(&self) -> &Span {
         match self {
             CharmapError::Conflict(_, span, _) => span,
             CharmapError::NoSuchCharmap(_, span) => span,
         }
     }
-    pub fn make_diag(&self, error: &mut crate::source_store::ReportBuilder) {
+    pub fn make_diag<'span>(&'span self, error: &mut crate::diagnostics::ReportBuilder<'span>) {
         match self {
             CharmapError::Conflict(name, this_def, existing) => {
                 error.set_message(format!("A charmap called \"{name}\" already exists"));

@@ -2,12 +2,12 @@ use compact_str::CompactString;
 use phf::phf_map;
 use unicase::UniCase;
 
-use crate::{context_stack::Span, symbols::SymName};
+use crate::{sources::Span, Identifier};
 
 #[derive(Debug)]
-pub struct Token<'ctx_stack> {
+pub struct Token {
     pub payload: TokenPayload,
-    pub span: Span<'ctx_stack>,
+    pub span: Span,
 }
 
 macro_rules! define_tokens {
@@ -24,7 +24,7 @@ macro_rules! define_tokens {
         pub enum $enum_name {$(
             #[doc = $descr]
             #[strum(to_string = $descr)]
-            $(#{$attr})*
+            $(#[$attr])*
             $token $(($($fields,)*))? ,
         )*}
 
@@ -55,12 +55,17 @@ macro_rules! define_tokens {
 define_tokens! {
     #[derive(Debug, Clone)]
     pub enum TokenPayload {
+        #[name = "end of input"]
+        Eof,
+
         #[name = "number"]
         Number(i32),
         #[name = "string"]
         String(CompactString),
         #[name = "identifier"]
-        Identifier(SymName),
+        /// The boolean indicates whether the identifier is immediately followed by a colon.
+        /// This is used to disambiguate labels and macro calls.
+        Identifier(Identifier, bool),
         #[name = "anonymous label reference"]
         AnonLabelRef(i32),
         #[name = "end of line"]

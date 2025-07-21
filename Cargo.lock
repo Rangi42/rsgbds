@@ -79,7 +79,7 @@ dependencies = [
 [[package]]
 name = "ariadne"
 version = "0.5.0"
-source = "git+https://github.com/ISSOtm/ariadne.git?branch=write_refactor#34fe426a64cebe79e6b44f3d6a5ae3b22c424456"
+source = "git+https://github.com/ISSOtm/ariadne.git?branch=rgbds#71fb06118772d75988ad01c359fbba0e64f89254"
 dependencies = [
  "unicode-width",
  "yansi",
@@ -313,6 +313,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c9e6a11ca8224451684bc0d7d5a7adbf8f2fd6887261a1cfc3c0432f9d4068e"
 dependencies = [
  "powerfmt",
+]
+
+[[package]]
+name = "derive_more"
+version = "0.99.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6edb4b64a43d977b8e99788fe3a04d483834fba1215a7e02caa415b626497f7f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.100",
 ]
 
 [[package]]
@@ -1082,6 +1093,8 @@ dependencies = [
  "chrono",
  "clap",
  "compact_str",
+ "derive_more",
+ "displaydoc",
  "funty",
  "indexmap",
  "libtest-mimic",

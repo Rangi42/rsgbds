@@ -1,1277 +1,1150 @@
-/*! The innermost part of the language's processing.
+//! The innermost part of the language's processing.
+//!
+//! `rgbasm`'s lexer is unusual because of the language's design.
+//! In particular, macro arguments (`\1` etc.) and interpolation (`{DUCK}`) work at a textual level; this is enforced by their semantics.
+//!
+//! The first (known) design of the lexer handled them in the various token functions, but this meant that there was a lot of duplicated handling, and this caused a lot of bugs ([#63], [#362], [#531]...)
+//! Instead, we handle them at the lowest level, thus handling them in a manner transparent to the rest of the lexer.
+//!
+//! TODO: describe the "char stream" / remainder split more
+//!
+//! [#63]: https://github.com/gbdev/rgbds/issues/63
+//! [#362]: https://github.com/gbdev/rgbds/issues/362
+//! [#531]: https://github.com/gbdev/rgbds/issues/531
 
-`rgbasm`'s lexer is unusual because of the language's design.
-In particular, macro arguments (`\1` etc.) and interpolation (`{DUCK}`) work at a textual level; this is enforced by their semantics.
-
-The first (known) design of the lexer handled them in the various token functions, but this meant that there was a lot of duplicated handling, and this caused a lot of bugs ([#63], [#362], [#531]...)
-Instead, we handle them at the lowest level, thus handling them in a manner transparent to the rest of the lexer.
-
-TODO: describe the "char stream" / remainder split more
-
-[#63]: https://github.com/gbdev/rgbds/issues/63
-[#362]: https://github.com/gbdev/rgbds/issues/362
-[#531]: https://github.com/gbdev/rgbds/issues/531
- */
-
-use std::{cell::Cell, num::NonZeroUsize, ops::Range};
+use std::{cell::Cell, iter::Peekable, ops::Deref, rc::Rc, str::CharIndices};
 
 use compact_str::CompactString;
 use unicase::UniCase;
 
 use crate::{
-    context_stack::{ContextStack, SourceContext, SourceNode, SourceRef, SourcesMut, Span},
-    diagnostics,
-    format::FormatSpec,
-    source_store::{RawSpan, ReportBuilder, SourceStore},
+    diagnostics::{self, ReportBuilder},
+    macro_args::MacroArgs,
+    sources::{NormalSpan, Source, Span, SpanKind},
     symbols::Symbols,
-    syntax::tokens::{tok, Token, TokenPayload, KEYWORDS},
-    Options,
+    Identifier, Identifiers, Options,
 };
 
-#[derive(Debug)]
-pub struct LexerState {
-    expansions: Vec<Expansion>,
-    /// How many of the chars yet to be consumed have been scanned for expansions.
-    /// This is similar to the colloquial "blue paint" of the C preprocessor.
-    ///
-    /// Scanning for expansions is idempotent, so in theory we do not need to store this; however, macro args present a special case.
-    /// The second backslash out of two (`\\`) should not trigger macro args; for example, `\\1` should *not* expand,
-    /// even though after consuming the first backslash, we're left with `\1`, which *does* look like a macro arg.
-    ///
-    /// Likewise, macro args cannot contain expansions (this is by design), so they are immediately marked as "scanned" when expanded.
-    nb_scanned_for_expansion: usize,
+use super::tokens::{tok, Token, TokenPayload, KEYWORDS};
 
-    cursor: usize,
+#[derive(Debug)]
+pub struct Lexer {
+    contexts: Vec<Context>,
 }
 
 #[derive(Debug)]
-pub struct Expansion {
-    name: Option<CompactString>,
-    contents: CompactString,
-    cursor: usize,
+struct Context {
+    span: NormalSpan,
+    cur_byte: usize,
+    /// Bytes before this one have already been scanned for expansions.
+    /// Note that this is only updated when necessary, so it may be lagging behind `cur_byte`.
+    ///
+    /// This is akin to the C preprocessor's “blue paint”.
+    ofs_scanned_for_expansion: usize,
 }
 
-impl LexerState {
+impl Lexer {
     pub fn new() -> Self {
-        Self {
-            expansions: Vec::new(),
-            nb_scanned_for_expansion: 0,
-            cursor: 0,
-        }
+        Self { contexts: vec![] }
     }
 
-    fn active_expansion(&self) -> Option<&str> {
-        self.expansions
-            .iter()
-            .map(|expansion| &expansion.contents[expansion.cursor..])
-            .find(|buf| !buf.is_empty())
-    }
-
-    fn active_buffer<'a>(&'a self, source: &'a str) -> &'a str {
-        self.active_expansion().unwrap_or(&source[self.cursor..])
-    }
-
-    // TODO: combine the lexer recursion depth with the context stack depth
-    #[must_use = "Do not increase the recursion depth if this function returns `true`!"]
-    fn check_recursion_depth(&self, options: &Options) -> bool {
-        self.expansions.len() >= options.runtime_opts.recursion_depth
-    }
-
-    fn begin_expansion(
-        &mut self,
-        name: Option<CompactString>,
-        contents: CompactString,
-        options: &Options,
-    ) {
-        if name.is_some() && self.check_recursion_depth(options) {
-            return;
+    pub fn push_file(&mut self, file: Rc<Source>, parent: Option<Rc<NormalSpan>>) {
+        if parent.is_none() {
+            debug_assert!(self.contexts.is_empty());
         }
 
-        // Do not expand empty strings (we'd just skip over that buffer anyway).
-        if contents.is_empty() {
-            return;
-        }
-        self.expansions.push(Expansion {
-            name,
-            contents,
-            cursor: 0,
+        self.contexts.push(Context {
+            span: NormalSpan::new(file, SpanKind::File, parent),
+            cur_byte: 0,
+            ofs_scanned_for_expansion: 0,
         });
     }
+
+    pub fn push_macro(&mut self, mut contents: NormalSpan, parent: Rc<NormalSpan>) {
+        contents.parent = Some(parent);
+        self.contexts.push(Context {
+            cur_byte: contents.bytes.start,
+            ofs_scanned_for_expansion: contents.bytes.start,
+            span: contents,
+        });
+    }
+}
+
+struct LexerParams<'idents, 'sym, 'margs, 'nerr, 'opts> {
+    identifiers: &'idents mut Identifiers,
+    symbols: &'sym Symbols,
+    macro_args: Option<&'margs MacroArgs>,
+    nb_errors_left: &'nerr Cell<usize>,
+    options: &'opts Options,
 }
 
 macro_rules! chars {
-    (newline) => {'\r' | '\n'};
-    (whitespace) => {' ' | '\t'};
-    (starts_ident) => {'A'..='Z' | 'a'..='z' | '.' | '_'};
-    (ident) => {chars!(starts_ident) | '0'..='9' | '#' | '$' | '@'};
-    (starts_macro_arg) => {'@' | '#' | '<' | '1'..='9'};
+    (whitespace) => {
+        ' ' | '\t'
+    };
+    (newline) => {
+        '\n' | '\r'
+    };
+    (line_cont) => {
+        chars!(whitespace) | chars!(newline) | ';'
+    };
+    (ident_start) => {
+        'a'..='z' | 'A'..='Z' | '_'
+    };
+    (ident) => {
+        chars!(ident_start) | '0'..='9' | '$' | '@' | '#'
+    }
+}
+fn is_whitespace(ch: char) -> bool {
+    matches!(ch, chars!(whitespace))
 }
 
-/// Returns a **one-byte** span at the current lexer position.
-///
-/// This is only meant to be called when at the end of a context, when no more tokens can be produced to extract spans out of.
-pub fn current_span(ctx_stack: &ContextStack) -> Span<'_> {
-    let sources = ctx_stack.sources();
-    let src_ctx = sources
-        .active_context()
-        .expect("Called `current_span` with no active context");
-    let (src_idx, start) = loc(src_ctx);
-    drop(sources);
-    Span {
-        src: Some(SourceRef::new(ctx_stack, src_idx)),
-        byte_span: start..(start + 1),
+impl Context {
+    fn is_empty(&self) -> bool {
+        debug_assert!(self.span.is_offset_valid(self.cur_byte));
+        self.cur_byte == self.span.bytes.end
+    }
+
+    fn remaining_text(&self) -> &str {
+        &self.span.src.contents.text()[self.cur_byte..self.span.bytes.end]
+    }
+
+    fn new_span(&self) -> NormalSpan {
+        let mut span = self.span.clone();
+        span.bytes = self.cur_byte..self.cur_byte;
+        span
     }
 }
 
-pub fn is_next_char_a_colon(
-    ctx_stack: &ContextStack,
-    source_store: &SourceStore,
-    symbols: &mut Symbols, // We need to be able to intern names, and to resolve them for expansion.
-    nb_errors_remaining: &Cell<usize>,
-    options: &Options,
-) -> bool {
-    let mut sources = ctx_stack.sources_mut();
-    let Some((src_ctx, nodes)) = sources.active_context_mut() else {
-        // If there are no more contexts, no more tokens can be produced.
-        return false;
-    };
-    let node = src_ctx.node(nodes);
-    let mut parameters = LexParams {
-        ctx_stack,
-        src_ctx,
-        source_store,
-        node,
-        source: node.source(source_store),
-        symbols,
-        nb_errors_remaining,
-        options,
-    };
-    peek(&mut parameters, true, true) == Some(':')
-}
+impl Lexer {
+    fn active_context(&mut self) -> Option<&mut Context> {
+        // Any contexts that we are at the end of are only kept to prevent some infinite expansion cases,
+        // but they should be ignored..
+        self.contexts
+            .iter_mut()
+            .rev()
+            .find(|ctx| !ctx.is_empty() || !ctx.span.kind.ends_implicitly())
+    }
 
-/// Parameters that remain constant throughout a call to `next_token`.
-/// This is used to pass all of them at once, for simplicity.
-struct LexParams<'ctx_stack, 'src_store, 'syms, 'sym_ctx_stack, 'errs_rem, 'options> {
-    ctx_stack: &'ctx_stack ContextStack,
-    src_ctx: &'ctx_stack mut SourceContext,
-    source_store: &'src_store SourceStore,
-    node: &'ctx_stack SourceNode,
-    source: &'src_store str,
-    symbols: &'syms mut Symbols<'sym_ctx_stack>,
-    nb_errors_remaining: &'errs_rem Cell<usize>,
-    options: &'options Options,
-}
-
-pub fn next_token<'ctx_stack>(
-    expand_equs: bool,
-    ctx_stack: &'ctx_stack ContextStack,
-    source_store: &SourceStore,
-    symbols: &mut Symbols, // We need to be able to intern names, and to resolve them for expansion.
-    nb_errors_remaining: &Cell<usize>,
-    options: &Options,
-) -> Option<Token<'ctx_stack>> {
-    let mut sources = ctx_stack.sources_mut();
-    let (src_ctx, nodes) = sources.active_context_mut()?; // If there are no more contexts, no more tokens can be produced.
-    let node = src_ctx.node(nodes);
-    let mut parameters = LexParams {
-        ctx_stack,
-        src_ctx,
-        source_store,
-        node,
-        source: node.source(source_store),
-        symbols,
-        nb_errors_remaining,
-        options,
-    };
-    let params = &mut parameters;
-
-    Some(loop {
-        let ch = peek(params, true, true)?;
-        let start = loc(params.src_ctx); // All tokens start *now*; even if `make!` is recursively invoked.
-
-        macro_rules! make {
-            ($kind:expr) => {{
-                consume_char(params.src_ctx, ch);
-                // Since there is no need to dispatch, don't bother `peek`ing.
-                Token {
-                    payload: $kind,
-                    span: span(start, loc(params.src_ctx), ctx_stack, &mut sources),
-                }
-            }};
-            ($default:expr $(, $extra:pat => $with_extra:expr)+ $(,)?) => {{
-                consume_char(params.src_ctx, ch);
-                match peek(params, true, true) {
-                    $(Some(extra_ @ $extra) => {
-                        consume_char(params.src_ctx, extra_);
-                        #[allow(unreachable_code)] // Sometimes, `payload` is a diverging expression. But that's intended!
-                        Token {
-                            payload: $with_extra,
-                            span: span(start, loc(params.src_ctx), ctx_stack, &mut sources),
-                        }
-                    })+
-                    _ => Token {
-                        payload: $default,
-                        span: span(start, loc(params.src_ctx), ctx_stack, &mut sources),
-                    }
-                }
-            }};
-        }
-
-        match ch {
-            ';' => {
-                discard_comment(params);
-                continue;
-            }
-            // TODO: try to discard whitespace in bulk.
-            //       We could advance through the buffers/expansions, ignoring leading whitespace.
-            //       Such a function would also be useful in other places, I think?
-            chars!(whitespace) => {
-                consume_char(params.src_ctx, ch);
-                continue;
-            } // Just ignore whitespace.
-
-            // Newline.
-            '\r' => {
-                handle_crlf(params);
-
-                break Token {
-                    span: span(start, loc(params.src_ctx), ctx_stack, &mut sources),
-                    payload: tok!("end of line"),
-                };
-            }
-            '\n' => break make!(tok!("end of line")),
-
-            // Unambiguous single-char tokens.
-            '~' => break make!(tok!("~")),
-            '@' => break make!(tok!("identifier")(params.symbols.intern_name("@"))),
-            '[' => break make!(tok!("[")),
-            ']' => break make!(tok!("]")),
-            '(' => break make!(tok!("(")),
-            ')' => break make!(tok!(")")),
-            ',' => break make!(tok!(",")),
-
-            // 1- or 2-char tokens.
-            '+' => break make!(tok!("+"), '=' => tok!("+=")),
-            '-' => break make!(tok!("-"), '=' => tok!("-=")),
-            '*' => {
-                break make!(tok!("*"), '=' => tok!("*="), '*' => tok!("**"), '/' => { error_block_comment_term(params, start); continue; });
-            }
-            '/' => {
-                break make!(tok!("/"), '=' => tok!("/="), '*' => { discard_block_comment(params, start); continue; });
-            }
-            '|' => break make!(tok!("|"), '=' => tok!("|="), '|' => tok!("||")),
-            '^' => break make!(tok!("^"), '=' => tok!("^=")),
-            '=' => break make!(tok!("="), '=' => tok!("==")),
-            '!' => break make!(tok!("!"), '=' => tok!("!=")),
-
-            '<' => {
-                break make!(tok!("<"),
-                    '=' => tok!("<="),
-                    '<' => break make!(tok!("<<"), '=' => tok!("<<=")),
-                )
-            }
-            '>' => {
-                break make!(tok!(">"),
-                    '=' => tok!(">="),
-                    '>' => break make!(tok!(">>"), '=' => tok!(">>="),
-                        '>' => break make!(tok!(">>>"), '=' => tok!(">>>=")),
-                    )
-                )
-            }
-            ':' => {
-                break make!(tok!(":"),
-                    ':' => tok!("::"),
-                    first_char @ ('-' | '+') => read_anon_label_ref(params, first_char)
-                )
-            }
-
-            '0'..='9' => {
-                consume_char(params.src_ctx, ch);
-
-                let number = read_number(params, ch, 10, start);
-                if peek(params, true, true) == Some('.') {
-                    todo!();
-                }
-                break Token {
-                    payload: tok!("number")(number),
-                    span: span(start, loc(params.src_ctx), ctx_stack, &mut sources),
-                };
-            }
-
-            '&' => {
-                break make!(tok!("&"),
-                    '=' => tok!("&="),
-                    '&' => tok!("&&"),
-                    ch @ '0'..='7' => tok!("number")(read_number(params, ch, 8, start))
+    fn push_context(
+        &mut self,
+        source: Rc<Source>,
+        trigger_span: NormalSpan,
+        ctx_kind: SpanKind,
+        painted_blue: bool,
+        params: &LexerParams,
+    ) {
+        if self.contexts.len() == params.options.runtime_opts.recursion_depth {
+            let span = Span::Normal(trigger_span);
+            params.error(&span, |error| {
+                error.set_message("Maximum recursion depth exceeded");
+                error.add_label(
+                    diagnostics::error_label(&span)
+                        .with_message(format!("Depth is at {} here", self.contexts.len())),
                 );
-            }
-            '%' => {
-                consume_char(params.src_ctx, ch);
+            });
+        } else if !source.contents.is_empty() {
+            // Don't bother with empty expansions.
+            let span = NormalSpan::new(source, ctx_kind, Some(Rc::new(trigger_span)));
+            self.contexts.push(Context {
+                cur_byte: span.bytes.start,
+                ofs_scanned_for_expansion: if painted_blue {
+                    span.bytes.end
+                } else {
+                    span.bytes.start
+                },
+                span,
+            })
+        }
+    }
 
-                break match peek(params, true, true) {
-                    Some('=') => make!(tok!("%=")),
-                    Some(c) if params.options.runtime_opts.binary_digits.contains(&c) => {
-                        make!(tok!("number")(read_dyn_number(
-                            params,
-                            c,
-                            &params.options.runtime_opts.binary_digits,
-                            start,
-                        )))
-                    }
-                    _ => Token {
-                        payload: tok!("%"),
-                        span: span(start, loc(params.src_ctx), ctx_stack, &mut sources),
-                    },
-                };
-            }
-            '$' => {
-                consume_char(params.src_ctx, ch);
+    /// Returns whether there are still more contexts after popping the top (active) one.
+    #[must_use]
+    pub fn pop_context(&mut self) -> bool {
+        let ctx = self
+            .contexts
+            .pop()
+            .expect("Attempting to pop a lexer context when there are no more!?");
+        debug_assert!(!ctx.span.kind.ends_implicitly());
+        !self.contexts.is_empty()
+    }
 
-                if let Some(first_char) = peek(params, true, true) {
-                    if first_char.is_ascii_hexdigit() {
-                        break make!(tok!("number")(read_number(params, first_char, 16, start)));
-                    }
-                }
-            }
-            '`' => {
-                consume_char(params.src_ctx, ch);
+    fn peek(&mut self, params: &LexerParams) -> Option<char> {
+        while let Some(ctx) = self.active_context() {
+            let text = ctx.remaining_text();
+            let mut chars = text.char_indices();
+            let (zero, ch) = chars.next()?; // We might be at EOF in the current context.
+            debug_assert_eq!(zero, 0);
+            match ch {
+                _ if ctx.cur_byte < ctx.ofs_scanned_for_expansion => {} // Characters that have been “painted blue” are “inert”.
 
-                if let Some(first_char) = peek(params, true, true) {
-                    if params.options.runtime_opts.gfx_chars.contains(&first_char) {
-                        break make!(tok!("number")(read_dyn_number(
-                            params,
-                            first_char,
-                            &params.options.runtime_opts.gfx_chars,
-                            start
-                        )));
-                    }
-                }
-            }
-
-            '"' => break make!(read_string(params, start, false)),
-
-            // Macro args were dealt with by `peek`, so if we still see one at this stage,
-            // the only valid possibility is a line continuation.
-            '\\' => todo!(),
-
-            '#' => {
-                consume_char(params.src_ctx, '#');
-
-                if let Some(payload) = match peek(params, true, true) {
-                    Some('"') => Some(read_string(params, start, true)),
-                    Some(chars!(starts_ident)) => Some(read_ident(params, true, true)),
-                    _ => None,
-                } {
-                    break Token {
-                        payload,
-                        span: span(start, loc(params.src_ctx), ctx_stack, &mut sources),
+                '\\' => {
+                    let macro_arg_id = Self::read_macro_arg(
+                        chars.by_ref().map(|(_ofs, ch)| ch),
+                        params.symbols,
+                        params.macro_args,
+                    );
+                    // `chars.offset()` is not stable yet.
+                    let macro_arg_len = match chars.next() {
+                        Some((ofs, _ch)) => ofs,
+                        None => text.len(),
                     };
-                }
-            }
-            chars!(starts_ident) => {
-                let payload = read_ident(params, false, true);
-                // If EQUS expansion is active...
-                if expand_equs {
-                    // ...then any identifier...
-                    if let TokenPayload::Identifier(ident) = &payload {
-                        // ...for a symbol...
-                        if let Some(sym) = params.symbols.find_interned(ident) {
-                            // ...that is string-typed...
-                            if let Some(string) = sym.get_string() {
-                                // ...triggers EQUS expansion.
-                                params.src_ctx.lexer_state_mut().begin_expansion(
-                                    Some(params.symbols.resolve(*ident).into()),
-                                    string,
+                    if let Some(res) = macro_arg_id {
+                        let trigger_span = ctx
+                            .span
+                            .sub_span(ctx.cur_byte..ctx.cur_byte + macro_arg_len);
+                        match res {
+                            Ok((span_kind, source)) => {
+                                // Consume all the characters implicated in the macro arg.
+                                ctx.cur_byte += macro_arg_len;
+                                self.push_context(
+                                    Rc::clone(source),
+                                    trigger_span,
+                                    span_kind,
+                                    true, // Don't scan for expansions inside of the macro arg.
+                                    params,
+                                );
+                                continue; // Try again, reading from the new expansion context.
+                            }
+                            Err(err) => {
+                                // Consuming the characters would cause them to be missed by any active spans, so we have to have them considered normally.
+                                // TODO: it *might* be possible to work around this by pushing a dummy context that ends immediately and adjusts the span?
+                                let span = Span::Normal(trigger_span);
+                                diagnostics::error(
+                                    &span,
+                                    |error| {
+                                        error.set_message(&err);
+                                        error.add_label(
+                                            diagnostics::error_label(&span)
+                                                .with_message(err.label_msg()),
+                                        );
+                                    },
+                                    params.nb_errors_left,
                                     params.options,
                                 );
+                            }
+                        }
+                    } else {
+                        // Ensure that the backslash *and* everything it escapes (at least one character) are not scanned for expansion again.
+                        // This is important, so that e.g. `\\1` isn't processed as a backslash then macro arg #1
+                        // (which would happen if the second backslash doesn't get that “blue paint”).
+                        ctx.ofs_scanned_for_expansion = ctx.cur_byte + macro_arg_len;
+                    }
+                }
+
+                '{' => {
+                    todo!();
+                }
+
+                _ => {} // Other chars do not get any special treatment.
+            }
+            return Some(ch);
+        }
+        // TODO: is his ever reached?
+        None
+    }
+
+    fn consume(&mut self, span: &mut NormalSpan) {
+        if Rc::ptr_eq(&span.src, &self.active_context().unwrap().span.src) {
+            debug_assert_eq!(span.bytes.end, self.active_context().unwrap().cur_byte);
+        }
+
+        // First, remove any “empty” contexts.
+        let ctx = loop {
+            let ctx = self
+                .contexts
+                .last_mut()
+                .expect("Lexer attempting to consume a char with no more contexts!?");
+
+            if !ctx.is_empty() {
+                break ctx;
+            }
+            debug_assert!(ctx.span.kind.ends_implicitly());
+
+            let ctx = self.contexts.pop().unwrap();
+
+            // Only repoint the span if it is currently pointing to the context we are exiting.
+            if Rc::ptr_eq(&span.src, &ctx.span.src) {
+                let span_is_empty = span.bytes.is_empty();
+                // Since we're popping a context, this means that the span is straddling two buffers.
+                // Thus, we will mark the span as spanning the entirety of the buffer's “expansion”.
+                // (Plus the character that's about to be consumed.)
+                *span = ctx.span.parent.unwrap().deref().clone();
+                // Exception: if the span is empty, we'll keep it empty (pointing at the end of the trigger),
+                //            but we still need to point it to the new active buffer.
+                if span_is_empty {
+                    span.bytes.start = span.bytes.end;
+                }
+            } else {
+                debug_assert!(
+                    Rc::ptr_eq(&span.src, &ctx.span.parent.as_ref().unwrap().src),
+                    "Span is pointing neither at current buffer ({}) nor its parent ({}), but at {}",
+                    &ctx.span.src.name,
+                    &ctx.span.parent.as_ref().unwrap().src.name,
+                    &span.src.name,
+                );
+            }
+        };
+
+        // Advancing the span and context requires knowing how many bytes the character being consumed is.
+        let text = ctx.remaining_text();
+        let c = text
+            .chars()
+            .next()
+            .expect("Lexer attempting to consume a char at EOF!?");
+
+        if Rc::ptr_eq(&span.src, &ctx.span.src) {
+            // The span is pointing at the active buffer.
+            debug_assert_eq!(span.bytes.end, ctx.cur_byte); // The span should be pointing at the char before this one.
+            span.bytes.end = ctx.cur_byte + c.len_utf8(); // Advance the span by as much, so it encompasses the character we just shifted.
+        } else {
+            debug_assert!(
+                ctx.span.kind.ends_implicitly(),
+                "Tokens can only straddle implicitly-ending contexts"
+            );
+            // The span is not pointing at the active buffer, so it should be pointing at its parent instead.
+            let Some(parent) = ctx.span.parent.as_ref() else {
+                panic!(
+                    "Span not pointing at the current top-level buffer ({}), but at {} instead",
+                    &ctx.span.src.name, &span.src.name,
+                );
+            };
+            debug_assert!(
+                Rc::ptr_eq(&span.src, &parent.src),
+                "Span is pointing neither at {} nor its parent {}, but at {}",
+                &ctx.span.src.name,
+                &parent.src.name,
+                &span.src.name,
+            );
+            // This modification is idempotent, so only do it at the beginning of the expansion, as a performance optimisation.
+            if ctx.cur_byte == ctx.span.bytes.start {
+                if !span.bytes.is_empty() {
+                    // Move the right edge of the span to encompass the entirety of the “trigger”.
+                    // Note that the parent will already have been advanced to start at the end of the trigger.
+                    debug_assert_eq!(span.bytes.end, parent.bytes.start);
+                    span.bytes.end = parent.bytes.end;
+                } else {
+                    // The span is empty, so move it to the beginning of the current buffer instead.
+                    *span = ctx.new_span();
+                    debug_assert!(span.bytes.is_empty());
+                    span.bytes.end = ctx.cur_byte + c.len_utf8();
+                }
+            }
+        }
+        debug_assert!(!span.bytes.is_empty());
+
+        // Advance the context's offset by that one character.
+        ctx.cur_byte += c.len_utf8();
+    }
+
+    /// Tries to read a macro argument (the part after the backslash, which is expected to have already been consumed)
+    /// and returns the macro arg index if a macro arg was found.
+    ///
+    /// Returns `None` if the backslash isn't part of a macro arg.
+    ///
+    /// Advances the iterator by however many characters are scanned; those characters must not be scanned again.
+    fn read_macro_arg<'margs>(
+        mut chars: impl Iterator<Item = char>,
+        symbols: &Symbols,
+        macro_args: Option<&'margs MacroArgs>,
+    ) -> Option<Result<(SpanKind, &'margs Rc<Source>), MacroArgError>> {
+        let idx = match chars.next() {
+            Some(ch @ '1'..='9') => (ch as u32 - '0' as u32) as usize,
+            Some('<') => todo!(),
+            Some('@') => todo!(),
+            Some('#') => todo!(),
+            _ => return None,
+        };
+        Some(
+            macro_args
+                .ok_or(MacroArgError::MacroArgOutsideMacro)
+                .and_then(|args| match args.arg(idx) {
+                    Some(arg) => Ok((SpanKind::MacroArg(idx), arg)),
+                    None => Err(MacroArgError::NoSuchArg {
+                        idx,
+                        max_valid: args.max_valid(),
+                    }),
+                }),
+        )
+    }
+
+    /// Tries to read an interpolation's contents, and returns the symbol name and format flags.
+    ///
+    /// Advances the iterator by however many characters are part of the interpolation;
+    /// **on success**, those characters must not be considered again.
+    fn read_interpolation(
+        chars: impl Iterator<Item = char>,
+        symbols: &Symbols,
+    ) -> Result<Option<Identifier>, ()> {
+        for ch in chars {
+            match ch {
+                chars!(newline) => break,
+                '{' => {
+                    todo!();
+                }
+                '}' => {
+                    todo!();
+                }
+                _ => {}
+            }
+        }
+        // Unterminated
+        Err(())
+    }
+
+    fn read_line_comment(chars: &mut Peekable<CharIndices>) {
+        while chars
+            .next_if(|&(_ofs, ch)| !matches!(ch, chars!(newline)))
+            .is_some()
+        {}
+    }
+
+    fn read_block_comment(chars: &mut Peekable<CharIndices>) -> Result<(), BlockCommentErr> {
+        let mut nesting_depth = 0usize;
+        while let Some((_ofs, ch)) = chars.next() {
+            match ch {
+                '*' => {
+                    if chars.next_if(|&(_ofs, ch)| ch == '/').is_some() {
+                        match nesting_depth.checked_sub(1) {
+                            Some(new_depth) => nesting_depth = new_depth,
+                            None => return Ok(()),
+                        }
+                    }
+                }
+                '/' => {
+                    if chars.next_if(|&(_ofs, ch)| ch == '*').is_some() {
+                        nesting_depth += 1;
+                    }
+                }
+                _ => {}
+            }
+        }
+        Err(BlockCommentErr::Unterminated) // TODO: unterminated
+    }
+
+    fn read_line_continuation(
+        ctx: &Context,
+        text: &str,
+        chars: &mut Peekable<CharIndices>,
+        params: &LexerParams,
+    ) -> Result<(), LineContinuationErr> {
+        while let Some(&(ofs, ch)) = chars.peek() {
+            match ch {
+                chars!(newline) => {
+                    chars.next();
+                    if ch == '\r' {
+                        chars.next_if(|&(_ofs, ch)| ch == '\n');
+                    }
+                    return Ok(());
+                }
+
+                chars!(whitespace) => {
+                    chars.next();
+                }
+                ';' => Self::read_line_comment(chars),
+                '/' => {
+                    chars.next();
+
+                    if chars.next_if(|&(_ofs, ch)| ch == '*').is_some() {
+                        if let Err(err) = Self::read_block_comment(chars) {
+                            let mut span = ctx.new_span();
+                            span.bytes.start += ofs;
+                            span.bytes.end += match chars.next() {
+                                Some((ofs, _ch)) => ofs,
+                                None => text.len(),
+                            };
+                            let span = Span::Normal(span);
+                            params.error(&span, |error| {
+                                error.set_message(&err);
+                                error.add_label(
+                                    diagnostics::error_label(&span).with_message("TODO"),
+                                );
+                            });
+                        }
+                    } else {
+                        return Err(LineContinuationErr::NotAtEol);
+                    }
+                }
+                _ => return Err(LineContinuationErr::NotAtEol),
+            }
+        }
+        Err(LineContinuationErr::Eof)
+    }
+
+    fn with_active_context_raw<F: FnOnce(&Context, &str) -> usize>(
+        &mut self,
+        span: &mut NormalSpan,
+        callback: F,
+    ) {
+        debug_assert!(
+            span.bytes.is_empty(),
+            "Do not consume a char before calling `with_active_context_raw`"
+        );
+        let ctx = self.active_context().unwrap();
+        let text = ctx.remaining_text();
+
+        *span = ctx.new_span();
+        let nb_bytes_consumed = callback(ctx, text);
+        debug_assert!(
+            nb_bytes_consumed <= text.len(),
+            "Consumed {nb_bytes_consumed} bytes out of a {}-byte string!?",
+            text.len()
+        );
+
+        span.bytes.end += nb_bytes_consumed;
+        ctx.cur_byte += nb_bytes_consumed;
+    }
+}
+
+impl Lexer {
+    fn handle_crlf(&mut self, ch: char, span: &mut NormalSpan, params: &LexerParams) {
+        if ch == '\r' && self.peek(params) == Some('\n') {
+            self.consume(span);
+        }
+    }
+
+    pub fn next_token(
+        &mut self,
+        identifiers: &mut Identifiers,
+        symbols: &Symbols,
+        macro_args: Option<&MacroArgs>,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) -> Token {
+        let mut params = LexerParams {
+            identifiers,
+            symbols,
+            macro_args,
+            nb_errors_left,
+            options,
+        };
+
+        // Create a 1-char span pointing at the character right after the previous token,
+        // which will be used for newlines, to provide better-looking syntax error messages.
+        // Create it *after* the first `peek` call, so that it points inside of any expansions that would create.
+        let first_char = self.peek(&params);
+        let ctx = self
+            .active_context() // Do this after `peek`, in case it triggered an expansion.
+            .expect("Attempting to lex a token without an active context!?");
+        // TODO: this span is also before any invalid chars, so a newline after invalid chars is reported in a weird location.
+        let mut span_before_whitespace = ctx.new_span();
+        let Some(ch) = first_char else {
+            return Token {
+                // Empty span pointing at EOF.
+                span: Span::Normal(span_before_whitespace),
+                payload: tok!("end of input"),
+            };
+        };
+        span_before_whitespace.bytes.end += ch.len_utf8();
+
+        let mut span = self.active_context().unwrap().new_span();
+        loop {
+            match self.peek(&params) {
+                None => {
+                    return Token {
+                        span: Span::Normal(self.active_context().unwrap().new_span()),
+                        payload: tok!("end of input"),
+                    };
+                }
+
+                Some(ch @ chars!(newline)) => {
+                    self.consume(&mut span);
+                    self.handle_crlf(ch, &mut span, &params);
+                    return Token {
+                        payload: tok!("end of line"),
+                        span: Span::Normal(span_before_whitespace),
+                    };
+                }
+
+                // All the stuff that gets ignored.
+                Some(chars!(whitespace)) => {
+                    debug_assert!(span.bytes.is_empty());
+                    self.consume(&mut span);
+                    // Move the start of the span as well.
+                    span.bytes.start = span.bytes.end;
+                }
+
+                Some(';') => {
+                    self.with_active_context_raw(&mut span, |_ctx, text| {
+                        let mut chars = text.char_indices().peekable();
+                        Self::read_line_comment(&mut chars);
+                        match chars.next() {
+                            Some((ofs, _newline)) => ofs,
+                            None => text.len(),
+                        }
+                    });
+                    // Ignore the comment.
+                    span.bytes.start = span.bytes.end;
+                }
+
+                Some('\\') => {
+                    // Macro args are implicitly handled by `peek`, and the only other thing that
+                    // a backslash can be part of outside of a string, is a line continuation.
+                    self.with_active_context_raw(&mut span, |ctx, text| {
+                        let mut chars = text.char_indices().peekable();
+                        let backslash = chars.next();
+                        debug_assert_eq!(backslash, Some((0, '\\')));
+
+                        let res = Self::read_line_continuation(ctx, text, &mut chars, &params);
+                        let cont_len = match chars.next() {
+                            Some((ofs, _ch)) => ofs,
+                            None => text.len(),
+                        };
+                        match res {
+                            Ok(()) => {}
+                            Err(err) => {
+                                let mut span = ctx.new_span();
+                                span.bytes.end += cont_len;
+                                let span = Span::Normal(span.clone());
+                                params.error(&span, |error| {
+                                    error.set_message(&err);
+                                    error.add_label(
+                                        diagnostics::error_label(&span)
+                                            .with_message(err.label_msg()),
+                                    );
+                                })
+                            }
+                        }
+                        cont_len
+                    });
+
+                    // Ignore the line continuation.
+                    span.bytes.start = span.bytes.end;
+                }
+
+                // Unambiguous single-char tokens.
+                Some('~') => {
+                    self.consume(&mut span);
+                    break Token {
+                        payload: tok!("~"),
+                        span: Span::Normal(span),
+                    };
+                }
+                Some('@') => {
+                    self.consume(&mut span);
+                    break Token {
+                        // TODO(perf): this could be `.get("@").unwrap()`
+                        payload: tok!("identifier"(identifiers.get_or_intern_static("@"), false)),
+                        span: Span::Normal(span),
+                    };
+                }
+                Some('[') => {
+                    self.consume(&mut span);
+                    break Token {
+                        payload: tok!("["),
+                        span: Span::Normal(span),
+                    };
+                }
+                Some(']') => {
+                    self.consume(&mut span);
+                    break Token {
+                        payload: tok!("]"),
+                        span: Span::Normal(span),
+                    };
+                }
+                Some('(') => {
+                    self.consume(&mut span);
+                    break Token {
+                        payload: tok!("("),
+                        span: Span::Normal(span),
+                    };
+                }
+                Some(')') => {
+                    self.consume(&mut span);
+                    break Token {
+                        payload: tok!(")"),
+                        span: Span::Normal(span),
+                    };
+                }
+                Some(',') => {
+                    self.consume(&mut span);
+                    break Token {
+                        payload: tok!(","),
+                        span: Span::Normal(span),
+                    };
+                }
+
+                // TODO: more tokens
+
+                // String.
+                Some('"') => {
+                    // Guaranteed to succeed, since we've already read the opening quote.
+                    let payload = self.read_string_maybe(&mut span, &params).unwrap();
+                    break Token {
+                        payload,
+                        span: Span::Normal(span),
+                    };
+                }
+
+                // Raw string or raw identifier.
+                Some('#') => {
+                    let payload = if let Some(payload) = self.read_string_maybe(&mut span, &params)
+                    {
+                        payload
+                    } else {
+                        self.consume(&mut span);
+                        match self.peek(&params) {
+                            Some(first_char @ chars!(ident_start)) => {
+                                self.consume(&mut span);
+                                self.read_identifier(first_char, &mut span, false, &mut params)
+                            }
+                            _ => {
+                                let span = Span::Normal(span.clone());
+                                params.error(&span, |error| {
+                                    error.set_message("Invalid '#'");
+                                    error.add_label(diagnostics::error_label(&span).with_message(
+                                        "This doesn't start a raw string or raw identifier",
+                                    ));
+                                });
                                 continue;
                             }
                         }
-                    }
+                    };
+                    break Token {
+                        payload,
+                        span: Span::Normal(span),
+                    };
                 }
-                break Token {
-                    payload,
-                    span: span(start, loc(params.src_ctx), ctx_stack, &mut sources),
-                };
-            }
 
-            _ => consume_char(params.src_ctx, ch),
-        }
+                // Identifier.
+                Some(ch @ chars!(ident_start)) => {
+                    self.consume(&mut span);
 
-        // This point is only reached by invalid characters.
-        // TODO: how to recover from these?
-        //       Discard until the next stand-alone punctuation (e.g. comma) or whitespace?
-        //       Currently, each bad character generates an individual diagnostic, which gets floody quickly.
-        params.error(start, |error, span| {
-            error.with_message("Unexpected character").with_label(
-                diagnostics::error_label(span).with_message(
-                    "This does not belong to any of the tokens expected at this point",
-                ),
-            )
-        });
-    })
-}
-
-/// This assumes that the leading semicolon has *not* been shifted yet.
-fn discard_comment(params: &mut LexParams<'_, '_, '_, '_, '_, '_>) {
-    debug_assert_eq!(peek(params, false, false), Some(';'));
-    let mut ch = ';';
-
-    loop {
-        consume_char(params.src_ctx, ch);
-        match peek(params, false, false) {
-            None | Some(chars!(newline)) => break,
-            Some(c) => ch = c,
-        }
-    }
-}
-
-fn discard_block_comment(
-    params: &mut LexParams<'_, '_, '_, '_, '_, '_>,
-    start: (NonZeroUsize, usize),
-) {
-    let start_marker_end = params.src_ctx.lexer_state().cursor;
-    loop {
-        match peek(params, false, false) {
-            None => {
-                params.error_at(start.1..start_marker_end, |error, span| {
-                    error.with_message("Unterminated block comment").with_label(
-                        diagnostics::error_label(span).with_message("The comment starts here"),
-                    )
-                });
-                break;
-            }
-            Some('*') => {
-                consume_char(params.src_ctx, '*');
-
-                if let Some(ch) = peek(params, false, false) {
-                    consume_char(params.src_ctx, ch);
-
-                    if ch == '/' {
-                        break; // Matched `*/`!
-                    }
+                    let payload = self.read_identifier(ch, &mut span, true, &mut params);
+                    // TODO: `elif` hack (lexer.cpp:1937)
+                    break Token {
+                        payload,
+                        span: Span::Normal(span),
+                    };
                 }
-            }
-            Some('/') => {
-                let marker_start = params.src_ctx.lexer_state().cursor;
-                consume_char(params.src_ctx, '/');
 
-                if let Some(ch) = peek(params, false, false) {
-                    consume_char(params.src_ctx, ch);
+                // Default case.
+                Some(ch) => {
+                    debug_assert!(span.bytes.is_empty());
+                    self.consume(&mut span);
 
-                    if ch == '*' {
-                        params.warning_at(
-                            marker_start..params.src_ctx.lexer_state().cursor,
-                            |warning, span| {
-                                let source_handle = span.source;
-                                warning
-                                    .with_message("Block comment opening marker found inside of a block comment")
-                                    .with_labels([
-                                        diagnostics::warning_label(span)
-                                            .with_message("This opening marker..."),
-                                        diagnostics::warning_label((source_handle, start.1..start_marker_end))
-                                            .with_message("...is inside of the block comment opened here"),
-                                    ])
-                            },
+                    let err_span = Span::Normal(span);
+                    params.error(&err_span, |error| {
+                        error
+                            .set_message(format!("Unexpected character '{}'", ch.escape_default()));
+                        error.add_label(
+                            diagnostics::error_label(&err_span)
+                                .with_message("This character was not expected at this point"),
                         );
-                    }
-                }
-            }
-            Some(ch) => consume_char(params.src_ctx, ch),
-        }
-    }
-}
-
-fn error_block_comment_term(
-    params: &mut LexParams<'_, '_, '_, '_, '_, '_>,
-    start: (NonZeroUsize, usize),
-) {
-    params.error(start, |error, span| {
-        error
-            .with_message("Found a block comment's end marker outside of a block comment")
-            .with_label(diagnostics::error_label(span))
-    });
-}
-
-fn read_anon_label_ref(
-    params: &mut LexParams<'_, '_, '_, '_, '_, '_>,
-    first_char: char,
-) -> TokenPayload {
-    let mut ofs = 1; // We already read the first char.
-    while peek(params, true, true) == Some(first_char) {
-        consume_char(params.src_ctx, first_char);
-        ofs += 1;
-    }
-
-    tok!("anonymous label reference")(if first_char == '+' { ofs } else { -ofs })
-}
-
-fn read_number(
-    params: &mut LexParams<'_, '_, '_, '_, '_, '_>,
-    first_char: char,
-    radix: u32,
-    start: (NonZeroUsize, usize),
-) -> i32 {
-    let mut number = Some(first_char.to_digit(radix).unwrap()); // Should be checked by the caller.
-    while let Some(mut ch) = peek(params, true, true) {
-        if ch == '_' {
-            let underscore_start = loc(params.src_ctx);
-            consume_char(params.src_ctx, '_');
-
-            match peek(params, true, true) {
-                Some(next) if next.is_digit(radix) => ch = next,
-                _ => {
-                    params.error(underscore_start, |error, span| {
-                        error
-                            .with_message("Trailing underscore in number literal")
-                            .with_label(
-                                diagnostics::error_label(span)
-                                    .with_message("Expected a digit after this `_`"),
-                            )
                     });
-                    break;
+
+                    // Borrowck is not happy otherwise, but this should hopefully compile to nothing.
+                    let Span::Normal(moved_span) = err_span else {
+                        unreachable!();
+                    };
+                    span = moved_span;
+                    // Make the span empty, as we ignore the character that's just been consumed.
+                    span.bytes.start = span.bytes.end;
                 }
             }
         }
-
-        if let Some(digit) = ch.to_digit(radix) {
-            consume_char(params.src_ctx, ch);
-            number = number
-                .and_then(|num| num.checked_mul(radix))
-                .and_then(|num| num.checked_add(digit));
-        } else {
-            break;
-        }
     }
-    make_number_token(params, number, start)
-}
 
-fn read_dyn_number(
-    params: &mut LexParams<'_, '_, '_, '_, '_, '_>,
-    first_char: char,
-    digits: &[char],
-    start: (NonZeroUsize, usize),
-) -> i32 {
-    let to_digit = |ch| digits.iter().position(|&c| c == ch).map(|idx| idx as u32);
+    fn read_identifier(
+        &mut self,
+        first_char: char,
+        span: &mut NormalSpan,
+        can_be_keyword: bool,
+        params: &mut LexerParams,
+    ) -> TokenPayload {
+        debug_assert!(
+            !span.bytes.is_empty(),
+            "Consume the first char before calling `read_identifier`"
+        );
+        debug_assert!(matches!(first_char, chars!(ident_start)));
 
-    let mut number = Some(to_digit(first_char).unwrap()); // Should be checked by the caller.
-    while let Some(mut ch) = peek(params, true, true) {
-        if ch == '_' {
-            let underscore_start = loc(params.src_ctx);
-            consume_char(params.src_ctx, ch);
-            match peek(params, true, true) {
-                Some(next) if to_digit(next).is_some() => ch = next,
-                _ => {
-                    params.error(underscore_start, |error, span| {
-                        error
-                            .with_message("Trailing underscore in number literal")
-                            .with_label(
-                                diagnostics::error_label(span)
-                                    .with_message("Expected a digit after this `_`"),
-                            )
-                    });
-                    break;
+        let mut name = CompactString::default();
+        name.push(first_char);
+        let followed_by_colon = loop {
+            match self.peek(params) {
+                Some(ch @ chars!(ident)) => {
+                    self.consume(span);
+                    name.push(ch);
                 }
+                Some(':') => break true,
+                _ => break false,
             }
-        }
-
-        if let Some(digit) = to_digit(ch) {
-            consume_char(params.src_ctx, ch);
-            number = number
-                .and_then(|num| num.checked_mul(digits.len() as u32))
-                .and_then(|num| num.checked_add(digit));
-        } else {
-            break;
-        }
-    }
-    make_number_token(params, number, start)
-}
-
-fn make_number_token(
-    params: &mut LexParams<'_, '_, '_, '_, '_, '_>,
-    number: Option<u32>,
-    start: (NonZeroUsize, usize),
-) -> i32 {
-    number.unwrap_or_else(|| {
-        params.error(start, |error, span| {
-            error
-                .with_message("Number literals are only supported up to 4_294_967_295")
-                .with_label(
-                    diagnostics::error_label(span).with_message("This number literal is too large"),
-                )
-        });
-        u32::MAX // Saturate.
-    }) as i32
-}
-
-fn read_string(
-    params: &mut LexParams<'_, '_, '_, '_, '_, '_>,
-    start: (NonZeroUsize, usize),
-    is_raw: bool,
-) -> TokenPayload {
-    // We reach this function after reading a single double-quote, but possibly there might be two more,
-    // which would start a multiline string.
-    let multiline = if let Some('"') = peek(params, false, false) {
-        consume_char(params.src_ctx, '"');
-        if let Some('"') = peek(params, false, false) {
-            consume_char(params.src_ctx, '"');
-            true
-        } else {
-            // Two consecutive quotes just mean an empty string.
-            return tok!("string")(CompactString::default());
-        }
-    } else {
-        false
-    };
-    let open_marker_end = params.src_ctx.lexer_state().cursor;
-
-    let mut string = CompactString::default();
-    loop {
-        let Some(ch) = peek(params, false, false).and_then(|ch| {
-            if !multiline && matches!(ch, chars!(newline)) {
-                None
-            } else {
-                Some(ch)
-            }
-        }) else {
-            params.error_at(start.1..open_marker_end, |error, span| {
-                error.with_message("Unterminated string").with_label(
-                    diagnostics::error_label(span).with_message("The string starts here"),
-                )
-            });
-            break;
         };
 
-        match ch {
-            '\r' => {
-                // Note: this is only possible for multiline strings.
-                consume_char(params.src_ctx, '\r');
-                handle_crlf(params);
-                string.push('\n'); // For platform independency, only push LF even if CRLF.
-            }
-            '"' => {
-                consume_char(params.src_ctx, '"');
-
-                if !multiline {
-                    break;
-                }
-                // Multi-line strings need three quotes to be terminated.
-                if peek(params, false, false) == Some('"') {
-                    // Two quotes...
-                    consume_char(params.src_ctx, '"');
-                    if peek(params, false, false) == Some('"') {
-                        // Three!
-                        consume_char(params.src_ctx, '"');
-                        break;
-                    }
-                    string.push('"');
-                }
-                string.push('"');
-            }
-            '\\' if !is_raw => {
-                // Escape character, or macro argument.
-                todo!()
-            }
-            '{' if !is_raw => {
-                // Interpolation.
-                todo!()
-            }
-            ch => {
-                consume_char(params.src_ctx, ch);
-                string.push(ch);
+        if can_be_keyword {
+            if let Some(keyword) = KEYWORDS.get(&UniCase::ascii(name.as_str())) {
+                return keyword.clone();
             }
         }
+        let identifier = params.identifiers.get_or_intern(&name);
+        tok!("identifier"(identifier, followed_by_colon))
     }
 
-    tok!("string")(string)
-}
-
-fn read_ident(
-    params: &mut LexParams<'_, '_, '_, '_, '_, '_>,
-    is_raw: bool,
-    with_expansions: bool,
-) -> TokenPayload {
-    let mut name = CompactString::default();
-    while let Some(ch) = peek(params, with_expansions, with_expansions) {
-        let chars!(ident) = ch else {
-            break;
-        };
-
-        consume_char(params.src_ctx, ch);
-        name.push(ch);
-    }
-
-    if !is_raw {
-        if let Some(keyword) = KEYWORDS.get(&UniCase::ascii(name.as_str())) {
-            return keyword.clone();
-        }
-    }
-    tok!("identifier")(params.symbols.intern_name(name))
-}
-
-pub fn next_token_raw<'ctx_stack>(
-    ctx_stack: &'ctx_stack ContextStack,
-    source_store: &SourceStore,
-    symbols: &mut Symbols,
-    nb_errors_remaining: &Cell<usize>,
-    options: &Options,
-) -> Option<(CompactString, Span<'ctx_stack>)> {
-    let mut sources = ctx_stack.sources_mut();
-    let (src_ctx, nodes) = sources.active_context_mut()?; // If there are no more contexts, no more tokens can be produced.
-    let node = src_ctx.node(nodes);
-    let mut params = LexParams {
-        ctx_stack,
-        src_ctx,
-        source_store,
-        node,
-        source: node.source(source_store),
-        symbols,
-        nb_errors_remaining,
-        options,
-    };
-
-    // Trim left whitespace (but not block comments!).
-    while let Some(ch) = peek(&mut params, true, true) {
-        match ch {
-            chars!(whitespace) => consume_char(params.src_ctx, ch), // Just discard whitespace.
-            '\\' => {
-                consume_char(params.src_ctx, '\\');
-                let ch = peek(&mut params, true, true);
-                if !matches!(ch, None | Some(chars!(whitespace) | chars!(newline))) {
-                    todo!(); // Process as a normal character...
-                }
-                todo!(); // Line continuation
+    fn read_string_maybe(
+        &mut self,
+        span: &mut NormalSpan,
+        params: &LexerParams,
+    ) -> Option<TokenPayload> {
+        let mut string = CompactString::default();
+        self.with_active_context_raw(span, |ctx, text| {
+            fn is_quote(&(_, ch): &(usize, char)) -> bool {
+                ch == '"'
             }
-            _ => break,
-        }
-    }
 
-    let mut raw_elem = CompactString::default();
-    let start = loc(params.src_ctx);
-    let mut end = loc(params.src_ctx);
-
-    let mut parens_depth = 0usize;
-    let ended_on_comma = loop {
-        macro_rules! consume {
-            ($ch:expr) => {{
-                consume_char(params.src_ctx, $ch);
-                raw_elem.push($ch);
-            }};
-        }
-
-        fn consume_string_literal(
-            params: &mut LexParams<'_, '_, '_, '_, '_, '_>,
-            is_raw: bool,
-            raw_elem: &mut CompactString,
-        ) {
-            let start = loc(params.src_ctx);
-
-            // Note that throughout this function, macro args and interpolation are handled manually.
-            // This is required, because quotes inside of them are treated specially:
-            // they cannot end the string.
-
-            // This function is reached after reading only one quote, but multiline strings use three.
-            debug_assert_eq!(peek(params, false, false), Some('"'));
-            consume_char(params.src_ctx, '"');
-            raw_elem.push('"');
-            let multiline = if peek(params, false, false) == Some('"') {
-                consume_char(params.src_ctx, '"');
-                raw_elem.push('"');
-                if peek(params, false, false) == Some('"') {
-                    consume_char(params.src_ctx, '"');
-                    raw_elem.push('"');
-                    true
-                } else {
-                    // `""` is an empty string, so skip the loop.
-                    return;
+            let mut chars = text.char_indices().peekable();
+            let raw = chars.next_if(|&(_zero, ch)| ch == '#').is_some();
+            if chars.next_if(is_quote).is_none() {
+                return 0; // Not a string.
+            }
+            let multiline = if let Some((ofs, quote)) = chars.next_if(is_quote) {
+                // We have two consecutive quotes: if there are only two, then we have an empty string;
+                //                                 if there are three, we have a multi-line string.
+                if chars.next_if(is_quote).is_none() {
+                    return ofs + quote.len_utf8();
                 }
+                true
             } else {
                 false
             };
 
-            loop {
-                let Some(ch) = peek(params, false, false)
-                    .and_then(|ch| (multiline || !matches!(ch, chars!(newline))).then_some(ch))
-                else {
-                    params.error(start, |error, mut span| {
-                        span.byte_range.end = span.byte_range.start + '"'.len_utf8();
-                        error
-                            .with_message("Unterminated string literal")
-                            .with_label(
-                                diagnostics::error_label(span)
-                                    .with_message("The string began here"),
-                            )
-                    });
-                    return;
-                };
-
-                // Since we will be staying in the string, we can safely consume that character.
-                let start = loc(params.src_ctx);
-                consume_char(params.src_ctx, ch);
-
+            let mut end_ofs = text.len();
+            while let Some((ofs, ch)) = chars.next() {
                 match ch {
                     '"' => {
-                        raw_elem.push('"');
-                        if !multiline {
-                            break;
+                        if multiline {
+                            // We need three consecutive quotes to close the string, not just one.
+                            if let Some((_ofs, _quote)) = chars.next_if(is_quote) {
+                                // Two in a row...
+                                if let Some((ofs, _quote)) = chars.next_if(is_quote) {
+                                    // Three in a row! Winner winner chicken dinner
+                                    return ofs + ch.len_utf8();
+                                }
+                                string.push('"');
+                            }
+                            string.push('"');
+                        } else {
+                            return ofs + ch.len_utf8();
                         }
-                        // A multiline string needs *three* double-quotes in a row to be terminated.
-                        if peek(params, false, false) == Some('"') {
-                            consume_char(params.src_ctx, '"');
-                            raw_elem.push('"');
-                            if peek(params, false, false) == Some('"') {
-                                consume_char(params.src_ctx, '"');
-                                raw_elem.push('"');
-                                break;
+                    }
+                    chars!(newline) => {
+                        if !multiline {
+                            end_ofs = ofs;
+                            break;
+                        } else if ch == '\r' {
+                            // Handle CRLF, normalised as a single LF.
+                            chars.next_if(|&(_, ch)| ch == '\n');
+                        }
+                        string.push('\n');
+                    }
+
+                    // Strings manually manage the normally implicit expansions.
+                    '\\' if !raw => {
+                        // Check for a macro arg, and else for an escape.
+                        let mut macro_chars = chars.clone();
+                        if let Some(res) = Self::read_macro_arg(
+                            macro_chars.by_ref().map(|(_ofs, ch)| ch),
+                            params.symbols,
+                            params.macro_args,
+                        ) {
+                            match res {
+                                Ok((_kind, src)) => string.push_str(src.contents.text()),
+                                Err(err) => {
+                                    let macro_arg_len = match macro_chars.peek() {
+                                        Some(&(ofs, _ch)) => ofs,
+                                        None => text.len(),
+                                    };
+                                    let mut span = ctx.new_span();
+                                    span.bytes = ctx.cur_byte + ofs..ctx.cur_byte + macro_arg_len;
+                                    let span = Span::Normal(span);
+                                    params.error(&span, |error| {
+                                        error.set_message(&err);
+                                        error.add_label(
+                                            diagnostics::error_label(&span)
+                                                .with_message(err.label_msg()),
+                                        );
+                                    });
+                                }
+                            }
+
+                            chars = macro_chars; // Consume all characters implicated in the macro arg.
+                        } else {
+                            match chars.next() {
+                                Some((_ofs, ch @ ('\\' | '"' | '{' | '}'))) => string.push(ch),
+                                Some((_ofs, 'n')) => string.push('\n'),
+                                Some((_ofs, 'r')) => string.push('\r'),
+                                Some((_ofs, 't')) => string.push('\t'),
+                                Some((_ofs, '0')) => string.push('\0'),
+
+                                Some((_ofs, chars!(line_cont))) => {
+                                    // Line continuation.
+                                    todo!()
+                                }
+
+                                Some((escaped_ofs, ch)) => {
+                                    let mut span = ctx.new_span();
+                                    span.bytes = ctx.cur_byte + ofs
+                                        ..ctx.cur_byte + escaped_ofs + ch.len_utf8();
+                                    let span = Span::Normal(span);
+                                    params.error(&span, |error| {
+                                        error.set_message("Invalid character escape");
+                                        error.add_label(
+                                            diagnostics::error_label(&span)
+                                                .with_message("Cannot escape this character"),
+                                        );
+                                    });
+
+                                    string.push(ch);
+                                }
+                                None => {
+                                    let mut span = ctx.new_span();
+                                    span.bytes = ctx.cur_byte + ofs..ctx.cur_byte + text.len();
+                                    let span = Span::Normal(span);
+                                    params.error(&span, |error| {
+                                        error.set_message("Invalid character escape");
+                                        error.add_label(
+                                            diagnostics::error_label(&span)
+                                                .with_message("No character to escape"),
+                                        );
+                                    });
+                                }
                             }
                         }
                     }
-
-                    // Character escape, or macro arg.
-                    '\\' if !is_raw => {
-                        match peek(params, false, false) {
-                            // Line continuation.
-                            Some(chars!(whitespace) | chars!(newline)) => todo!(),
-
-                            // Macro arg.
-                            Some(chars!(starts_macro_arg)) => todo!(),
-
-                            None => diagnostics::lex_error(
-                                params.node,
-                                &(start.1..loc(params.src_ctx).1),
-                                |error, span| {
-                                    error
-                                        .with_message("Backslash found at the end of input")
-                                        .with_label(diagnostics::error_label(span).with_message(
-                                            "This backslash is not followed by any characters",
-                                        ))
-                                },
-                                params.source_store,
-                                params.nb_errors_remaining,
-                                params.options,
-                            ),
-                            Some(ch) => diagnostics::lex_error(
-                                params.node,
-                                &(start.1..loc(params.src_ctx).1),
-                                |error, span| {
-                                    error
-                                        .with_message(format!("Invalid character escape '\\{ch}'"))
-                                        .with_label(diagnostics::error_label(span).with_message(
-                                            "This backslash is not followed by any characters",
-                                        ))
-                                },
-                                params.source_store,
-                                params.nb_errors_remaining,
-                                params.options,
-                            ),
-                        }
+                    '{' if !raw => {
+                        todo!();
                     }
 
-                    '{' if !is_raw => {
-                        if let Some((_name, contents)) = read_interpolation(params) {
-                            todo!();
-                        }
-                    }
-
-                    ch => raw_elem.push(ch),
+                    ch => string.push(ch),
                 }
             }
-        }
 
-        match peek(&mut params, true, true) {
-            // String literals inside of a raw element.
-            Some('"') => {
-                consume_string_literal(&mut params, false, &mut raw_elem);
-                end = loc(params.src_ctx);
-            }
-            // (Possibly) raw string literals inside of a raw element.
-            Some('#') => {
-                consume!('#');
-                if peek(&mut params, true, true) == Some('"') {
-                    consume_string_literal(&mut params, true, &mut raw_elem);
-                }
-                end = loc(params.src_ctx);
-            }
+            // The string wasn't terminated properly.
+            let mut err_span = ctx.new_span();
+            err_span.bytes.end = ctx.cur_byte + end_ofs;
+            let err_span = Span::Normal(err_span);
+            params.error(&err_span, |error| {
+                error.set_message("Unterminated string literal");
+                error.add_label(diagnostics::error_label(&err_span).with_message(format!(
+                    "No closing quote before the end of {}",
+                    if multiline { "input" } else { "the line" }
+                )))
+            });
 
-            Some('(') => {
-                consume!('(');
-                parens_depth += 1;
-                end = loc(params.src_ctx);
-            }
-            Some(')') => {
-                consume!(')');
-                if parens_depth != 0 {
-                    parens_depth -= 1;
-                } else {
-                    todo!() // Warn?
-                }
-                end = loc(params.src_ctx);
-            }
+            end_ofs
+        });
 
-            // Block comments inside of macro args.
-            Some('/') => todo!(),
-            // Line comments at the end of a raw element.
-            Some(';') => {
-                discard_comment(&mut params);
-                break false; // We know we must be at EOL.
-            }
-            Some(chars!(newline)) | None => break false, // Finished!
-
-            Some(',') if parens_depth == 0 => {
-                consume_char(params.src_ctx, ',');
-                break true;
-            }
-
-            // Character escape.
-            Some('\\') => todo!(),
-
-            Some(ch) => {
-                consume!(ch);
-                if !ch.is_ascii_whitespace() {
-                    end = loc(params.src_ctx);
-                }
-            }
-        }
-    };
-
-    if parens_depth != 0 {
-        // TODO: warn?
+        (!span.bytes.is_empty()).then_some(tok!("string"(string)))
     }
+}
 
-    // Trim whitespace at the end of the macro arg.
-    raw_elem.truncate(
-        raw_elem
-            .trim_end_matches(|ch| matches!(ch, chars!(whitespace)))
-            .len(),
-    );
+impl Lexer {
+    pub fn next_token_raw(
+        &mut self,
+        identifiers: &mut Identifiers,
+        symbols: &Symbols,
+        macro_args: Option<&MacroArgs>,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) -> Option<(CompactString, Span)> {
+        let params = LexerParams {
+            identifiers,
+            symbols,
+            macro_args,
+            nb_errors_left,
+            options,
+        };
 
-    if ended_on_comma || !raw_elem.is_empty() {
-        Some((raw_elem, span(start, end, ctx_stack, &mut sources)))
-    } else {
+        let mut span = self
+            .active_context()
+            .expect("Cannot lex a raw string without a context active")
+            .new_span();
+        let mut string = CompactString::default();
+        let mut last_char = None;
+
+        self.with_active_context_raw(&mut span, |ctx, text| {
+            let mut chars = text.char_indices().peekable();
+
+            // Trim leading whitespace (but stop at a block comment).
+            while let Some(&(ofs, ch)) = chars.peek() {
+                match ch {
+                    chars!(whitespace) => {
+                        chars.next();
+                    }
+                    '\\' => {
+                        let backup = chars.clone();
+                        // If the backslash isn't a line continuation, we'll want to process it normally.
+                        if chars
+                            .next_if(|&(_ofs, ch)| {
+                                matches!(ch, chars!(whitespace) | chars!(newline))
+                            })
+                            .is_none()
+                        {
+                            chars = backup;
+                            break;
+                        }
+
+                        // Line continuations count as “whitespace”.
+                        if let Err(err) =
+                            Lexer::read_line_continuation(ctx, text, &mut chars, &params)
+                        {
+                            let mut span = ctx.new_span();
+                            span.bytes.start += ofs;
+                            span.bytes.end += match chars.peek() {
+                                Some(&(ofs, _ch)) => ofs,
+                                None => text.len(),
+                            };
+                            let span = Span::Normal(span);
+                            params.error(&span, |error| {
+                                error.set_message(&err);
+                                error.add_label(
+                                    diagnostics::error_label(&span).with_message(err.label_msg()),
+                                );
+                            });
+                        }
+                    }
+                    _ => break,
+                }
+            }
+
+            let mut parens_depth = 0;
+            while let Some((_ofs, ch)) = chars.next() {
+                last_char = Some(ch);
+
+                todo!();
+            }
+            text.len()
+        });
+
+        // Trim right whitespace.
+        let trimmed_len = string.trim_end_matches(is_whitespace).len();
+        string.truncate(trimmed_len);
+
+        // Returning COMMAs to the parser would mean that two consecutive commas
+        // (i.e. an empty argument) need to return two different tokens (STRING
+        // then COMMA) without advancing the read. To avoid this, commas in raw
+        // mode end the current macro argument but are not tokenized themselves.
+
+        if last_char == Some(',') {
+            todo!();
+            return Some((string, Span::Normal(span)));
+        }
         None
     }
 }
 
-/// Assuming that a `\r` has just been consumed, consumes a `\n` if it is the next char.
-fn handle_crlf(params: &mut LexParams<'_, '_, '_, '_, '_, '_>) {
-    // We explicitly don't use `peek`, because we only care about CRLF within a single buffer.
-    if params
-        .src_ctx
-        .lexer_state()
-        .active_buffer(params.source)
-        .starts_with('\n')
-    {
-        consume_char(params.src_ctx, '\n');
-    }
-}
+impl Lexer {
+    pub fn capture_until_keyword(
+        &mut self,
+        keyword: &str,
+        kind: &'static str,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) -> (NormalSpan, Result<(), CaptureBlockErr>) {
+        let mut span = self
+            .active_context()
+            .expect("Cannot capture a block without a context active")
+            .new_span();
 
-fn read_interpolation(
-    params: &mut LexParams<'_, '_, '_, '_, '_, '_>,
-) -> Option<(CompactString, CompactString)> {
-    fn inner(
-        params: &mut LexParams<'_, '_, '_, '_, '_, '_>,
-        remaining_depth: usize,
-    ) -> Option<(CompactString, CompactString)> {
-        // The opening brace that got us here should not have been consumed yet.
-        debug_assert_eq!(peek(params, false, false), Some('{'));
-        let start = loc(params.src_ctx);
-        consume_char(params.src_ctx, '{');
+        let mut capture_len = 0;
+        let mut res = Ok(());
+        self.with_active_context_raw(&mut span, |ctx, mut text| {
+            debug_assert!(
+                matches!(
+                    ctx.span.src.contents.text()[ctx.cur_byte - 1..ctx.cur_byte]
+                        .chars()
+                        .next(),
+                    Some(chars!(newline))
+                ),
+                "Block capture not started at beginning of line",
+            );
 
-        if remaining_depth == 0 {
-            let mut depth = 1; // From the opening brace that got us here.
-            while depth != 0 {
-                let Some(ch) = peek(params, false, false) else {
-                    break;
+            loop {
+                let (line, remainder) = match text.split_once(|ch| matches!(ch, chars!(newline))) {
+                    Some((line, remainder)) => (line, Some(remainder)),
+                    None => todo!(),
                 };
-                match ch {
-                    '{' => depth += 1,
-                    '}' => depth -= 1,
-                    _ => {} // Just consume other chars.
+
+                // Capture everything before the start of this line.
+                // SAFETY: `line` is derived from `text` via offsetting.
+                capture_len = unsafe { line.as_ptr().offset_from(text.as_ptr()) } as usize;
+                debug_assert!(capture_len as isize >= 0); // `line` comes after `text`.
+
+                if let Some(first_word) =
+                    line.trim_start_matches(is_whitespace).get(..keyword.len())
+                {
+                    if unicase::eq_ascii(first_word, keyword) {
+                        // Found the end!
+                        break capture_len + keyword.len();
+                    }
+                }
+
+                // Try again with the next line.
+                let Some(remainder) = remainder else {
+                    res = Err(CaptureBlockErr::Unterminated { name: kind });
+                    break text.len();
                 };
-                consume_char(params.src_ctx, ch);
+                text = remainder;
             }
-            params.error(start, |error, span| {
-                error
-                    .with_message(format!(
-                        "Recursion limit ({}) exceeded",
-                        params.options.runtime_opts.recursion_depth
-                    ))
-                    .with_label(
-                        diagnostics::error_label(span)
-                            .with_message("Trying to expand this interpolation"),
-                    )
-            });
-            return None;
-        }
+        });
 
-        let mut fmt = FormatSpec::new();
-        let mut buf = CompactString::default();
-        loop {
-            // We will expand interpolations manually, since otherwise `peek` calls this function
-            // recursively without checking for the depth.
-            match peek(params, true, false) {
-                Some('{') => {
-                    // Nested expansion.
-                    if let Some((name, contents)) = inner(params, remaining_depth - 1) {
-                        params.src_ctx.lexer_state_mut().begin_expansion(
-                            Some(name),
-                            contents,
-                            params.options,
-                        );
-                    }
-                }
-                None | Some('\r' | '\n' | '"') => {
-                    params.error(start, |error, mut span| {
-                        span.byte_range.end = span.byte_range.start + '{'.len_utf8();
-                        error.with_message("Unterminated interpolation").with_label(
-                            diagnostics::error_label(span)
-                                .with_message("This brace is never closed"),
-                        )
-                    });
-                    return None;
-                }
-                Some('}') => {
-                    consume_char(params.src_ctx, '}');
-                    break;
-                }
-                Some(':') => {
-                    let start = loc(params.src_ctx);
-                    consume_char(params.src_ctx, ':');
-                    if fmt.is_finished() {
-                        params.error(start, |error, mut span| {
-                            // TODO: would be nice to highlight the other colon
-                            span.byte_range.start = span.byte_range.end - ':'.len_utf8();
-                            error
-                                .with_message("A format spec has already been provided")
-                                .with_label(
-                                    diagnostics::error_label(span)
-                                        .with_message("Second colon here"),
-                                )
-                        });
-                    } else {
-                        todo!();
-                    }
-                }
-                Some(c) => {
-                    consume_char(params.src_ctx, c);
-                    buf.push(c);
-                }
-            }
-        }
-
-        let (name, is_raw) = match buf.strip_prefix('#') {
-            Some(rest) => (rest, true),
-            None => (buf.as_str(), false),
-        };
-        // PC doesn't follow the usual naming rules, but is nonetheless a valid symbol.
-        if name != "@" {
-            let mut chars = name.chars();
-            match chars.next() {
-                None => {
-                    params.error(start, |error, mut span| {
-                        span.byte_range.start = span.byte_range.end - '}'.len_utf8();
-                        error
-                            .with_message("Missing symbol name in this interpolation")
-                            .with_label(
-                                diagnostics::error_label(span)
-                                    .with_message("Missing before this brace"),
-                            )
-                    });
-                    return None;
-                }
-                Some(chars!(starts_ident)) => {} // OK!
-                Some(c) => {
-                    params.error(start, |error, span| {
-                        error
-                            .with_message("Attempting to interpolate an invalid symbol name")
-                            .with_label(diagnostics::error_label(span).with_message(format!(
-                                "The character `{c}` cannot begin a symbol name"
-                            )))
-                    });
-                    return None;
-                }
-            }
-            if let Some(c) = chars.find(|c| !matches!(c, chars!(ident))) {
-                params.error(start, |error, span| {
-                    error
-                        .with_message("Attempting to interpolate an invalid symbol name")
-                        .with_label(diagnostics::error_label(span).with_message(format!(
-                            "The character `{c}` is not allowed inside of a symbol name"
-                        )))
-                });
-                return None;
-            }
-
-            if !is_raw && KEYWORDS.contains_key(&UniCase::ascii(name)) {
-                params.error(start, |error, span| {
-                    error
-                        .with_message(format!("The name `{name}` is a reserved keyword"))
-                        .with_help("Add a `#` prefix to use it as a raw symbol name instead")
-                });
-                return None;
-            }
-        }
-
-        // TODO: would be nice to use `with_capacity`, but that depends on the contents of the symbol u_u
-        let mut contents = CompactString::default();
-        // Interning must be done separately, as otherwise `params` remains *mutably* borrowed inside of the `match`.
-        let interned_name = params.symbols.get_interned_name(name);
-        match params.symbols.format_as(
-            interned_name,
-            &fmt,
-            &mut contents,
-            params.src_ctx.macro_args(),
-        ) {
-            Ok(()) => Some((buf, contents)),
-            Err(err) => {
-                params.error(start, |error, span| {
-                    use crate::symbols::FormatError;
-
-                    let mut error = error.with_message(format!(
-                        "Cannot interpolate symbol `{name}`: {}",
-                        match &err {
-                            FormatError::NotFound | FormatError::Deleted(..) => "it does not exist",
-                            FormatError::BadKind =>
-                                "only numeric and string symbols can be interpolated",
-                        },
-                    ));
-                    error.add_label(diagnostics::error_label(span));
-                    if let FormatError::Deleted(location) = err {
-                        // TODO: would be nice to point out *where* using a label.
-                        //       That would require cloning `location` through our borrowed `ctx_stack`, though!
-                        error.set_note("The symbol was deleted earlier");
-                    }
-                    error
-                });
-                None
-            }
-        }
+        (span, res)
     }
-    // TODO: would be nice if the depth was cumulated with the `context`'s own depth?
-    inner(params, params.options.runtime_opts.recursion_depth)
 }
 
-fn peek(
-    params: &mut LexParams<'_, '_, '_, '_, '_, '_>,
-    with_macro_args: bool,
-    with_interpolation: bool,
-) -> Option<char> {
-    loop {
-        let state = params.src_ctx.lexer_state_mut();
-        let buffer = state.active_buffer(params.source);
-        let mut chars = buffer.chars();
-
-        let ch = chars.next();
-        // Do not try to perform expansions if the character has been already scanned for them.
-        // This is especially important because expansions are *not* idempotent.
-        if state.nb_scanned_for_expansion > 0 {
-            break ch;
-        }
-        // We are about to scan that character for expansions, so don't do it again.
-        state.nb_scanned_for_expansion += 1;
-
-        match ch {
-            Some('\\') if with_macro_args => {
-                todo!()
+#[derive(displaydoc::Display)]
+enum MacroArgError {
+    /// unterminated macro argument
+    // (For `\<`.))
+    Unterminated,
+    /// macro argument #{idx} doesn't exist
+    NoSuchArg { idx: usize, max_valid: usize },
+    /// a macro argument was used outside of a macro
+    MacroArgOutsideMacro,
+}
+impl MacroArgError {
+    fn label_msg(&self) -> String {
+        match self {
+            Self::Unterminated => "the macro arg begins here".into(),
+            Self::NoSuchArg { max_valid, .. } => {
+                format!("{max_valid} macro arguments are available")
             }
-            Some('{') if with_interpolation => {
-                if let Some((name, contents)) = read_interpolation(params) {
-                    // The lexer state should be unchanged, but we cannot carry the `state` borrow
-                    // from `params` across the call to `read_interpolation`.
-                    params.src_ctx.lexer_state_mut().begin_expansion(
-                        Some(name),
-                        contents,
-                        params.options,
-                    );
-                }
-                continue;
-            }
-            ch => break ch,
+            Self::MacroArgOutsideMacro => "cannot use a macro argument here".into(),
         }
     }
 }
 
-fn consume_char(context: &mut SourceContext, ch: char) {
-    let state = context.lexer_state_mut();
-
-    state.nb_scanned_for_expansion -= 1;
-
-    while let Some(expansion) = state.expansions.last_mut() {
-        debug_assert!(expansion.cursor <= expansion.contents.len());
-
-        // If we had reached the end of that expansion, remove it from the list (and keep looping).
-        // It may seems bizarre not to perform this check *after* incrementing `cursor`, but there is a reason.
-        // If we did that, then an expansion that expands to exactly itself (e.g. `DEF recurse EQUS "recurse"`)
-        // would always end *right before* the new expansion is pushed onto the stack; this would cause
-        // an infinite loop at a constant stack depth; that would be bad.
-        // So we keep expansions in the list for one extra character.
-        // TODO: instead of this, just clear empty expansions at the beginning of `next_token`? This may also improve error reporting.
-        if expansion.cursor == expansion.contents.len() {
-            state.expansions.pop();
-        } else {
-            expansion.cursor += ch.len_utf8();
-            return;
+#[derive(displaydoc::Display)]
+enum LineContinuationErr {
+    /// line continuation at end of input
+    Eof,
+    /// unexpected character after line continuation
+    NotAtEol,
+}
+impl LineContinuationErr {
+    fn label_msg(&self) -> String {
+        match self {
+            Self::Eof => "this should be followed by a newline, or removed".into(),
+            Self::NotAtEol => {
+                "there can only be whitespace between this backslash and the end of the line".into()
+            }
         }
     }
-
-    // Advance within the buffer's contents.
-    state.cursor += ch.len_utf8();
 }
 
-fn loc(context: &SourceContext) -> (NonZeroUsize, usize) {
-    (context.source_id(), context.lexer_state().cursor)
+#[derive(Debug, displaydoc::Display)]
+enum BlockCommentErr {
+    /// unterminated block comment
+    Unterminated,
 }
-fn span<'ctx_stack>(
-    start: (NonZeroUsize, usize),
-    end: (NonZeroUsize, usize),
-    ctx_stack: &'ctx_stack ContextStack,
-    sources: &mut SourcesMut<'_>,
-) -> Span<'ctx_stack> {
-    debug_assert_eq!(start.0, end.0);
-    Span {
-        src: Some(SourceRef::new_via(ctx_stack, start.0, sources)),
-        byte_span: start.1..end.1,
+
+impl LexerParams<'_, '_, '_, '_, '_> {
+    pub fn error<'span, F: FnOnce(&mut ReportBuilder<'span>)>(&self, span: &'span Span, build: F) {
+        diagnostics::error(span, build, self.nb_errors_left, self.options)
     }
 }
-impl LexParams<'_, '_, '_, '_, '_, '_> {
-    fn error_at<F: FnOnce(ReportBuilder, RawSpan) -> ReportBuilder>(
-        &self,
-        byte_range: Range<usize>,
-        build: F,
-    ) {
-        diagnostics::lex_error(
-            self.node,
-            &byte_range,
-            build,
-            self.source_store,
-            self.nb_errors_remaining,
-            self.options,
-        );
-    }
 
-    fn error<F: FnOnce(ReportBuilder, RawSpan) -> ReportBuilder>(
-        &self,
-        start: (NonZeroUsize, usize),
-        build: F,
-    ) {
-        let end = self.src_ctx.lexer_state().cursor;
-        self.error_at(start.1..end, build);
-    }
-
-    fn warning_at<F: FnOnce(ReportBuilder, RawSpan) -> ReportBuilder>(
-        &self,
-        byte_range: Range<usize>,
-        build: F,
-    ) {
-        todo!();
-    }
-
-    fn warning<F: FnOnce(ReportBuilder, RawSpan) -> ReportBuilder>(
-        &self,
-        start: (NonZeroUsize, usize),
-        build: F,
-    ) {
-        let end = self.src_ctx.lexer_state().cursor;
-        self.warning_at(start.1..end, build);
-    }
+#[derive(Debug, displaydoc::Display)]
+pub enum CaptureBlockErr {
+    /// unterminated {name}
+    Unterminated { name: &'static str },
 }

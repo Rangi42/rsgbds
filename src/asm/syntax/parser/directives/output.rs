@@ -2,10 +2,7 @@ use crate::{diagnostics, syntax::tokens::Token};
 
 use super::super::{expect_one_of, matches_tok, misc, parse_ctx, string};
 
-fn parse_print_elem<'ctx_stack>(
-    first_token: Option<Token<'ctx_stack>>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> (Option<()>, Option<Token<'ctx_stack>>) {
+fn parse_print_elem(first_token: Token, parse_ctx: &mut parse_ctx!()) -> (Option<()>, Token) {
     let (expr, lookahead) = misc::parse_str_or_const_expr(first_token, parse_ctx);
     match expr {
         None => return (None, lookahead),
@@ -14,10 +11,7 @@ fn parse_print_elem<'ctx_stack>(
     };
     (Some(()), lookahead)
 }
-pub(in super::super) fn parse_println<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(in super::super) fn parse_println(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     let mut lookahead = parse_ctx.next_token();
     // Allow a lack of arguments.
     if !matches_tok!(lookahead, "end of line") {
@@ -27,10 +21,7 @@ pub(in super::super) fn parse_println<'ctx_stack>(
     println!();
     lookahead
 }
-pub(in super::super) fn parse_print<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(in super::super) fn parse_print(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     let mut lookahead = parse_ctx.next_token();
     // Allow a lack of arguments.
     if !matches_tok!(lookahead, "end of line") {
@@ -40,68 +31,46 @@ pub(in super::super) fn parse_print<'ctx_stack>(
     lookahead
 }
 
-pub(in super::super) fn parse_warn<'ctx_stack>(
-    keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(in super::super) fn parse_warn(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     let (maybe_message, lookahead) = string::expect_string_expr(parse_ctx.next_token(), parse_ctx);
     if let Some((message, _span)) = maybe_message {
-        diagnostics::warn(
-            diagnostics::warning!("user"),
-            &keyword.span,
-            |warning| {
-                warning.set_message(message);
-                warning.add_label(diagnostics::warning_label(&keyword.span))
-            },
-            parse_ctx.sources,
-            parse_ctx.nb_errors_remaining,
-            parse_ctx.options,
-        );
+        parse_ctx.warn(diagnostics::warning!("user"), &keyword.span, |warning| {
+            warning.set_message(message);
+            warning.add_label(diagnostics::warning_label(&keyword.span))
+        });
     }
     lookahead
 }
-pub(in super::super) fn parse_fail<'ctx_stack>(
-    keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) {
+pub(in super::super) fn parse_fail(keyword: Token, parse_ctx: &mut parse_ctx!()) {
     let (maybe_message, lookahead) = string::expect_string_expr(parse_ctx.next_token(), parse_ctx);
 
     expect_one_of! {lookahead => {
-        None => {},
+        |"end of input"| => {},
         |"end of line"| => {},
         else |unexpected| => {
-            parse_ctx.report_syntax_error(unexpected.as_ref(), |error, span| {
+            parse_ctx.report_syntax_error(&unexpected, |error, span| {
                 error.add_label(diagnostics::error_label(span).with_message("Expected nothing else on this line"))
             });
         }
     }};
 
     if let Some((message, _span)) = maybe_message {
-        diagnostics::error(
-            &keyword.span,
-            |error| {
-                error.set_message(message);
-                error.add_label(
-                    diagnostics::error_label(&keyword.span).with_message("Assembly aborted here"),
-                );
-            },
-            parse_ctx.sources,
-            parse_ctx.nb_errors_remaining,
-            parse_ctx.options,
-        );
+        parse_ctx.error(&keyword.span, |error| {
+            error.set_message(message);
+            error.add_label(
+                diagnostics::error_label(&keyword.span).with_message("Assembly aborted here"),
+            );
+        });
     }
 }
 
-pub(in super::super) fn parse_assert<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(in super::super) fn parse_assert(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(in super::super) fn parse_static_assert<'ctx_stack>(
-    _keyword: Token<'ctx_stack>,
-    parse_ctx: &mut parse_ctx!('ctx_stack),
-) -> Option<Token<'ctx_stack>> {
+pub(in super::super) fn parse_static_assert(
+    _keyword: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> Token {
     todo!()
 }

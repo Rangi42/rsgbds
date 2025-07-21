@@ -13,7 +13,7 @@ use std::{fmt::Display, path::PathBuf};
 use clap::{ColorChoice, CommandFactory, Parser};
 use thiserror::Error;
 
-use crate::diagnostics::{WarningKind, META_WARNINGS, SIMPLE_WARNINGS};
+use crate::diagnostics::{WarningKind, WarningLevel, META_WARNINGS, SIMPLE_WARNINGS};
 
 use super::*;
 
@@ -34,6 +34,9 @@ pub(super) struct Cli {
     /// The two characters to use for binary constants
     #[arg(short, long, value_name = "chars")]
     binary_digits: Option<String>,
+    /// How many levels deep should errors report their “backtraces”
+    #[arg(long, default_value_t = 10)]
+    backtrace_depth: usize,
     /// Controls when to use color
     #[arg(long, default_value_t = ColorChoice::Auto)]
     color: ColorChoice,
@@ -137,6 +140,7 @@ impl Cli {
                     output: self.output,
                     preinclude: self.preinclude,
                     inhibit_warnings: self.inhibit_warnings,
+                    backtrace_depth: self.backtrace_depth,
                     max_errors: self.max_errors,
                     runtime_opts,
                     runtime_opt_stack: vec![],
