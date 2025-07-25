@@ -3,6 +3,7 @@ use std::rc::Rc;
 use crate::{
     diagnostics,
     sources::{Source, Span},
+    syntax::parser::discard_rest_of_line,
 };
 
 use super::super::{expect_one_of, expr, matches_tok, parse_ctx, require, string, Token};
@@ -19,9 +20,7 @@ pub(in super::super) fn parse_include(keyword: Token, parse_ctx: &mut parse_ctx!
             );
         });
         // Discard the rest of the line.
-        while !matches_tok!(lookahead, "end of line" | "end of input") {
-            lookahead = parse_ctx.next_token();
-        }
+        lookahead = discard_rest_of_line(lookahead, parse_ctx);
     }
 
     if let Some((string, span)) = maybe_string {
@@ -51,11 +50,7 @@ pub(in super::super) fn parse_macro(_keyword: Token, parse_ctx: &mut parse_ctx!(
             error.add_label(diagnostics::error_label(span).with_message("Expected the macro's name"));
         });
 
-        let mut lookahead = unexpected;
-        while !matches_tok!(lookahead, "end of line" | "end of input") {
-            lookahead = parse_ctx.next_token();
-        }
-        return lookahead;
+        return discard_rest_of_line(unexpected, parse_ctx);
     } }
 
     lookahead = parse_ctx.next_token();
@@ -64,18 +59,31 @@ pub(in super::super) fn parse_macro(_keyword: Token, parse_ctx: &mut parse_ctx!(
             error.add_label(diagnostics::error_label(span).with_message("Expected nothing else on this line"));
         });
 
-        let mut lookahead = unexpected;
-        while !matches_tok!(lookahead, "end of line" | "end of input") {
-            lookahead = parse_ctx.next_token();
-        }
-        return lookahead;
+        return discard_rest_of_line(unexpected, parse_ctx);
     } }
 
     let (body, res) = parse_ctx.lexer.capture_until_keyword(
         "ENDM",
         "macro definition",
-        &parse_ctx.nb_errors_remaining,
-        &parse_ctx.options,
+        parse_ctx.nb_errors_remaining,
+        parse_ctx.options,
+    );
+    if let Err(err) = res {
+        parse_ctx.error(&span, |error| {
+            error.set_message(&err);
+            error.add_label(
+                diagnostics::error_label(&span).with_message("Macro definition starting here"),
+            );
+        })
+    }
+
+    parse_ctx.symbols.define_macro(
+        name,
+        parse_ctx.identifiers,
+        span,
+        body,
+        parse_ctx.nb_errors_remaining,
+        parse_ctx.options,
     );
 
     parse_ctx.next_token()

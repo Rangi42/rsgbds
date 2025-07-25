@@ -161,44 +161,41 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
     }
 
     let mut label_span = None;
-    if let tok!("identifier"(ident, is_followed_by_colon)) = first_token.payload {
-        // Identifiers at the beginning of the line can be two things.
-        // Either a label name, if it's *directly* followed by a colon; or the name of a macro.
-        if is_followed_by_colon {
-            expect_one_of!(parse_ctx.next_token() => {
-                |":"| => {
-                    label_span = Some(first_token.span.clone());
-                    parse_ctx.symbols.define_label(
-                        ident,
-                        parse_ctx.identifiers,
-                        first_token.span,
-                        false,
-                        parse_ctx.nb_errors_remaining,
-                        parse_ctx.options
-                    );
-                    first_token= parse_ctx.next_token();
-                },
-                |"::"| => {
-                    label_span = Some(first_token.span.clone());
-                    parse_ctx.symbols.define_label(
-                        ident,
-                        parse_ctx.identifiers,
-                        first_token.span,
-                        true,
-                        parse_ctx.nb_errors_remaining,
-                        parse_ctx.options
-                    );
-                    first_token= parse_ctx.next_token();
-                },
-                else |token, _expected| => {
-                    // Try continuing the parse with this token as the first in the line.
-                    // We know the token can't be empty, because the lexer just reported that its next character would be a colon.
-                    first_token = token;
-                }
-            });
-        }
-
-        // TODO: handle directives that cannot be preceded by a label def.
+    // Identifiers at the beginning of the line can be two things.
+    // Either a label name, if it's *directly* followed by a colon; or the name of a macro.
+    // Here, we only process the former.
+    if let tok!("identifier"(ident, true)) = first_token.payload {
+        expect_one_of!(parse_ctx.next_token() => {
+            |":"| => {
+                label_span = Some(first_token.span.clone());
+                parse_ctx.symbols.define_label(
+                    ident,
+                    parse_ctx.identifiers,
+                    first_token.span,
+                    false,
+                    parse_ctx.nb_errors_remaining,
+                    parse_ctx.options
+                );
+                first_token = parse_ctx.next_token();
+            },
+            |"::"| => {
+                label_span = Some(first_token.span.clone());
+                parse_ctx.symbols.define_label(
+                    ident,
+                    parse_ctx.identifiers,
+                    first_token.span,
+                    true,
+                    parse_ctx.nb_errors_remaining,
+                    parse_ctx.options
+                );
+                first_token = parse_ctx.next_token();
+            },
+            else |token, _expected| => {
+                // Try continuing the parse with this token as the first in the line.
+                // We know the token can't be empty, because the lexer just reported that its next character would be a colon.
+                first_token = token;
+            }
+        });
     }
 
     let eol_token = match first_token.payload {
@@ -209,6 +206,10 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
             // Get the macro's arguments.
             let args =
                 std::iter::from_fn(|| parse_ctx.next_token_raw().map(|(arg, _span)| arg)).collect();
+
+            // Since we're about to switch contexts, lex the EOL token now.
+            // No error handling is necessary, because raw mode is guaranteed to end at EOL.
+            let lookahead = parse_ctx.next_token();
 
             let name = parse_ctx.identifiers.resolve(ident).unwrap();
             match parse_ctx.symbols.find_macro(&ident) {
@@ -238,7 +239,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
                 }
             }
 
-            parse_ctx.next_token()
+            lookahead
         }
 
         // These are not valid after a label.
@@ -401,6 +402,13 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
     });
 
     Some(())
+}
+
+fn discard_rest_of_line(mut lookahead: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+    while !matches_tok!(lookahead, "end of line" | "end of input") {
+        lookahead = parse_ctx.next_token();
+    }
+    lookahead
 }
 
 fn reject_prior_label_def(

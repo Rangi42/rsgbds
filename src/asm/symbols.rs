@@ -246,13 +246,9 @@ impl Symbols {
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
-        if let Err((existing, definition)) = Self::try_define_symbol(
-            &mut self.symbols,
-            name,
-            definition,
-            SymbolKind::Label,
-            exported,
-        ) {
+        if let Err((existing, definition)) =
+            Self::try_define_symbol(&mut self.symbols, name, definition, payload, exported)
+        {
             diagnostics::error(
                 &definition,
                 |error| {
@@ -309,6 +305,26 @@ impl Symbols {
             definition,
             SymbolKind::Label,
             exported,
+            nb_errors_left,
+            options,
+        )
+    }
+
+    pub fn define_macro(
+        &mut self,
+        name: Identifier,
+        identifiers: &Identifiers,
+        definition: Span,
+        body: NormalSpan,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        self.define_symbol(
+            name,
+            identifiers,
+            definition,
+            SymbolKind::Macro(body),
+            false,
             nb_errors_left,
             options,
         )

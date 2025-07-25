@@ -193,10 +193,10 @@ impl Lexer {
                         let trigger_span = ctx
                             .span
                             .sub_span(ctx.cur_byte..ctx.cur_byte + macro_arg_len);
+                        // Consume all the characters implicated in the macro arg.
+                        ctx.cur_byte += macro_arg_len;
                         match res {
                             Ok((span_kind, source)) => {
-                                // Consume all the characters implicated in the macro arg.
-                                ctx.cur_byte += macro_arg_len;
                                 self.push_context(
                                     Rc::clone(source),
                                     trigger_span,
@@ -222,6 +222,8 @@ impl Lexer {
                                     params.nb_errors_left,
                                     params.options,
                                 );
+                                // TODO: push a dummy context to cause `consume` to adjust the span
+                                continue; // Try again, reading after the macro arg.
                             }
                         }
                     } else {
@@ -442,29 +444,9 @@ impl Lexer {
                     chars.next();
                 }
                 ';' => Self::read_line_comment(chars),
-                '/' => {
-                    chars.next();
-
-                    if chars.next_if(|&(_ofs, ch)| ch == '*').is_some() {
-                        if let Err(err) = Self::read_block_comment(chars) {
-                            let mut span = ctx.new_span();
-                            span.bytes.start += ofs;
-                            span.bytes.end += match chars.next() {
-                                Some((ofs, _ch)) => ofs,
-                                None => text.len(),
-                            };
-                            let span = Span::Normal(span);
-                            params.error(&span, |error| {
-                                error.set_message(&err);
-                                error.add_label(
-                                    diagnostics::error_label(&span).with_message("TODO"),
-                                );
-                            });
-                        }
-                    } else {
-                        return Err(LineContinuationErr::NotAtEol);
-                    }
-                }
+                // Block comments are intentionally not allowed:
+                // they can simply be placed before the continuation,
+                // and they can also be used as line continuations themselves.
                 _ => return Err(LineContinuationErr::NotAtEol),
             }
         }
@@ -796,144 +778,174 @@ impl Lexer {
             if chars.next_if(is_quote).is_none() {
                 return 0; // Not a string.
             }
-            let multiline = if let Some((ofs, quote)) = chars.next_if(is_quote) {
-                // We have two consecutive quotes: if there are only two, then we have an empty string;
-                //                                 if there are three, we have a multi-line string.
-                if chars.next_if(is_quote).is_none() {
-                    return ofs + quote.len_utf8();
-                }
-                true
-            } else {
-                false
-            };
-
-            let mut end_ofs = text.len();
-            while let Some((ofs, ch)) = chars.next() {
-                match ch {
-                    '"' => {
-                        if multiline {
-                            // We need three consecutive quotes to close the string, not just one.
-                            if let Some((_ofs, _quote)) = chars.next_if(is_quote) {
-                                // Two in a row...
-                                if let Some((ofs, _quote)) = chars.next_if(is_quote) {
-                                    // Three in a row! Winner winner chicken dinner
-                                    return ofs + ch.len_utf8();
-                                }
-                                string.push('"');
-                            }
-                            string.push('"');
-                        } else {
-                            return ofs + ch.len_utf8();
-                        }
-                    }
-                    chars!(newline) => {
-                        if !multiline {
-                            end_ofs = ofs;
-                            break;
-                        } else if ch == '\r' {
-                            // Handle CRLF, normalised as a single LF.
-                            chars.next_if(|&(_, ch)| ch == '\n');
-                        }
-                        string.push('\n');
-                    }
-
-                    // Strings manually manage the normally implicit expansions.
-                    '\\' if !raw => {
-                        // Check for a macro arg, and else for an escape.
-                        let mut macro_chars = chars.clone();
-                        if let Some(res) = Self::read_macro_arg(
-                            macro_chars.by_ref().map(|(_ofs, ch)| ch),
-                            params.symbols,
-                            params.macro_args,
-                        ) {
-                            match res {
-                                Ok((_kind, src)) => string.push_str(src.contents.text()),
-                                Err(err) => {
-                                    let macro_arg_len = match macro_chars.peek() {
-                                        Some(&(ofs, _ch)) => ofs,
-                                        None => text.len(),
-                                    };
-                                    let mut span = ctx.new_span();
-                                    span.bytes = ctx.cur_byte + ofs..ctx.cur_byte + macro_arg_len;
-                                    let span = Span::Normal(span);
-                                    params.error(&span, |error| {
-                                        error.set_message(&err);
-                                        error.add_label(
-                                            diagnostics::error_label(&span)
-                                                .with_message(err.label_msg()),
-                                        );
-                                    });
-                                }
-                            }
-
-                            chars = macro_chars; // Consume all characters implicated in the macro arg.
-                        } else {
-                            match chars.next() {
-                                Some((_ofs, ch @ ('\\' | '"' | '{' | '}'))) => string.push(ch),
-                                Some((_ofs, 'n')) => string.push('\n'),
-                                Some((_ofs, 'r')) => string.push('\r'),
-                                Some((_ofs, 't')) => string.push('\t'),
-                                Some((_ofs, '0')) => string.push('\0'),
-
-                                Some((_ofs, chars!(line_cont))) => {
-                                    // Line continuation.
-                                    todo!()
-                                }
-
-                                Some((escaped_ofs, ch)) => {
-                                    let mut span = ctx.new_span();
-                                    span.bytes = ctx.cur_byte + ofs
-                                        ..ctx.cur_byte + escaped_ofs + ch.len_utf8();
-                                    let span = Span::Normal(span);
-                                    params.error(&span, |error| {
-                                        error.set_message("Invalid character escape");
-                                        error.add_label(
-                                            diagnostics::error_label(&span)
-                                                .with_message("Cannot escape this character"),
-                                        );
-                                    });
-
-                                    string.push(ch);
-                                }
-                                None => {
-                                    let mut span = ctx.new_span();
-                                    span.bytes = ctx.cur_byte + ofs..ctx.cur_byte + text.len();
-                                    let span = Span::Normal(span);
-                                    params.error(&span, |error| {
-                                        error.set_message("Invalid character escape");
-                                        error.add_label(
-                                            diagnostics::error_label(&span)
-                                                .with_message("No character to escape"),
-                                        );
-                                    });
-                                }
-                            }
-                        }
-                    }
-                    '{' if !raw => {
-                        todo!();
-                    }
-
-                    ch => string.push(ch),
-                }
-            }
-
-            // The string wasn't terminated properly.
-            let mut err_span = ctx.new_span();
-            err_span.bytes.end = ctx.cur_byte + end_ofs;
-            let err_span = Span::Normal(err_span);
-            params.error(&err_span, |error| {
-                error.set_message("Unterminated string literal");
-                error.add_label(diagnostics::error_label(&err_span).with_message(format!(
-                    "No closing quote before the end of {}",
-                    if multiline { "input" } else { "the line" }
-                )))
-            });
-
-            end_ofs
+            Self::read_string_inner(&mut string, raw, &mut chars, ctx, text, params)
         });
 
         (!span.bytes.is_empty()).then_some(tok!("string"(string)))
+    }
+
+    fn read_string_inner(
+        string: &mut CompactString,
+        raw: bool,
+        chars: &mut Peekable<CharIndices>,
+        ctx: &Context,
+        text: &str,
+        params: &LexerParams,
+    ) -> usize {
+        fn is_quote(&(_, ch): &(usize, char)) -> bool {
+            ch == '"'
+        }
+
+        let multiline = if let Some((ofs, quote)) = chars.next_if(is_quote) {
+            // We have two consecutive quotes: if there are only two, then we have an empty string;
+            //                                 if there are three, we have a multi-line string.
+            if chars.next_if(is_quote).is_none() {
+                return ofs + quote.len_utf8();
+            }
+            true
+        } else {
+            false
+        };
+
+        let mut end_ofs = text.len();
+        while let Some((ofs, ch)) = chars.next() {
+            match ch {
+                '"' => {
+                    if multiline {
+                        // We need three consecutive quotes to close the string, not just one.
+                        if let Some((_ofs, _quote)) = chars.next_if(is_quote) {
+                            // Two in a row...
+                            if let Some((ofs, _quote)) = chars.next_if(is_quote) {
+                                // Three in a row! Winner winner chicken dinner
+                                return ofs + ch.len_utf8();
+                            }
+                            string.push('"');
+                        }
+                        string.push('"');
+                    } else {
+                        return ofs + ch.len_utf8();
+                    }
+                }
+                chars!(newline) => {
+                    if !multiline {
+                        end_ofs = ofs;
+                        break;
+                    } else if ch == '\r' {
+                        // Handle CRLF, normalised as a single LF.
+                        chars.next_if(|&(_, ch)| ch == '\n');
+                    }
+                    string.push('\n');
+                }
+
+                // Strings manually manage the normally implicit expansions.
+                '\\' if !raw => {
+                    // Check for a macro arg, and else for an escape.
+                    let mut macro_chars = chars.clone();
+                    if let Some(res) = Self::read_macro_arg(
+                        macro_chars.by_ref().map(|(_ofs, ch)| ch),
+                        params.symbols,
+                        params.macro_args,
+                    ) {
+                        match res {
+                            Ok((_kind, src)) => string.push_str(src.contents.text()),
+                            Err(err) => {
+                                let macro_arg_len = match macro_chars.peek() {
+                                    Some(&(ofs, _ch)) => ofs,
+                                    None => text.len(),
+                                };
+                                let mut span = ctx.new_span();
+                                span.bytes = ctx.cur_byte + ofs..ctx.cur_byte + macro_arg_len;
+                                let span = Span::Normal(span);
+                                params.error(&span, |error| {
+                                    error.set_message(&err);
+                                    error.add_label(
+                                        diagnostics::error_label(&span)
+                                            .with_message(err.label_msg()),
+                                    );
+                                });
+                            }
+                        }
+
+                        *chars = macro_chars; // Consume all characters implicated in the macro arg.
+                    } else if let Some(value) =
+                        Self::get_char_escape(chars.next(), ofs, ctx, text, chars, params)
+                    {
+                        string.push(value);
+                    }
+                }
+                '{' if !raw => {
+                    todo!();
+                }
+
+                ch => string.push(ch),
+            }
+        }
+
+        // The string wasn't terminated properly.
+        let mut err_span = ctx.new_span();
+        err_span.bytes.end = ctx.cur_byte + end_ofs;
+        let err_span = Span::Normal(err_span);
+        params.error(&err_span, |error| {
+            error.set_message("Unterminated string literal");
+            error.add_label(diagnostics::error_label(&err_span).with_message(format!(
+                "No closing quote before the end of {}",
+                if multiline { "input" } else { "the line" }
+            )))
+        });
+
+        end_ofs
+    }
+
+    fn get_char_escape(
+        escaped: Option<(usize, char)>,
+        backslash_ofs: usize,
+        ctx: &Context,
+        text: &str,
+        chars: &mut Peekable<CharIndices>,
+        params: &LexerParams,
+    ) -> Option<char> {
+        match escaped {
+            Some((_ofs, ch @ ('\\' | '"' | '{' | '}'))) => Some(ch),
+            Some((_ofs, 'n')) => Some('\n'),
+            Some((_ofs, 'r')) => Some('\r'),
+            Some((_ofs, 't')) => Some('\t'),
+            Some((_ofs, '0')) => Some('\0'),
+
+            Some((_ofs, chars!(line_cont))) => {
+                Self::read_line_continuation(ctx, text, chars, params);
+
+                None
+            }
+
+            Some((escaped_ofs, ch)) => {
+                let mut span = ctx.new_span();
+                span.bytes =
+                    ctx.cur_byte + backslash_ofs..ctx.cur_byte + escaped_ofs + ch.len_utf8();
+                let span = Span::Normal(span);
+                params.error(&span, |error| {
+                    error.set_message("Invalid character escape");
+                    error.add_label(
+                        diagnostics::error_label(&span)
+                            .with_message("Cannot escape this character"),
+                    );
+                });
+
+                Some(ch)
+            }
+            None => {
+                let mut span = ctx.new_span();
+                span.bytes = ctx.cur_byte + backslash_ofs..ctx.cur_byte + text.len();
+                let span = Span::Normal(span);
+                params.error(&span, |error| {
+                    error.set_message("Invalid character escape");
+                    error.add_label(
+                        diagnostics::error_label(&span).with_message("No character to escape"),
+                    );
+                });
+
+                None
+            }
+        }
     }
 }
 
@@ -1006,11 +1018,87 @@ impl Lexer {
                 }
             }
 
-            let mut parens_depth = 0;
-            while let Some((_ofs, ch)) = chars.next() {
+            let mut parens_depth = 0usize;
+            while let Some((ofs, ch)) = chars.next() {
                 last_char = Some(ch);
 
-                todo!();
+                match ch {
+                    '"' => {
+                        string.push('"');
+                        let _len = Self::read_string_inner(
+                            &mut string,
+                            false,
+                            &mut chars,
+                            ctx,
+                            text,
+                            &params,
+                        );
+                        string.push('"');
+                        last_char = Some('"'); // The terminating quote.
+                    }
+                    '#' => {
+                        string.push('#');
+                        if chars.next_if(|&(_ofs, ch)| ch == '"').is_some() {
+                            string.push('"');
+                            let _len = Self::read_string_inner(
+                                &mut string,
+                                true,
+                                &mut chars,
+                                ctx,
+                                text,
+                                &params,
+                            );
+                            string.push('"');
+                            last_char = Some('"'); // The terminating quote.
+                        }
+                    }
+
+                    chars!(newline) => break,
+                    ';' => {
+                        Self::read_line_comment(&mut chars);
+                        break;
+                    }
+                    '/' => {
+                        if chars.next_if(|&(_ofs, ch)| ch == '*').is_some() {
+                            if let Err(err) = Self::read_block_comment(&mut chars) {
+                                todo!()
+                            }
+                        } else {
+                            string.push('/');
+                        }
+                    }
+
+                    ',' if parens_depth == 0 => return ofs,
+
+                    '(' => {
+                        parens_depth += 1;
+                        string.push('(');
+                    }
+                    ')' if parens_depth != 0 => {
+                        parens_depth -= 1;
+                        string.push(')');
+                    }
+
+                    '\\' => {
+                        let ch = chars.peek().copied();
+                        if let Some(res) = Self::read_macro_arg(
+                            chars.by_ref().map(|(_ofs, ch)| ch),
+                            params.symbols,
+                            params.macro_args,
+                        ) {
+                            match res {
+                                Ok((_kind, source)) => string.push_str(source.contents.text()),
+                                Err(err) => todo!(),
+                            }
+                        } else if let Some(value) =
+                            Self::get_char_escape(ch, ofs, ctx, text, &mut chars, &params)
+                        {
+                            string.push(value);
+                        }
+                    }
+
+                    _ => string.push(ch),
+                }
             }
             text.len()
         });
@@ -1020,14 +1108,23 @@ impl Lexer {
         string.truncate(trimmed_len);
 
         // Returning COMMAs to the parser would mean that two consecutive commas
-        // (i.e. an empty argument) need to return two different tokens (STRING
-        // then COMMA) without advancing the read. To avoid this, commas in raw
-        // mode end the current macro argument but are not tokenized themselves.
-
+        // (i.e. an empty argument) need to return two different tokens (string then comma)
+        // without consuming any chars.
+        // To avoid this, commas in raw mode end the current macro argument,
+        // but are not tokenized themselves.
         if last_char == Some(',') {
-            todo!();
+            let mut dummy_span = span.clone();
+            self.consume(&mut dummy_span);
             return Some((string, Span::Normal(span)));
         }
+
+        // The last argument may end in a trailing comma, newline, or EOF.
+        // To allow trailing commas, what would be the last argument is not emitted if empty.
+        // To pass an empty last argument, use a second trailing comma.
+        if !string.is_empty() {
+            return Some((string, Span::Normal(span)));
+        }
+
         None
     }
 }
@@ -1047,7 +1144,7 @@ impl Lexer {
 
         let mut capture_len = 0;
         let mut res = Ok(());
-        self.with_active_context_raw(&mut span, |ctx, mut text| {
+        self.with_active_context_raw(&mut span, |ctx, text| {
             debug_assert!(
                 matches!(
                     ctx.span.src.contents.text()[ctx.cur_byte - 1..ctx.cur_byte]
@@ -1058,10 +1155,12 @@ impl Lexer {
                 "Block capture not started at beginning of line",
             );
 
+            let mut capture = text;
             loop {
-                let (line, remainder) = match text.split_once(|ch| matches!(ch, chars!(newline))) {
+                let (line, remainder) = match capture.split_once(|ch| matches!(ch, chars!(newline)))
+                {
                     Some((line, remainder)) => (line, Some(remainder)),
-                    None => todo!(),
+                    None => (capture, None),
                 };
 
                 // Capture everything before the start of this line.
@@ -1081,11 +1180,14 @@ impl Lexer {
                 // Try again with the next line.
                 let Some(remainder) = remainder else {
                     res = Err(CaptureBlockErr::Unterminated { name: kind });
+                    capture_len = text.len();
                     break text.len();
                 };
-                text = remainder;
+                capture = remainder;
             }
         });
+        // Don't capture the closing keyword.
+        span.bytes.end = span.bytes.start + capture_len;
 
         (span, res)
     }
