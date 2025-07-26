@@ -12,17 +12,17 @@
 //! [#362]: https://github.com/gbdev/rgbds/issues/362
 //! [#531]: https://github.com/gbdev/rgbds/issues/531
 
-use std::{cell::Cell, iter::Peekable, ops::Deref, rc::Rc, str::CharIndices};
+use std::{cell::Cell, fmt::format, iter::Peekable, ops::Deref, rc::Rc, str::CharIndices};
 
 use compact_str::CompactString;
 use unicase::UniCase;
 
 use crate::{
     diagnostics::{self, ReportBuilder},
-    macro_args::MacroArgs,
+    macro_args::{MacroArgs, UniqueId},
     sources::{NormalSpan, Source, Span, SpanKind},
     symbols::Symbols,
-    Identifier, Identifiers, Options,
+    Identifier, Identifiers, Options, RuntimeOptions,
 };
 
 use super::tokens::{tok, Token, TokenPayload, KEYWORDS};
@@ -33,14 +33,22 @@ pub struct Lexer {
 }
 
 #[derive(Debug)]
-struct Context {
-    span: NormalSpan,
+pub struct Context {
+    pub span: NormalSpan,
     cur_byte: usize,
     /// Bytes before this one have already been scanned for expansions.
     /// Note that this is only updated when necessary, so it may be lagging behind `cur_byte`.
     ///
     /// This is akin to the C preprocessor's “blue paint”.
     ofs_scanned_for_expansion: usize,
+    pub loop_state: LoopInfo,
+}
+#[derive(Debug, Default)]
+pub struct LoopInfo {
+    pub nb_iters: u32,
+    pub for_var: Option<Identifier>,
+    pub for_value: i32,
+    pub for_step: i32,
 }
 
 impl Lexer {
@@ -48,33 +56,56 @@ impl Lexer {
         Self { contexts: vec![] }
     }
 
-    pub fn push_file(&mut self, file: Rc<Source>, parent: Option<Rc<NormalSpan>>) {
-        if parent.is_none() {
-            debug_assert!(self.contexts.is_empty());
-        }
+    pub fn push_file(
+        &mut self,
+        file: Rc<Source>,
+        parent: Option<Rc<NormalSpan>>,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        debug_assert_eq!(parent.is_none(), self.contexts.is_empty());
 
-        self.contexts.push(Context {
-            span: NormalSpan::new(file, SpanKind::File, parent),
-            cur_byte: 0,
-            ofs_scanned_for_expansion: 0,
-        });
+        self.push_context(
+            NormalSpan::new(file, SpanKind::File, parent),
+            Default::default(),
+            nb_errors_left,
+            options,
+        );
     }
 
-    pub fn push_macro(&mut self, mut contents: NormalSpan, parent: Rc<NormalSpan>) {
+    pub fn push_macro(
+        &mut self,
+        macro_name: Identifier,
+        mut contents: NormalSpan,
+        parent: Rc<NormalSpan>,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
         contents.parent = Some(parent);
-        self.contexts.push(Context {
-            cur_byte: contents.bytes.start,
-            ofs_scanned_for_expansion: contents.bytes.start,
-            span: contents,
-        });
+        contents.kind = SpanKind::Macro(macro_name);
+        self.push_context(contents, Default::default(), nb_errors_left, options);
+    }
+
+    pub fn push_loop(
+        &mut self,
+        loop_info: LoopInfo,
+        mut contents: NormalSpan,
+        parent: Rc<NormalSpan>,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        contents.parent = Some(parent);
+        contents.kind = SpanKind::Loop(0);
+        self.push_context(contents, loop_info, nb_errors_left, options);
     }
 }
 
-struct LexerParams<'idents, 'sym, 'margs, 'nerr, 'opts> {
+struct LexerParams<'idents, 'sym, 'mac_args, 'uniq_id, 'nb_err, 'opts> {
     identifiers: &'idents mut Identifiers,
     symbols: &'sym Symbols,
-    macro_args: Option<&'margs MacroArgs>,
-    nb_errors_left: &'nerr Cell<usize>,
+    macro_args: Option<&'mac_args MacroArgs>,
+    unique_id: &'uniq_id mut UniqueId,
+    nb_errors_left: &'nb_err Cell<usize>,
     options: &'opts Options,
 }
 
@@ -95,7 +126,7 @@ macro_rules! chars {
         chars!(ident_start) | '0'..='9' | '$' | '@' | '#'
     }
 }
-fn is_whitespace(ch: char) -> bool {
+pub fn is_whitespace(ch: char) -> bool {
     matches!(ch, chars!(whitespace))
 }
 
@@ -114,6 +145,13 @@ impl Context {
         span.bytes = self.cur_byte..self.cur_byte;
         span
     }
+
+    /// This is only meant to be used to restart a loop.
+    pub fn reset(&mut self) {
+        debug_assert!(matches!(self.span.kind, SpanKind::Loop(..)));
+        self.cur_byte = self.span.bytes.start;
+        self.ofs_scanned_for_expansion = self.span.bytes.start;
+    }
 }
 
 impl Lexer {
@@ -128,48 +166,101 @@ impl Lexer {
 
     fn push_context(
         &mut self,
-        source: Rc<Source>,
-        trigger_span: NormalSpan,
-        ctx_kind: SpanKind,
-        painted_blue: bool,
-        params: &LexerParams,
+        span: NormalSpan,
+        loop_info: LoopInfo,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
     ) {
-        if self.contexts.len() == params.options.runtime_opts.recursion_depth {
-            let span = Span::Normal(trigger_span);
-            params.error(&span, |error| {
-                error.set_message("Maximum recursion depth exceeded");
-                error.add_label(
-                    diagnostics::error_label(&span)
-                        .with_message(format!("Depth is at {} here", self.contexts.len())),
-                );
-            });
-        } else if !source.contents.is_empty() {
-            // Don't bother with empty expansions.
-            let span = NormalSpan::new(source, ctx_kind, Some(Rc::new(trigger_span)));
+        debug_assert!(self.contexts.len() <= options.runtime_opts.recursion_depth);
+
+        if self.contexts.len() == options.runtime_opts.recursion_depth {
+            let span = match span.parent {
+                Some(trigger_span) => Span::Normal(trigger_span.as_ref().clone()),
+                None => Span::CommandLine,
+            };
+            diagnostics::error(
+                &span,
+                |error| {
+                    error.set_message("Maximum recursion depth exceeded");
+                    error.add_label(diagnostics::error_label(&span).with_message(format!(
+                        "Depth is {} contexts here, cannot enter a new one",
+                        self.contexts.len()
+                    )));
+                },
+                nb_errors_left,
+                options,
+            );
+        } else {
             self.contexts.push(Context {
                 cur_byte: span.bytes.start,
-                ofs_scanned_for_expansion: if painted_blue {
+                // Expansions that end implicitly cannot contain other expansions.
+                ofs_scanned_for_expansion: if span.kind.ends_implicitly() {
                     span.bytes.end
                 } else {
                     span.bytes.start
                 },
                 span,
+                loop_state: loop_info,
             })
         }
+    }
+
+    pub fn set_recursion_depth(
+        &self,
+        new_depth: usize,
+        opt_span: &Span,
+        nb_errors_left: &Cell<usize>,
+        options: &mut Options,
+    ) {
+        if self.contexts.len() > new_depth {
+            diagnostics::error(
+                opt_span,
+                |error| {
+                    error.set_message("Recursion is deeper than new limit");
+                    error.add_label(diagnostics::error_label(opt_span).with_message(format!(
+                        "Depth is {} contexts at this point",
+                        self.contexts.len()
+                    )))
+                },
+                nb_errors_left,
+                options,
+            );
+        } else {
+            options.runtime_opts.recursion_depth = new_depth;
+        }
+    }
+
+    pub fn top_context(&mut self) -> &mut Context {
+        let ctx = self.active_context().expect("No active lexer context");
+        debug_assert!(!ctx.span.kind.ends_implicitly());
+        ctx
     }
 
     /// Returns whether there are still more contexts after popping the top (active) one.
     #[must_use]
     pub fn pop_context(&mut self) -> bool {
-        let ctx = self
-            .contexts
-            .pop()
-            .expect("Attempting to pop a lexer context when there are no more!?");
-        debug_assert!(!ctx.span.kind.ends_implicitly());
+        loop {
+            let ctx = self
+                .contexts
+                .pop()
+                .expect("Attempting to pop a lexer context when there are no more!?");
+            // Pop any remaining implicitly-ending contexts
+            // (e.g. if the current top-level “hard“ context ends with an expansion).
+            if !ctx.span.kind.ends_implicitly() {
+                break;
+            }
+        }
         !self.contexts.is_empty()
     }
 
-    fn peek(&mut self, params: &LexerParams) -> Option<char> {
+    pub fn debug_check_done(&self) {
+        debug_assert!(
+            self.contexts.is_empty(),
+            "Ending parse with lexer contexts active!?"
+        );
+    }
+
+    fn peek(&mut self, params: &mut LexerParams) -> Option<char> {
         while let Some(ctx) = self.active_context() {
             let text = ctx.remaining_text();
             let mut chars = text.char_indices();
@@ -183,6 +274,7 @@ impl Lexer {
                         chars.by_ref().map(|(_ofs, ch)| ch),
                         params.symbols,
                         params.macro_args,
+                        params.unique_id,
                     );
                     // `chars.offset()` is not stable yet.
                     let macro_arg_len = match chars.next() {
@@ -198,11 +290,14 @@ impl Lexer {
                         match res {
                             Ok((span_kind, source)) => {
                                 self.push_context(
-                                    Rc::clone(source),
-                                    trigger_span,
-                                    span_kind,
-                                    true, // Don't scan for expansions inside of the macro arg.
-                                    params,
+                                    NormalSpan::new(
+                                        Rc::clone(source),
+                                        span_kind,
+                                        Some(Rc::new(trigger_span)),
+                                    ),
+                                    Default::default(),
+                                    params.nb_errors_left,
+                                    params.options,
                                 );
                                 continue; // Try again, reading from the new expansion context.
                             }
@@ -218,6 +313,9 @@ impl Lexer {
                                             diagnostics::error_label(&span)
                                                 .with_message(err.label_msg()),
                                         );
+                                        if let Some(help) = err.help_msg() {
+                                            error.set_help(help);
+                                        }
                                     },
                                     params.nb_errors_left,
                                     params.options,
@@ -345,15 +443,21 @@ impl Lexer {
     /// Returns `None` if the backslash isn't part of a macro arg.
     ///
     /// Advances the iterator by however many characters are scanned; those characters must not be scanned again.
-    fn read_macro_arg<'margs>(
+    fn read_macro_arg<'mac_args>(
         mut chars: impl Iterator<Item = char>,
         symbols: &Symbols,
-        macro_args: Option<&'margs MacroArgs>,
-    ) -> Option<Result<(SpanKind, &'margs Rc<Source>), MacroArgError>> {
+        macro_args: Option<&'mac_args MacroArgs>,
+        unique_id: &'mac_args mut UniqueId,
+    ) -> Option<Result<(SpanKind, &'mac_args Rc<Source>), MacroArgError>> {
         let idx = match chars.next() {
             Some(ch @ '1'..='9') => (ch as u32 - '0' as u32) as usize,
             Some('<') => todo!(),
-            Some('@') => todo!(),
+            Some('@') => {
+                return Some(match unique_id.unique_id() {
+                    Some(src) => Ok((SpanKind::UniqueId, src)),
+                    None => Err(MacroArgError::NoUniqueId),
+                })
+            }
             Some('#') => todo!(),
             _ => return None,
         };
@@ -479,7 +583,7 @@ impl Lexer {
 }
 
 impl Lexer {
-    fn handle_crlf(&mut self, ch: char, span: &mut NormalSpan, params: &LexerParams) {
+    fn handle_crlf(&mut self, ch: char, span: &mut NormalSpan, params: &mut LexerParams) {
         if ch == '\r' && self.peek(params) == Some('\n') {
             self.consume(span);
         }
@@ -490,6 +594,7 @@ impl Lexer {
         identifiers: &mut Identifiers,
         symbols: &Symbols,
         macro_args: Option<&MacroArgs>,
+        unique_id: &mut UniqueId,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) -> Token {
@@ -497,6 +602,7 @@ impl Lexer {
             identifiers,
             symbols,
             macro_args,
+            unique_id,
             nb_errors_left,
             options,
         };
@@ -504,7 +610,7 @@ impl Lexer {
         // Create a 1-char span pointing at the character right after the previous token,
         // which will be used for newlines, to provide better-looking syntax error messages.
         // Create it *after* the first `peek` call, so that it points inside of any expansions that would create.
-        let first_char = self.peek(&params);
+        let first_char = self.peek(&mut params);
         let ctx = self
             .active_context() // Do this after `peek`, in case it triggered an expansion.
             .expect("Attempting to lex a token without an active context!?");
@@ -521,7 +627,7 @@ impl Lexer {
 
         let mut span = self.active_context().unwrap().new_span();
         loop {
-            match self.peek(&params) {
+            match self.peek(&mut params) {
                 None => {
                     return Token {
                         span: Span::Normal(self.active_context().unwrap().new_span()),
@@ -531,7 +637,7 @@ impl Lexer {
 
                 Some(ch @ chars!(newline)) => {
                     self.consume(&mut span);
-                    self.handle_crlf(ch, &mut span, &params);
+                    self.handle_crlf(ch, &mut span, &mut params);
                     return Token {
                         payload: tok!("end of line"),
                         span: Span::Normal(span_before_whitespace),
@@ -651,7 +757,7 @@ impl Lexer {
                 // String.
                 Some('"') => {
                     // Guaranteed to succeed, since we've already read the opening quote.
-                    let payload = self.read_string_maybe(&mut span, &params).unwrap();
+                    let payload = self.read_string_maybe(&mut span, &mut params).unwrap();
                     break Token {
                         payload,
                         span: Span::Normal(span),
@@ -660,12 +766,13 @@ impl Lexer {
 
                 // Raw string or raw identifier.
                 Some('#') => {
-                    let payload = if let Some(payload) = self.read_string_maybe(&mut span, &params)
+                    let payload = if let Some(payload) =
+                        self.read_string_maybe(&mut span, &mut params)
                     {
                         payload
                     } else {
                         self.consume(&mut span);
-                        match self.peek(&params) {
+                        match self.peek(&mut params) {
                             Some(first_char @ chars!(ident_start)) => {
                                 self.consume(&mut span);
                                 self.read_identifier(first_char, &mut span, false, &mut params)
@@ -722,6 +829,7 @@ impl Lexer {
                     span = moved_span;
                     // Make the span empty, as we ignore the character that's just been consumed.
                     span.bytes.start = span.bytes.end;
+                    span_before_whitespace = span.clone();
                 }
             }
         }
@@ -765,7 +873,7 @@ impl Lexer {
     fn read_string_maybe(
         &mut self,
         span: &mut NormalSpan,
-        params: &LexerParams,
+        params: &mut LexerParams,
     ) -> Option<TokenPayload> {
         let mut string = CompactString::default();
         self.with_active_context_raw(span, |ctx, text| {
@@ -790,7 +898,7 @@ impl Lexer {
         chars: &mut Peekable<CharIndices>,
         ctx: &Context,
         text: &str,
-        params: &LexerParams,
+        params: &mut LexerParams,
     ) -> usize {
         fn is_quote(&(_, ch): &(usize, char)) -> bool {
             ch == '"'
@@ -845,6 +953,7 @@ impl Lexer {
                         macro_chars.by_ref().map(|(_ofs, ch)| ch),
                         params.symbols,
                         params.macro_args,
+                        params.unique_id,
                     ) {
                         match res {
                             Ok((_kind, src)) => string.push_str(src.contents.text()),
@@ -862,6 +971,9 @@ impl Lexer {
                                         diagnostics::error_label(&span)
                                             .with_message(err.label_msg()),
                                     );
+                                    if let Some(help) = err.help_msg() {
+                                        error.set_help(help);
+                                    }
                                 });
                             }
                         }
@@ -955,13 +1067,15 @@ impl Lexer {
         identifiers: &mut Identifiers,
         symbols: &Symbols,
         macro_args: Option<&MacroArgs>,
+        unique_id: &mut UniqueId,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) -> Option<(CompactString, Span)> {
-        let params = LexerParams {
+        let mut params = LexerParams {
             identifiers,
             symbols,
             macro_args,
+            unique_id,
             nb_errors_left,
             options,
         };
@@ -997,7 +1111,7 @@ impl Lexer {
 
                         // Line continuations count as “whitespace”.
                         if let Err(err) =
-                            Lexer::read_line_continuation(ctx, text, &mut chars, &params)
+                            Lexer::read_line_continuation(ctx, text, &mut chars, &mut params)
                         {
                             let mut span = ctx.new_span();
                             span.bytes.start += ofs;
@@ -1031,7 +1145,7 @@ impl Lexer {
                             &mut chars,
                             ctx,
                             text,
-                            &params,
+                            &mut params,
                         );
                         string.push('"');
                         last_char = Some('"'); // The terminating quote.
@@ -1046,14 +1160,14 @@ impl Lexer {
                                 &mut chars,
                                 ctx,
                                 text,
-                                &params,
+                                &mut params,
                             );
                             string.push('"');
                             last_char = Some('"'); // The terminating quote.
                         }
                     }
 
-                    chars!(newline) => break,
+                    chars!(newline) => return ofs,
                     ';' => {
                         Self::read_line_comment(&mut chars);
                         break;
@@ -1085,6 +1199,7 @@ impl Lexer {
                             chars.by_ref().map(|(_ofs, ch)| ch),
                             params.symbols,
                             params.macro_args,
+                            params.unique_id,
                         ) {
                             match res {
                                 Ok((_kind, source)) => string.push_str(source.contents.text()),
@@ -1132,7 +1247,8 @@ impl Lexer {
 impl Lexer {
     pub fn capture_until_keyword(
         &mut self,
-        keyword: &str,
+        end_keyword: &str,
+        nesting_keywords: &[&str],
         kind: &'static str,
         nb_errors_left: &Cell<usize>,
         options: &Options,
@@ -1156,6 +1272,7 @@ impl Lexer {
             );
 
             let mut capture = text;
+            let mut nesting_depth = 0usize;
             loop {
                 let (line, remainder) = match capture.split_once(|ch| matches!(ch, chars!(newline)))
                 {
@@ -1168,12 +1285,24 @@ impl Lexer {
                 capture_len = unsafe { line.as_ptr().offset_from(text.as_ptr()) } as usize;
                 debug_assert!(capture_len as isize >= 0); // `line` comes after `text`.
 
-                if let Some(first_word) =
-                    line.trim_start_matches(is_whitespace).get(..keyword.len())
-                {
-                    if unicase::eq_ascii(first_word, keyword) {
-                        // Found the end!
-                        break capture_len + keyword.len();
+                let trimmed = line.trim_start_matches(is_whitespace);
+                let nb_trimmed = line.len() - trimmed.len();
+                if let Some(first_word) = trimmed.get(..end_keyword.len()) {
+                    if unicase::eq_ascii(first_word, end_keyword) {
+                        // Found the ending keyword!
+                        match nesting_depth.checked_sub(1) {
+                            Some(new_depth) => nesting_depth = new_depth,
+                            None => break capture_len + nb_trimmed + end_keyword.len(),
+                        }
+                    }
+                } else {
+                    for keyword in nesting_keywords {
+                        if let Some(first_word) = trimmed.get(..keyword.len()) {
+                            if unicase::eq_ascii(first_word, keyword) {
+                                nesting_depth += 1;
+                                break; // As an optimisation.
+                            }
+                        }
                     }
                 }
 
@@ -1202,6 +1331,8 @@ enum MacroArgError {
     NoSuchArg { idx: usize, max_valid: usize },
     /// a macro argument was used outside of a macro
     MacroArgOutsideMacro,
+    /// a unique identifier is not available in this context
+    NoUniqueId,
 }
 impl MacroArgError {
     fn label_msg(&self) -> String {
@@ -1211,6 +1342,17 @@ impl MacroArgError {
                 format!("{max_valid} macro arguments are available")
             }
             Self::MacroArgOutsideMacro => "cannot use a macro argument here".into(),
+            Self::NoUniqueId => "cannot use `\\@` here".into(),
+        }
+    }
+    fn help_msg(&self) -> Option<String> {
+        match self {
+            Self::Unterminated => None,
+            Self::NoSuchArg { .. } => None,
+            Self::MacroArgOutsideMacro => None,
+            Self::NoUniqueId => {
+                Some("unique identifiers are available inside of macros and loops".into())
+            }
         }
     }
 }
@@ -1239,7 +1381,7 @@ enum BlockCommentErr {
     Unterminated,
 }
 
-impl LexerParams<'_, '_, '_, '_, '_> {
+impl LexerParams<'_, '_, '_, '_, '_, '_> {
     pub fn error<'span, F: FnOnce(&mut ReportBuilder<'span>)>(&self, span: &'span Span, build: F) {
         diagnostics::error(span, build, self.nb_errors_left, self.options)
     }

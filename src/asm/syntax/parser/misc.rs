@@ -35,7 +35,7 @@ pub(super) fn parse_comma_list<
     (elements, lookahead)
 }
 
-pub(super) enum StrOrNum {
+pub enum StrOrNum {
     Num(i32),
     String(CompactString),
 }

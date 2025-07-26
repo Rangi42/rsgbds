@@ -1,9 +1,4 @@
-use std::{
-    cell::Cell,
-    num::NonZeroUsize,
-    ops::{Deref, Index, Range},
-    sync::OnceLock,
-};
+use std::{cell::Cell, sync::OnceLock};
 
 use ariadne::{Config, IndexType, Label, ReportKind};
 use compact_str::CompactString;
@@ -181,12 +176,7 @@ fn add_backtrace_labels_and_print(diag: ReportBuilder<'_>, span: &Span, options:
             .eprint(())
             .expect("Failed to print diagnostic");
     }
-    fn add_level(
-        diag: ReportBuilder<'_>,
-        mut span: &NormalSpan,
-        allowed_depth: usize,
-        options: &Options,
-    ) {
+    fn add_level(diag: ReportBuilder<'_>, mut span: &NormalSpan, allowed_depth: usize) {
         let mut diag = diag; // Required for rustc to figure out a new lifetime for that binding of `diag`.
 
         if let Some(parent) = &span.parent {
@@ -198,9 +188,9 @@ fn add_backtrace_labels_and_print(diag: ReportBuilder<'_>, span: &Span, options:
                         SpanKind::Macro(_) => "macro called here",
                         SpanKind::Loop(_) => "loop beginning here",
                         SpanKind::Expansion(_) => "interpolated here",
-                        SpanKind::MacroArg(_) => "expanded here",
+                        SpanKind::MacroArg(_) | SpanKind::UniqueId => "expanded here",
                     }));
-                    add_level(diag, parent, depth, options);
+                    add_level(diag, parent, depth);
                 }
                 None => {
                     let mut remaining_depth = 1usize;
@@ -219,7 +209,7 @@ fn add_backtrace_labels_and_print(diag: ReportBuilder<'_>, span: &Span, options:
             print_diag(diag);
         }
     }
-    add_level(diag, span, options.backtrace_depth, options);
+    add_level(diag, span, options.backtrace_depth);
 }
 
 pub fn error_label(span: &Span) -> Label<&Span> {

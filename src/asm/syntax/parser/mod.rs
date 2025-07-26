@@ -20,14 +20,11 @@ use compact_str::CompactString;
 use crate::{
     charmap::Charmaps,
     diagnostics::{self, ReportBuilder, WarningKind},
-    macro_args::MacroArgs,
+    macro_args::{MacroArgs, UniqueId},
     section::Sections,
     sources::{Source, Span},
     symbols::Symbols,
-    syntax::{
-        lexer,
-        tokens::{tok, Token},
-    },
+    syntax::tokens::{tok, Token},
     Identifiers, Options,
 };
 
@@ -104,8 +101,8 @@ pub fn parse_file(
                     error.set_message(format!("Failed to open \"{}\"", path.display()));
                     error.add_note(err);
                 },
-                &nb_errors_remaining,
-                &options,
+                nb_errors_remaining,
+                options,
             );
             return;
         }
@@ -114,6 +111,7 @@ pub fn parse_file(
     let mut parse_ctx = ParseCtx {
         lexer: Lexer::new(),
         macro_args: Vec::with_capacity(1),
+        unique_id: UniqueId::new(),
         identifiers,
         charmaps,
         sections,
@@ -121,7 +119,7 @@ pub fn parse_file(
         nb_errors_remaining,
         options,
     };
-    parse_ctx.lexer.push_file(file, None);
+    parse_ctx.push_file(file, None);
 
     loop {
         loop {
@@ -129,18 +127,22 @@ pub fn parse_file(
             if matches_tok!(first_token, "end of input") {
                 break;
             }
-            let Some(()) = parse_line(first_token, &mut parse_ctx) else {
+            if parse_line(first_token, &mut parse_ctx).is_none() {
                 // Fatal error!
                 return;
-            };
+            }
         }
 
         // We're done parsing from this context, so end it.
         // (This will make REPT/FOR loop if possible, and pop everything else.)
-        if !parse_ctx.lexer.pop_context() {
+        if !parse_ctx.pop_context() {
             break;
         }
     }
+
+    parse_ctx.lexer.debug_check_done();
+    parse_ctx.unique_id.debug_check_empty();
+    debug_assert!(parse_ctx.macro_args.is_empty());
 }
 
 fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()> {
@@ -168,26 +170,32 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
         expect_one_of!(parse_ctx.next_token() => {
             |":"| => {
                 label_span = Some(first_token.span.clone());
-                parse_ctx.symbols.define_label(
-                    ident,
-                    parse_ctx.identifiers,
-                    first_token.span,
-                    false,
-                    parse_ctx.nb_errors_remaining,
-                    parse_ctx.options
-                );
+                if let Some((_data_section, sym_section)) = &parse_ctx.sections.active_section {
+                    sym_section.define_label(
+                        ident,
+                        parse_ctx.symbols,
+                        parse_ctx.identifiers,
+                        first_token.span,
+                        false,
+                        parse_ctx.nb_errors_remaining,
+                        parse_ctx.options
+                    );
+                }
                 first_token = parse_ctx.next_token();
             },
             |"::"| => {
                 label_span = Some(first_token.span.clone());
-                parse_ctx.symbols.define_label(
-                    ident,
-                    parse_ctx.identifiers,
-                    first_token.span,
-                    true,
-                    parse_ctx.nb_errors_remaining,
-                    parse_ctx.options
-                );
+                if let Some((_data_section, sym_section)) = &parse_ctx.sections.active_section {
+                    sym_section.define_label(
+                        ident,
+                        parse_ctx.symbols,
+                        parse_ctx.identifiers,
+                        first_token.span,
+                        true,
+                        parse_ctx.nb_errors_remaining,
+                        parse_ctx.options
+                    );
+                }
                 first_token = parse_ctx.next_token();
             },
             else |token, _expected| => {
@@ -201,6 +209,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
     let eol_token = match first_token.payload {
         tok!("end of line") | tok!("end of input") => first_token, // Empty line.
 
+        // FIXME: `Label: macro:` is accepted as a macro, instead of being rejected as two labels.
         tok!("identifier"(ident, _)) => {
             // Macro call.
             // Get the macro's arguments.
@@ -232,10 +241,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
                     let Span::Normal(span) = first_token.span else {
                         unreachable!();
                     };
-                    parse_ctx
-                        .lexer
-                        .push_macro(slice.clone(), Rc::new(span.clone()));
-                    parse_ctx.macro_args.push(args);
+                    parse_ctx.push_macro(ident, slice.clone(), Rc::new(span.clone()), args);
                 }
             }
 
@@ -339,10 +345,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
         tok!("endl") => directives::section::parse_endl(first_token, parse_ctx),
         tok!("endu") => directives::parse_endu(first_token, parse_ctx),
         tok!("export") => directives::parse_export(first_token, parse_ctx),
-        tok!("fail") => {
-            directives::output::parse_fail(first_token, parse_ctx);
-            return None;
-        }
+        tok!("fail") => directives::output::parse_fail(first_token, parse_ctx)?,
         tok!("fatal") => directives::parse_fatal(first_token, parse_ctx),
         tok!("incbin") => directives::parse_incbin(first_token, parse_ctx),
         tok!("include") => directives::context::parse_include(first_token, parse_ctx),
@@ -434,12 +437,14 @@ struct ParseCtx<'idents, 'charmaps, 'sections, 'symbols, 'nb_errs, 'options> {
     lexer: Lexer,
     identifiers: &'idents mut Identifiers,
     macro_args: Vec<MacroArgs>,
+    unique_id: UniqueId,
     charmaps: &'charmaps mut Charmaps,
     sections: &'sections mut Sections,
     symbols: &'symbols mut Symbols,
     nb_errors_remaining: &'nb_errs Cell<usize>,
     options: &'options mut Options,
 }
+/// Shorthand for a [`ParseCtx`] with all lifetimes elided.
 macro_rules! parse_ctx {
     () => {
         $crate::syntax::parser::ParseCtx<'_, '_, '_, '_, '_, '_>
@@ -455,6 +460,7 @@ impl parse_ctx!() {
             self.identifiers,
             self.symbols,
             self.macro_args.last(),
+            &mut self.unique_id,
             self.nb_errors_remaining,
             self.options,
         )
@@ -464,13 +470,10 @@ impl parse_ctx!() {
             self.identifiers,
             self.symbols,
             self.macro_args.last(),
+            &mut self.unique_id,
             self.nb_errors_remaining,
             self.options,
         )
-    }
-
-    fn extended_to(&self, span: &Span, token: &Token) -> Span {
-        span.merged_with(&token.span)
     }
 
     fn error<'span, F: FnOnce(&mut ReportBuilder<'span>)>(&self, span: &'span Span, callback: F) {

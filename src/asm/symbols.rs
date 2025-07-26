@@ -3,12 +3,12 @@ use std::cell::Cell;
 use chrono::prelude::*;
 use compact_str::CompactString;
 use rustc_hash::{FxBuildHasher, FxHashMap};
-use string_interner::{backend::StringBackend, symbol::SymbolU32, StringInterner};
 
 use crate::{
     diagnostics,
     format::FormatSpec,
     macro_args::MacroArgs,
+    section::Sections,
     sources::{NormalSpan, Span},
     Identifier, Identifiers, Options,
 };
@@ -47,7 +47,7 @@ pub enum SymbolKind {
     Numeric { value: i32, mutable: bool },
     String(CompactString),
     Macro(NormalSpan),
-    Label, // TODO
+    Label { section_id: usize, offset: usize },
     Ref,
 }
 
@@ -170,11 +170,12 @@ impl Symbols {
         fmt: &FormatSpec,
         buf: &mut CompactString,
         macro_args: Option<&MacroArgs>,
+        sections: &Sections,
     ) -> Result<(), FormatError<'sym>> {
-        let Some(sym) = name.and_then(|name| self.find(&name)) else {
-            return Err(FormatError::NotFound);
-        };
-        if let Some(value) = sym.get_number(macro_args) {
+        let sym = name
+            .and_then(|name| self.find(&name))
+            .ok_or(FormatError::NotFound)?;
+        if let Some(value) = sym.get_number(macro_args, sections) {
             todo!()
         } else if let Some(s) = sym.get_string() {
             fmt.write_str(&s, buf);
@@ -222,7 +223,7 @@ impl Symbols {
                         kind: SymbolKind::Ref,
                         exported: previously_exported,
                         ..
-                    } if matches!(kind, SymbolKind::Label | SymbolKind::Numeric { .. }) => {
+                    } if matches!(kind, SymbolKind::Label { .. } | SymbolKind::Numeric { .. }) => {
                         *existing = SymbolData::User {
                             definition,
                             kind,
@@ -295,6 +296,7 @@ impl Symbols {
         name: Identifier,
         identifiers: &Identifiers,
         definition: Span,
+        (section_id, offset): (usize, usize),
         exported: bool,
         nb_errors_left: &Cell<usize>,
         options: &Options,
@@ -303,7 +305,7 @@ impl Symbols {
             name,
             identifiers,
             definition,
-            SymbolKind::Label,
+            SymbolKind::Label { section_id, offset },
             exported,
             nb_errors_left,
             options,
@@ -345,17 +347,17 @@ impl SymbolData {
         }
     }
 
-    pub fn get_number(&self, macro_args: Option<&MacroArgs>) -> Option<i32> {
+    pub fn get_number(&self, macro_args: Option<&MacroArgs>, sections: &Sections) -> Option<i32> {
         match self {
             Self::User { kind, .. } | Self::Builtin(kind) => match kind {
                 SymbolKind::Numeric { value, .. } => Some(*value),
                 SymbolKind::String(..) => None,
                 SymbolKind::Macro(_) => None,
-                SymbolKind::Label => todo!(),
+                SymbolKind::Label { section_id, offset } => todo!(),
                 SymbolKind::Ref => None,
             },
             Self::Pc => todo!(),
-            Self::Narg => todo!(),
+            Self::Narg => macro_args.map(|args| args.max_valid() as i32),
             Self::Dot => None,
             Self::DotDot => None,
             Self::Deleted(..) => None,
@@ -368,7 +370,7 @@ impl SymbolData {
                 SymbolKind::Numeric { .. } => None,
                 SymbolKind::String(string) => Some(string.clone()),
                 SymbolKind::Macro(_) => None,
-                SymbolKind::Label => None,
+                SymbolKind::Label { .. } => None,
                 SymbolKind::Ref => None,
             },
             Self::Pc => None,

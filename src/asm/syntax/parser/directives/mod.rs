@@ -1,4 +1,4 @@
-use crate::syntax::tokens::Token;
+use crate::{diagnostics, syntax::tokens::Token};
 
 use super::parse_ctx;
 
@@ -38,12 +38,24 @@ pub(super) fn parse_endc(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token
     todo!()
 }
 
-pub(super) fn parse_endm(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(super) fn parse_endm(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+    parse_ctx.report_syntax_error(&keyword, |error, span| {
+        error.add_label(
+            diagnostics::error_label(span).with_message("This `ENDM` is outside of a macro"),
+        );
+    });
+
+    parse_ctx.next_token()
 }
 
-pub(super) fn parse_endr(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(super) fn parse_endr(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+    parse_ctx.report_syntax_error(&keyword, |error, span| {
+        error.add_label(
+            diagnostics::error_label(span).with_message("This `ENDR` is outside of a loop"),
+        );
+    });
+
+    parse_ctx.next_token()
 }
 
 pub(super) fn parse_endu(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
@@ -102,8 +114,8 @@ pub(super) fn parse_union(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Toke
     todo!()
 }
 
-pub(super) mod charmap;
-pub(super) mod context;
-pub(super) mod opt;
-pub(super) mod output;
-pub(super) mod section;
+pub mod charmap;
+pub mod context;
+pub mod opt;
+pub mod output;
+pub mod section;

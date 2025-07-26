@@ -5,34 +5,51 @@ use crate::{diagnostics, syntax::tokens::Token};
 use super::super::{parse_ctx, Span};
 
 fn process_option(string: &str, span: Span, parse_ctx: &mut parse_ctx!()) {
-    match string.chars().next() {
+    let mut chars = string.chars();
+    let option_char = chars.next();
+    let option_arg = chars
+        .as_str()
+        .trim_start_matches(crate::syntax::lexer::is_whitespace);
+
+    match option_char {
         Some('b') => handle_error(
-            parse_ctx.options.runtime_opts.parse_b(&string[1..]),
+            parse_ctx.options.runtime_opts.parse_b(option_arg),
             &span,
             parse_ctx,
         ),
         Some('g') => handle_error(
-            parse_ctx.options.runtime_opts.parse_g(&string[1..]),
+            parse_ctx.options.runtime_opts.parse_g(option_arg),
             &span,
             parse_ctx,
         ),
         Some('p') => handle_error(
-            parse_ctx.options.runtime_opts.parse_p(&string[1..]),
+            parse_ctx.options.runtime_opts.parse_p(option_arg),
             &span,
             parse_ctx,
         ),
         Some('Q') => handle_error(
-            parse_ctx.options.runtime_opts.parse_q(&string[1..]),
+            parse_ctx.options.runtime_opts.parse_q(option_arg),
             &span,
             parse_ctx,
         ),
         Some('r') => handle_error(
-            parse_ctx.options.runtime_opts.parse_r(&string[1..]),
+            parse_ctx
+                .options
+                .runtime_opts
+                .parse_r(option_arg)
+                .map(|new_depth| {
+                    parse_ctx.lexer.set_recursion_depth(
+                        new_depth,
+                        &span,
+                        parse_ctx.nb_errors_remaining,
+                        parse_ctx.options,
+                    )
+                }),
             &span,
             parse_ctx,
         ),
         Some('W') => handle_error(
-            parse_ctx.options.runtime_opts.parse_w(&string[1..]),
+            parse_ctx.options.runtime_opts.parse_w(option_arg),
             &span,
             parse_ctx,
         ),
@@ -50,15 +67,11 @@ fn process_option(string: &str, span: Span, parse_ctx: &mut parse_ctx!()) {
         }),
     }
 
-    fn handle_error<'ctx_stack, E: Display>(
-        r: Result<(), E>,
-        span: &Span,
-        parse_ctx: &mut parse_ctx!(),
-    ) {
+    fn handle_error<E: Display>(r: Result<(), E>, span: &Span, parse_ctx: &mut parse_ctx!()) {
         if let Err(err) = r {
             parse_ctx.error(span, |error| {
                 error.set_message(err);
-            })
+            });
         }
     }
 }

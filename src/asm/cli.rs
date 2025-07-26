@@ -6,17 +6,17 @@
  * SPDX-License-Identifier: MPL-2.0
  */
 
-#![deny(missing_docs)]
-
 use std::{fmt::Display, path::PathBuf};
 
 use clap::{ColorChoice, CommandFactory, Parser};
-use thiserror::Error;
+use derive_more::From;
+use displaydoc::Display;
 
 use crate::diagnostics::{WarningKind, WarningLevel, META_WARNINGS, SIMPLE_WARNINGS};
 
 use super::*;
 
+#[deny(missing_docs)]
 /// The command-line interface.
 #[derive(Debug, Parser)]
 #[clap(color = crate::common::cli::clap_color_choice())]
@@ -30,7 +30,7 @@ use super::*;
     arg_required_else_help = true,
     help_expected = true
 )]
-pub(super) struct Cli {
+pub struct Cli {
     /// The two characters to use for binary constants
     #[arg(short, long, value_name = "chars")]
     binary_digits: Option<String>,
@@ -86,7 +86,7 @@ pub(super) struct Cli {
 }
 
 impl Cli {
-    pub(super) fn finish(self) -> Result<(Options, PathBuf, Vec<String>, Vec<String>), ()> {
+    pub fn finish(self) -> Result<(Options, PathBuf, Vec<String>, Vec<String>), ()> {
         crate::common::cli::apply_color_choice(self.color);
         let mut fail = false;
 
@@ -114,7 +114,12 @@ impl Cli {
             handle_error(runtime_opts.parse_q(&precision), &mut fail);
         }
         if let Some(depth) = self.recursion_depth {
-            handle_error(runtime_opts.parse_r(&depth), &mut fail);
+            handle_error(
+                runtime_opts
+                    .parse_r(&depth)
+                    .map(|new_depth| runtime_opts.recursion_depth = new_depth),
+                &mut fail,
+            );
         }
         for flag in &self.warning {
             handle_error(runtime_opts.parse_w(flag), &mut fail);
@@ -174,10 +179,10 @@ impl RuntimeOptions {
         *target = digits;
         Ok(())
     }
-    pub(crate) fn parse_b(&mut self, arg: &str) -> Result<(), BinDigitsParseErr> {
+    pub fn parse_b(&mut self, arg: &str) -> Result<(), BinDigitsParseErr> {
         Self::parse_chars(arg, &mut self.binary_digits)
     }
-    pub(crate) fn parse_g(&mut self, arg: &str) -> Result<(), GfxCharsParseErr> {
+    pub fn parse_g(&mut self, arg: &str) -> Result<(), GfxCharsParseErr> {
         Self::parse_chars(arg, &mut self.gfx_chars)
     }
 }
@@ -186,18 +191,18 @@ enum DynCharParseErr {
     WrongCharCount(usize),
     BadChar(char),
 }
-#[derive(Debug, Error)]
-pub(crate) enum BinDigitsParseErr {
-    #[error("The argument must be exactly two characters long, not {0}")]
+#[derive(Debug, Display)]
+pub enum BinDigitsParseErr {
+    /// The argument must be exactly two characters long, not {0}
     WrongCharCount(usize),
-    #[error("Only printable ASCII characters are allowed, not '{0}'")]
+    /// Only printable ASCII characters are allowed, not '{0}'
     BadChar(char),
 }
-#[derive(Debug, Error)]
-pub(crate) enum GfxCharsParseErr {
-    #[error("The argument must be exactly four characters long, not {0}")]
+#[derive(Debug, Display)]
+pub enum GfxCharsParseErr {
+    /// The argument must be exactly four characters long, not {0}
     WrongCharCount(usize),
-    #[error("Only printable ASCII characters are allowed, not '{0}'")]
+    /// Only printable ASCII characters are allowed, not '{0}'
     BadChar(char),
 }
 impl From<DynCharParseErr> for BinDigitsParseErr {
@@ -218,14 +223,14 @@ impl From<DynCharParseErr> for GfxCharsParseErr {
 }
 
 impl RuntimeOptions {
-    pub(crate) fn parse_p(&mut self, arg: &str) -> Result<(), RecDepthParseErr> {
+    pub fn parse_p(&mut self, arg: &str) -> Result<(), RecDepthParseErr> {
         self.pad_value = crate::common::cli::parse_number(arg)?;
         Ok(())
     }
 }
 
 impl RuntimeOptions {
-    pub(crate) fn parse_q(&mut self, arg: &str) -> Result<(), FixPrecParseErr> {
+    pub fn parse_q(&mut self, arg: &str) -> Result<(), FixPrecParseErr> {
         match arg.strip_prefix('.').unwrap_or(arg).parse()? {
             precision @ 1..=31 => {
                 self.q_precision = precision;
@@ -235,27 +240,29 @@ impl RuntimeOptions {
         }
     }
 }
-#[derive(Debug, Error)]
-pub(crate) enum FixPrecParseErr {
-    #[error("{0}")]
-    BadNum(#[from] std::num::ParseIntError),
-    #[error("Fixed-point precision must be between 1 and 31, not {0}")]
+#[derive(Debug, Display, From)]
+pub enum FixPrecParseErr {
+    /// {0}
+    BadNum(std::num::ParseIntError),
+    /// Fixed-point precision must be between 1 and 31, not {0}
+    #[from(ignore)]
     OutOfRange(u8),
 }
 
 impl RuntimeOptions {
-    pub(crate) fn parse_r(&mut self, arg: &str) -> Result<(), RecDepthParseErr> {
-        todo!()
+    pub fn parse_r(&mut self, arg: &str) -> Result<usize, RecDepthParseErr> {
+        let new_depth = arg.parse()?;
+        Ok(new_depth)
     }
 }
-#[derive(Debug, Error)]
-pub(crate) enum RecDepthParseErr {
-    #[error("{0}")]
-    BadNum(#[from] std::num::ParseIntError),
+#[derive(Debug, Display, From)]
+pub enum RecDepthParseErr {
+    /// {0}
+    BadNum(std::num::ParseIntError),
 }
 
 impl RuntimeOptions {
-    pub(crate) fn parse_w<'arg>(&mut self, arg: &'arg str) -> Result<(), WarningParseErr<'arg>> {
+    pub fn parse_w<'arg>(&mut self, arg: &'arg str) -> Result<(), WarningParseErr<'arg>> {
         if arg == "error" {
             // `-Werror` promotes warnings to errors.
             self.warnings_are_errors = true;
@@ -366,12 +373,14 @@ impl RuntimeOptions {
         Err(WarningParseErr::Unknown(arg))
     }
 }
-#[derive(Debug, Error)]
-pub(crate) enum WarningParseErr<'arg> {
-    #[error("Invalid warning level: {0}")]
-    BadLevel(#[from] std::num::ParseIntError),
-    #[error("{1} is too large a parameter for `-W{0}`, the maximum is {2}")]
+#[derive(Debug, Display, From)]
+pub enum WarningParseErr<'arg> {
+    /// Invalid warning level: {0}
+    BadLevel(std::num::ParseIntError),
+    /// {1} is too large a parameter for `-W{0}`, the maximum is {2}
+    #[from(ignore)]
     ParamOutOfRange(&'static str, usize, usize),
-    #[error("Unknown warning name `{0}`")]
+    /// Unknown warning name `{0}`
+    #[from(ignore)]
     Unknown(&'arg str),
 }

@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use compact_str::CompactString;
 use indexmap::{map::Entry, IndexMap};
 use rustc_hash::FxBuildHasher;
@@ -6,6 +8,7 @@ use crate::{
     common::{section::MemRegion, S},
     expr::Expr,
     sources::Span,
+    Options,
 };
 
 #[derive(Debug)]
@@ -200,6 +203,26 @@ impl MergeError {
 }
 
 impl ActiveSection {
+    pub fn define_label(
+        &self,
+        name: crate::Identifier,
+        symbols: &mut crate::symbols::Symbols,
+        identifiers: &crate::Identifiers,
+        definition: Span,
+        exported: bool,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        symbols.define_label(
+            name,
+            identifiers,
+            definition,
+            (self.id, self.offset),
+            exported,
+            nb_errors_left,
+            options,
+        )
+    }
     pub fn points_to_same_as(&self, other: &Self) -> bool {
         self.id == other.id
     }

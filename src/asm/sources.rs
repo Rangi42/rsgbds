@@ -6,9 +6,9 @@ use crate::Identifier;
 
 #[derive(Debug)]
 pub struct Source {
-    pub(super) name: CompactString,
+    pub name: CompactString,
     // TODO: consider only computing the `Source` when printing diagnostics? Would also avoid the `'id: 'ret` issue
-    pub(super) contents: ariadne::Source<CompactString>,
+    pub contents: ariadne::Source<CompactString>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -21,11 +21,11 @@ pub enum Span {
 #[derive(Debug, Clone)]
 pub struct NormalSpan {
     // TODO(perf): consider the `rclite` crate, since we don't need weak refs
-    pub(super) src: Rc<Source>,
-    pub(super) bytes: Range<usize>,
-    pub(super) kind: SpanKind,
+    pub src: Rc<Source>,
+    pub bytes: Range<usize>,
+    pub kind: SpanKind,
     /// For example, for a [`File`][SpanKind::File], this is the span of its triggering `INCLUDE` directive.
-    pub(super) parent: Option<Rc<NormalSpan>>,
+    pub parent: Option<Rc<NormalSpan>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -35,6 +35,7 @@ pub enum SpanKind {
     Loop(u32),
     Expansion(Identifier),
     MacroArg(usize),
+    UniqueId,
 }
 
 impl Source {
@@ -46,8 +47,11 @@ impl Source {
 }
 
 impl SpanKind {
-    pub(crate) fn ends_implicitly(&self) -> bool {
-        matches!(self, SpanKind::Expansion(..) | SpanKind::MacroArg(..))
+    pub fn ends_implicitly(&self) -> bool {
+        match self {
+            SpanKind::File | SpanKind::Macro(..) | SpanKind::Loop(..) => false,
+            SpanKind::Expansion(..) | Self::MacroArg(..) | SpanKind::UniqueId => true,
+        }
     }
 }
 

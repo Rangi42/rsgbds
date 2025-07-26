@@ -21,9 +21,9 @@ mod symbols;
 use symbols::Symbols;
 mod syntax;
 
-pub(crate) type Identifier = string_interner::symbol::SymbolU32;
+pub type Identifier = string_interner::symbol::SymbolU32;
 // TODO(perf): evaluate other backends
-pub(crate) type Identifiers = string_interner::StringInterner<
+pub type Identifiers = string_interner::StringInterner<
     string_interner::backend::StringBackend<Identifier>,
     FxBuildHasher,
 >;
@@ -68,6 +68,18 @@ fn main() -> ExitCode {
     let mut charmaps = Charmaps::new();
     let mut sections = Sections::new();
     let mut symbols = Symbols::new(&mut identifiers);
+
+    if let Some(preinclude_path) = &options.preinclude {
+        syntax::parser::parse_file(
+            &preinclude_path.clone(),
+            &mut identifiers,
+            &mut sections,
+            &mut charmaps,
+            &mut symbols,
+            &nb_errors_left,
+            &mut options,
+        );
+    }
 
     syntax::parser::parse_file(
         &main_path,

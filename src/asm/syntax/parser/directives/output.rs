@@ -41,7 +41,7 @@ pub(in super::super) fn parse_warn(keyword: Token, parse_ctx: &mut parse_ctx!())
     }
     lookahead
 }
-pub(in super::super) fn parse_fail(keyword: Token, parse_ctx: &mut parse_ctx!()) {
+pub(in super::super) fn parse_fail(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Option<Token> {
     let (maybe_message, lookahead) = string::expect_string_expr(parse_ctx.next_token(), parse_ctx);
 
     expect_one_of! {lookahead => {
@@ -62,6 +62,8 @@ pub(in super::super) fn parse_fail(keyword: Token, parse_ctx: &mut parse_ctx!())
             );
         });
     }
+
+    None // Abort further parsing.
 }
 
 pub(in super::super) fn parse_assert(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
