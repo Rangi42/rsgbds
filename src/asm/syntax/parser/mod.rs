@@ -461,6 +461,7 @@ impl parse_ctx!() {
             self.symbols,
             self.macro_args.last_mut(),
             &mut self.unique_id,
+            self.sections,
             self.nb_errors_remaining,
             self.options,
         )
@@ -471,6 +472,7 @@ impl parse_ctx!() {
             self.symbols,
             self.macro_args.last_mut(),
             &mut self.unique_id,
+            self.sections,
             self.nb_errors_remaining,
             self.options,
         )

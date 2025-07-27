@@ -20,6 +20,7 @@ use unicase::UniCase;
 use crate::{
     diagnostics::{self, ReportBuilder},
     macro_args::{MacroArgs, UniqueId},
+    section::Sections,
     sources::{NormalSpan, Source, Span, SpanKind},
     symbols::Symbols,
     Identifier, Identifiers, Options, RuntimeOptions,
@@ -100,11 +101,12 @@ impl Lexer {
     }
 }
 
-struct LexerParams<'idents, 'sym, 'mac_args, 'uniq_id, 'nb_err, 'opts> {
+struct LexerParams<'idents, 'sym, 'mac_args, 'uniq_id, 'sections, 'nb_err, 'opts> {
     identifiers: &'idents mut Identifiers,
     symbols: &'sym Symbols,
     macro_args: Option<&'mac_args mut MacroArgs>,
     unique_id: &'uniq_id mut UniqueId,
+    sections: &'sections Sections,
     nb_errors_left: &'nb_err Cell<usize>,
     options: &'opts Options,
 }
@@ -263,7 +265,7 @@ impl Lexer {
     fn peek(&mut self, params: &mut LexerParams) -> Option<char> {
         while let Some(ctx) = self.active_context() {
             let text = ctx.remaining_text();
-            let mut chars = text.char_indices();
+            let mut chars = text.char_indices().peekable();
             let (zero, ch) = chars.next()?; // We might be at EOF in the current context.
             debug_assert_eq!(zero, 0);
             match ch {
@@ -271,10 +273,13 @@ impl Lexer {
 
                 '\\' => {
                     let macro_arg_id = Self::read_macro_arg(
-                        chars.by_ref().map(|(_ofs, ch)| ch),
+                        &mut chars,
+                        text,
+                        params.identifiers,
                         params.symbols,
                         &mut params.macro_args,
                         params.unique_id,
+                        params.sections,
                     );
                     // `chars.offset()` is not stable yet.
                     let macro_arg_len = match chars.next() {
@@ -285,10 +290,11 @@ impl Lexer {
                         let trigger_span = ctx
                             .span
                             .sub_span(ctx.cur_byte..ctx.cur_byte + macro_arg_len);
-                        // Consume all the characters implicated in the macro arg.
-                        ctx.cur_byte += macro_arg_len;
                         match res {
                             Ok((span_kind, source)) => {
+                                // Consume all the characters implicated in the macro arg.
+                                ctx.cur_byte += macro_arg_len;
+
                                 self.push_context(
                                     NormalSpan::new(
                                         Rc::clone(source),
@@ -321,6 +327,9 @@ impl Lexer {
                                     params.options,
                                 );
                                 // TODO: push a dummy context to cause `consume` to adjust the span
+
+                                // Consume all the characters implicated in the macro arg.
+                                ctx.cur_byte += macro_arg_len;
                                 continue; // Try again, reading after the macro arg.
                             }
                         }
@@ -443,39 +452,113 @@ impl Lexer {
     /// Returns `None` if the backslash isn't part of a macro arg.
     ///
     /// Advances the iterator by however many characters are scanned; those characters must not be scanned again.
-    fn read_macro_arg<'ret, 'mac_args: 'ret>(
-        mut chars: impl Iterator<Item = char>,
+    fn read_macro_arg<'ret, 'mac_args: 'ret, 'text>(
+        chars: &mut Peekable<CharIndices>,
+        text: &'text str,
+        identifiers: &Identifiers,
         symbols: &Symbols,
         macro_args: &'ret mut Option<&'mac_args mut MacroArgs>,
         unique_id: &'ret mut UniqueId,
-    ) -> Option<Result<(SpanKind, &'ret Rc<Source>), MacroArgError>> {
-        let macro_args = macro_args
-            .as_mut()
-            .ok_or(MacroArgError::MacroArgOutsideMacro);
+        sections: &Sections,
+    ) -> Option<Result<(SpanKind, &'ret Rc<Source>), MacroArgError<'text>>> {
+        fn args<'a>(
+            macro_args: &'a mut Option<&mut MacroArgs>,
+        ) -> Result<&'a mut MacroArgs, MacroArgError<'static>> {
+            macro_args
+                .as_deref_mut()
+                .ok_or(MacroArgError::MacroArgOutsideMacro)
+        }
 
         let idx = match chars.next() {
-            Some(ch @ '1'..='9') => (ch as u32 - '0' as u32) as usize,
-            Some('<') => todo!(),
-            Some('@') => {
+            Some((_ofs, ch @ '1'..='9')) => (ch as u32 - '0' as u32) as usize,
+
+            Some((_ofs, '<')) => {
+                fn digit(opt: Option<&(usize, char)>) -> Result<usize, Option<char>> {
+                    match opt {
+                        None => Err(None),
+                        Some(&(_ofs, ch)) => match ch.to_digit(10) {
+                            Some(digit) => Ok(digit as usize),
+                            None => Err(Some(ch)),
+                        },
+                    }
+                }
+
+                match digit(chars.peek()) {
+                    Ok(mut idx) => loop {
+                        chars.next();
+                        match digit(chars.peek()) {
+                            Ok(digit) => idx = idx * 10 + digit,
+                            Err(Some('>')) => {
+                                chars.next();
+                                break idx;
+                            }
+                            _ => return Some(Err(MacroArgError::Unterminated)),
+                        }
+                    },
+
+                    Err(Some(chars!(ident_start))) => {
+                        let (ofs, _ch) = chars.next().unwrap();
+                        let end_ofs = loop {
+                            match chars.peek() {
+                                Some((_ofs, chars!(ident))) => {
+                                    chars.next();
+                                }
+                                Some(&(ofs, '>')) => {
+                                    chars.next();
+                                    break ofs;
+                                }
+                                _ => return Some(Err(MacroArgError::Unterminated)),
+                            }
+                        };
+                        let name = &text[ofs..end_ofs];
+                        match identifiers.get(name).and_then(|ident| symbols.find(&ident)) {
+                            None => return Some(Err(MacroArgError::NoSuchSym(name))),
+                            Some(sym) => match sym.get_number(macro_args.as_deref(), sections) {
+                                None => return Some(Err(MacroArgError::SymNotNumeric(name))),
+                                Some(idx) => idx as usize,
+                            },
+                        }
+                    }
+
+                    Err(Some('>')) => {
+                        chars.next();
+                        return Some(Err(MacroArgError::EmptyBracketed));
+                    }
+                    Err(Some(';' | chars!(newline))) => {
+                        return Some(Err(MacroArgError::Unterminated))
+                    }
+                    _ => return Some(Err(MacroArgError::InvalidBracketedChar)),
+                }
+            }
+
+            Some((_ofs, '@')) => {
                 return Some(match unique_id.unique_id() {
                     Some(src) => Ok((SpanKind::UniqueId, src)),
                     None => Err(MacroArgError::NoUniqueId),
                 })
             }
-            Some('#') => {
+
+            Some((_ofs, '#')) => {
                 return Some(
-                    macro_args.map(|args| (SpanKind::CombinedMacroArgs, args.combined_args())),
+                    args(macro_args)
+                        .map(|args| (SpanKind::CombinedMacroArgs, args.combined_args())),
                 )
             }
+
             _ => return None,
         };
-        Some(macro_args.and_then(|args| match args.arg(idx) {
-            Some(arg) => Ok((SpanKind::MacroArg(idx), arg)),
-            None => Err(MacroArgError::NoSuchArg {
-                idx,
-                max_valid: args.max_valid(),
-            }),
-        }))
+
+        if idx == 0 {
+            Some(Err(MacroArgError::NoArg0))
+        } else {
+            Some(args(macro_args).and_then(|args| match args.arg(idx) {
+                Some(arg) => Ok((SpanKind::MacroArg(idx), arg)),
+                None => Err(MacroArgError::NoSuchArg {
+                    idx,
+                    max_valid: args.max_valid(),
+                }),
+            }))
+        }
     }
 
     /// Tries to read an interpolation's contents, and returns the symbol name and format flags.
@@ -484,7 +567,12 @@ impl Lexer {
     /// **on success**, those characters must not be considered again.
     fn read_interpolation(
         chars: impl Iterator<Item = char>,
+        identifiers: &Identifiers,
         symbols: &Symbols,
+        macro_args: &Option<&MacroArgs>,
+        sections: &Sections,
+        cur_depth: usize,
+        options: &Options,
     ) -> Result<Option<Identifier>, ()> {
         for ch in chars {
             match ch {
@@ -599,6 +687,7 @@ impl Lexer {
         symbols: &Symbols,
         macro_args: Option<&mut MacroArgs>,
         unique_id: &mut UniqueId,
+        sections: &Sections,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) -> Token {
@@ -607,6 +696,7 @@ impl Lexer {
             symbols,
             macro_args,
             unique_id,
+            sections,
             nb_errors_left,
             options,
         };
@@ -954,10 +1044,13 @@ impl Lexer {
                     // Check for a macro arg, and else for an escape.
                     let mut macro_chars = chars.clone();
                     if let Some(res) = Self::read_macro_arg(
-                        macro_chars.by_ref().map(|(_ofs, ch)| ch),
+                        &mut macro_chars,
+                        text,
+                        params.identifiers,
                         params.symbols,
                         &mut params.macro_args,
                         params.unique_id,
+                        params.sections,
                     ) {
                         match res {
                             Ok((_kind, src)) => string.push_str(src.contents.text()),
@@ -1028,7 +1121,18 @@ impl Lexer {
             Some((_ofs, '0')) => Some('\0'),
 
             Some((_ofs, chars!(line_cont))) => {
-                Self::read_line_continuation(ctx, text, chars, params);
+                if let Err(err) = Self::read_line_continuation(ctx, text, chars, params) {
+                    let mut span = ctx.new_span();
+                    span.bytes.start += backslash_ofs;
+                    span.bytes.end = span.bytes.start + '\\'.len_utf8();
+                    let span = Span::Normal(span);
+                    params.error(&span, |error| {
+                        error.set_message(&err);
+                        error.add_label(
+                            diagnostics::error_label(&span).with_message(err.label_msg()),
+                        );
+                    });
+                }
 
                 None
             }
@@ -1072,6 +1176,7 @@ impl Lexer {
         symbols: &Symbols,
         macro_args: Option<&mut MacroArgs>,
         unique_id: &mut UniqueId,
+        sections: &Sections,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) -> Option<(CompactString, Span)> {
@@ -1080,6 +1185,7 @@ impl Lexer {
             symbols,
             macro_args,
             unique_id,
+            sections,
             nb_errors_left,
             options,
         };
@@ -1115,7 +1221,7 @@ impl Lexer {
 
                         // Line continuations count as “whitespace”.
                         if let Err(err) =
-                            Lexer::read_line_continuation(ctx, text, &mut chars, &mut params)
+                            Lexer::read_line_continuation(ctx, text, &mut chars, &params)
                         {
                             let mut span = ctx.new_span();
                             span.bytes.start += ofs;
@@ -1210,14 +1316,29 @@ impl Lexer {
                     '\\' => {
                         let ch = chars.peek().copied();
                         if let Some(res) = Self::read_macro_arg(
-                            chars.by_ref().map(|(_ofs, ch)| ch),
+                            &mut chars,
+                            text,
+                            params.identifiers,
                             params.symbols,
                             &mut params.macro_args,
                             params.unique_id,
+                            params.sections,
                         ) {
                             match res {
                                 Ok((_kind, source)) => string.push_str(source.contents.text()),
-                                Err(err) => todo!(),
+                                Err(err) => {
+                                    let mut span = ctx.new_span();
+                                    span.bytes.start += ofs;
+                                    span.bytes.end = span.bytes.start + '\\'.len_utf8();
+                                    let span = Span::Normal(span);
+                                    params.error(&span, |error| {
+                                        error.set_message(&err);
+                                        error.add_label(
+                                            diagnostics::error_label(&span)
+                                                .with_message(err.label_msg()),
+                                        )
+                                    });
+                                }
                             }
                         } else if let Some(value) =
                             Self::get_char_escape(ch, ofs, ctx, text, &mut chars, &params)
@@ -1337,7 +1458,7 @@ impl Lexer {
 }
 
 #[derive(displaydoc::Display)]
-enum MacroArgError {
+enum MacroArgError<'text> {
     /// unterminated macro argument
     // (For `\<`.))
     Unterminated,
@@ -1347,28 +1468,53 @@ enum MacroArgError {
     MacroArgOutsideMacro,
     /// a unique identifier is not available in this context
     NoUniqueId,
+    /// macro argument #0 doesn't exist
+    NoArg0,
+    /// empty bracketed macro argument
+    EmptyBracketed,
+    /// invalid character in bracketed macro argument
+    InvalidBracketedChar,
+    /// no such symbol `{0}`
+    NoSuchSym(&'text str),
+    /// the symbol `{0}` is not numeric
+    SymNotNumeric(&'text str),
 }
-impl MacroArgError {
+impl MacroArgError<'_> {
     fn label_msg(&self) -> String {
         match self {
-            Self::Unterminated => "the macro arg begins here".into(),
+            Self::Unterminated => "missing '>' after this".into(),
             Self::NoSuchArg { max_valid, .. } => {
                 format!("{max_valid} macro arguments are available")
             }
             Self::MacroArgOutsideMacro => "cannot use a macro argument here".into(),
             Self::NoUniqueId => "cannot use `\\@` here".into(),
+            Self::NoArg0 => "macro argument 0 doesn't exist".into(),
+            Self::EmptyBracketed => {
+                "expected a number or symbol name between the angle brackets".into()
+            }
+            Self::InvalidBracketedChar => "invalid character for bracketed macro argument".into(),
+            Self::NoSuchSym(_name) => "no symbol by this name is defined at this point".into(),
+            Self::SymNotNumeric(_name) => "a symbol by this name exists, but is not numeric".into(),
         }
     }
     fn help_msg(&self) -> Option<String> {
         match self {
-            Self::Unterminated => None,
-            Self::NoSuchArg { .. } => None,
-            Self::MacroArgOutsideMacro => None,
             Self::NoUniqueId => {
                 Some("unique identifiers are available inside of macros and loops".into())
             }
+            Self::NoArg0 => {
+                Some("macro arguments are 1-indexed: the first macro argument is `\\1`".into())
+            }
+            Self::EmptyBracketed => Some("it kind of looks like a fish, doesn't it?".into()),
+            _ => None,
         }
     }
+}
+
+#[derive(Debug, displaydoc::Display)]
+enum InterpolationErr {
+    /// unterminated interpolation
+    Unterminated,
 }
 
 #[derive(displaydoc::Display)]
@@ -1402,7 +1548,7 @@ impl BlockCommentErr {
     }
 }
 
-impl LexerParams<'_, '_, '_, '_, '_, '_> {
+impl LexerParams<'_, '_, '_, '_, '_, '_, '_> {
     pub fn error<'span, F: FnOnce(&mut ReportBuilder<'span>)>(&self, span: &'span Span, build: F) {
         diagnostics::error(span, build, self.nb_errors_left, self.options)
     }
