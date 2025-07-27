@@ -459,7 +459,7 @@ impl parse_ctx!() {
         self.lexer.next_token(
             self.identifiers,
             self.symbols,
-            self.macro_args.last(),
+            self.macro_args.last_mut(),
             &mut self.unique_id,
             self.nb_errors_remaining,
             self.options,
@@ -469,7 +469,7 @@ impl parse_ctx!() {
         self.lexer.next_token_raw(
             self.identifiers,
             self.symbols,
-            self.macro_args.last(),
+            self.macro_args.last_mut(),
             &mut self.unique_id,
             self.nb_errors_remaining,
             self.options,

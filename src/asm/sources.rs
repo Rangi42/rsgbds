@@ -35,6 +35,7 @@ pub enum SpanKind {
     Loop(u32),
     Expansion(Identifier),
     MacroArg(usize),
+    CombinedMacroArgs,
     UniqueId,
 }
 
@@ -48,9 +49,13 @@ impl Source {
 
 impl SpanKind {
     pub fn ends_implicitly(&self) -> bool {
+        // Not using `matches` so that the match is guaranteed to be exhaustive.
         match self {
             SpanKind::File | SpanKind::Macro(..) | SpanKind::Loop(..) => false,
-            SpanKind::Expansion(..) | Self::MacroArg(..) | SpanKind::UniqueId => true,
+            SpanKind::Expansion(..)
+            | Self::MacroArg(..)
+            | Self::CombinedMacroArgs
+            | SpanKind::UniqueId => true,
         }
     }
 }
@@ -71,14 +76,15 @@ impl NormalSpan {
         debug_assert!(self.is_offset_valid(sub_range.end));
         Self {
             src: Rc::clone(&self.src),
-            bytes: sub_range.start + self.bytes.start..sub_range.end + self.bytes.start,
+            bytes: sub_range,
             kind: self.kind,
             parent: self.parent.clone(),
         }
     }
 
     pub fn is_offset_valid(&self, byte_ofs: usize) -> bool {
-        byte_ofs >= self.bytes.start && byte_ofs <= self.bytes.end
+        // Not using `.contains()` because we accept offsets matching the end.
+        self.bytes.start <= byte_ofs && byte_ofs <= self.bytes.end
     }
 }
 

@@ -188,7 +188,9 @@ fn add_backtrace_labels_and_print(diag: ReportBuilder<'_>, span: &Span, options:
                         SpanKind::Macro(_) => "macro called here",
                         SpanKind::Loop(_) => "loop beginning here",
                         SpanKind::Expansion(_) => "interpolated here",
-                        SpanKind::MacroArg(_) | SpanKind::UniqueId => "expanded here",
+                        SpanKind::MacroArg(_)
+                        | SpanKind::CombinedMacroArgs
+                        | SpanKind::UniqueId => "expanded here",
                     }));
                     add_level(diag, parent, depth);
                 }

@@ -103,7 +103,7 @@ impl Lexer {
 struct LexerParams<'idents, 'sym, 'mac_args, 'uniq_id, 'nb_err, 'opts> {
     identifiers: &'idents mut Identifiers,
     symbols: &'sym Symbols,
-    macro_args: Option<&'mac_args MacroArgs>,
+    macro_args: Option<&'mac_args mut MacroArgs>,
     unique_id: &'uniq_id mut UniqueId,
     nb_errors_left: &'nb_err Cell<usize>,
     options: &'opts Options,
@@ -273,7 +273,7 @@ impl Lexer {
                     let macro_arg_id = Self::read_macro_arg(
                         chars.by_ref().map(|(_ofs, ch)| ch),
                         params.symbols,
-                        params.macro_args,
+                        &mut params.macro_args,
                         params.unique_id,
                     );
                     // `chars.offset()` is not stable yet.
@@ -443,12 +443,16 @@ impl Lexer {
     /// Returns `None` if the backslash isn't part of a macro arg.
     ///
     /// Advances the iterator by however many characters are scanned; those characters must not be scanned again.
-    fn read_macro_arg<'mac_args>(
+    fn read_macro_arg<'ret, 'mac_args: 'ret>(
         mut chars: impl Iterator<Item = char>,
         symbols: &Symbols,
-        macro_args: Option<&'mac_args MacroArgs>,
-        unique_id: &'mac_args mut UniqueId,
-    ) -> Option<Result<(SpanKind, &'mac_args Rc<Source>), MacroArgError>> {
+        macro_args: &'ret mut Option<&'mac_args mut MacroArgs>,
+        unique_id: &'ret mut UniqueId,
+    ) -> Option<Result<(SpanKind, &'ret Rc<Source>), MacroArgError>> {
+        let macro_args = macro_args
+            .as_mut()
+            .ok_or(MacroArgError::MacroArgOutsideMacro);
+
         let idx = match chars.next() {
             Some(ch @ '1'..='9') => (ch as u32 - '0' as u32) as usize,
             Some('<') => todo!(),
@@ -458,20 +462,20 @@ impl Lexer {
                     None => Err(MacroArgError::NoUniqueId),
                 })
             }
-            Some('#') => todo!(),
+            Some('#') => {
+                return Some(
+                    macro_args.map(|args| (SpanKind::CombinedMacroArgs, args.combined_args())),
+                )
+            }
             _ => return None,
         };
-        Some(
-            macro_args
-                .ok_or(MacroArgError::MacroArgOutsideMacro)
-                .and_then(|args| match args.arg(idx) {
-                    Some(arg) => Ok((SpanKind::MacroArg(idx), arg)),
-                    None => Err(MacroArgError::NoSuchArg {
-                        idx,
-                        max_valid: args.max_valid(),
-                    }),
-                }),
-        )
+        Some(macro_args.and_then(|args| match args.arg(idx) {
+            Some(arg) => Ok((SpanKind::MacroArg(idx), arg)),
+            None => Err(MacroArgError::NoSuchArg {
+                idx,
+                max_valid: args.max_valid(),
+            }),
+        }))
     }
 
     /// Tries to read an interpolation's contents, and returns the symbol name and format flags.
@@ -593,7 +597,7 @@ impl Lexer {
         &mut self,
         identifiers: &mut Identifiers,
         symbols: &Symbols,
-        macro_args: Option<&MacroArgs>,
+        macro_args: Option<&mut MacroArgs>,
         unique_id: &mut UniqueId,
         nb_errors_left: &Cell<usize>,
         options: &Options,
@@ -952,7 +956,7 @@ impl Lexer {
                     if let Some(res) = Self::read_macro_arg(
                         macro_chars.by_ref().map(|(_ofs, ch)| ch),
                         params.symbols,
-                        params.macro_args,
+                        &mut params.macro_args,
                         params.unique_id,
                     ) {
                         match res {
@@ -1066,7 +1070,7 @@ impl Lexer {
         &mut self,
         identifiers: &mut Identifiers,
         symbols: &Symbols,
-        macro_args: Option<&MacroArgs>,
+        macro_args: Option<&mut MacroArgs>,
         unique_id: &mut UniqueId,
         nb_errors_left: &Cell<usize>,
         options: &Options,
@@ -1175,7 +1179,17 @@ impl Lexer {
                     '/' => {
                         if chars.next_if(|&(_ofs, ch)| ch == '*').is_some() {
                             if let Err(err) = Self::read_block_comment(&mut chars) {
-                                todo!()
+                                let mut span = ctx.new_span();
+                                span.bytes.start += ofs;
+                                span.bytes.end = span.bytes.start + "/*".len();
+                                let span = Span::Normal(span);
+                                params.error(&span, |error| {
+                                    error.set_message(&err);
+                                    error.add_label(
+                                        diagnostics::error_label(&span)
+                                            .with_message(err.label_msg()),
+                                    )
+                                });
                             }
                         } else {
                             string.push('/');
@@ -1198,7 +1212,7 @@ impl Lexer {
                         if let Some(res) = Self::read_macro_arg(
                             chars.by_ref().map(|(_ofs, ch)| ch),
                             params.symbols,
-                            params.macro_args,
+                            &mut params.macro_args,
                             params.unique_id,
                         ) {
                             match res {
@@ -1379,6 +1393,13 @@ impl LineContinuationErr {
 enum BlockCommentErr {
     /// unterminated block comment
     Unterminated,
+}
+impl BlockCommentErr {
+    fn label_msg(&self) -> String {
+        match self {
+            Self::Unterminated => "block comment starting here".into(),
+        }
+    }
 }
 
 impl LexerParams<'_, '_, '_, '_, '_, '_> {

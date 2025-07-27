@@ -9,6 +9,7 @@ use crate::sources::Source;
 pub struct MacroArgs {
     args: Vec<Rc<Source>>,
     shift: usize,
+    combined_args: Option<Rc<Source>>,
 }
 
 #[derive(Debug)]
@@ -35,6 +36,7 @@ impl FromIterator<CompactString> for MacroArgs {
                 })
                 .collect(),
             shift: 0,
+            combined_args: None,
         }
     }
 }
@@ -47,6 +49,32 @@ impl MacroArgs {
     pub fn max_valid(&self) -> usize {
         // Not `- 1`, because the arguments are 1-indexed!
         self.args.len().saturating_sub(self.shift)
+    }
+
+    pub fn shift_by(&mut self, offset: isize) {
+        self.shift = self.shift.saturating_add_signed(offset);
+        self.combined_args = None; // Invalidate the cache.
+    }
+
+    pub fn combined_args(&mut self) -> &Rc<Source> {
+        self.combined_args.get_or_insert_with(|| {
+            let args = &self.args[self.shift..];
+            let mut contents = CompactString::with_capacity(
+                args.iter()
+                    .fold(0, |acc, arg| acc + arg.contents.text().len() + 1),
+            );
+            for (i, arg) in args.iter().enumerate() {
+                contents.push_str(arg.contents.text());
+                // Commas go between after, and after an empty argument.
+                if i + self.shift < self.args.len() || arg.contents.is_empty() {
+                    contents.push(',');
+                }
+            }
+            Rc::new(Source {
+                name: "<combined macro args>".into(),
+                contents: contents.into(),
+            })
+        })
     }
 }
 
