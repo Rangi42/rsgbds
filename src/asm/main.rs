@@ -47,8 +47,8 @@ pub struct Options {
 pub struct RuntimeOptions {
     binary_digits: [char; 2],
     gfx_chars: [char; 4],
-    pad_value: u8,
-    q_precision: u8,
+    pad_byte: u8,
+    q_precision: usize,
     recursion_depth: usize,
     // TODO: use some bitfield(s) instead?
     warnings: [WarningState; NB_WARNINGS],

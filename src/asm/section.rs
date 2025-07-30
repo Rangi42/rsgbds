@@ -13,7 +13,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Sections {
-    sections: IndexMap<CompactString, Section, FxBuildHasher>,
+    pub sections: IndexMap<CompactString, Section, FxBuildHasher>,
     /// The first is the “data” section, the second is the “symbol” section.
     pub active_section: Option<(ActiveSection, ActiveSection)>,
     section_stack: Vec<Option<(ActiveSection, ActiveSection)>>,
@@ -47,7 +47,7 @@ pub enum AddrConstraint {
 
 #[derive(Debug, Clone)]
 pub struct ActiveSection {
-    id: usize,
+    pub id: usize,
     offset: usize,
 }
 
@@ -90,6 +90,10 @@ impl Sections {
             }
             Entry::Occupied(entry) => todo!(),
         }
+    }
+
+    pub fn find(&self, section_id: usize) -> &Section {
+        &self.sections[section_id]
     }
 
     pub fn push_active_section(&mut self) {
@@ -225,5 +229,14 @@ impl ActiveSection {
     }
     pub fn points_to_same_as(&self, other: &Self) -> bool {
         self.id == other.id
+    }
+}
+
+impl Section {
+    pub fn address(&self) -> Option<u16> {
+        match self.attrs.address {
+            AddrConstraint::None | AddrConstraint::Align(_, _) => None,
+            AddrConstraint::Addr(addr) => Some(addr),
+        }
     }
 }

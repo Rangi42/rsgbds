@@ -37,6 +37,7 @@ pub enum SpanKind {
     MacroArg(usize),
     CombinedMacroArgs,
     UniqueId,
+    Invalid,
 }
 
 impl Source {
@@ -51,11 +52,12 @@ impl SpanKind {
     pub fn ends_implicitly(&self) -> bool {
         // Not using `matches` so that the match is guaranteed to be exhaustive.
         match self {
-            SpanKind::File | SpanKind::Macro(..) | SpanKind::Loop(..) => false,
-            SpanKind::Expansion(..)
+            Self::File | Self::Macro(..) | Self::Loop(..) => false,
+            Self::Expansion(..)
             | Self::MacroArg(..)
             | Self::CombinedMacroArgs
-            | SpanKind::UniqueId => true,
+            | Self::UniqueId
+            | Self::Invalid => true,
         }
     }
 }

@@ -6,7 +6,7 @@ use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::{
     diagnostics,
-    format::FormatSpec,
+    format::{FormatError, FormatSpec},
     macro_args::MacroArgs,
     section::Sections,
     sources::{NormalSpan, Span},
@@ -164,37 +164,42 @@ impl Symbols {
         }
     }
 
-    pub fn format_as<'sym>(
+    pub fn format_as<'name, 'sym>(
         &'sym self,
         name: Option<Identifier>,
+        name_str: &'name str,
         fmt: &FormatSpec,
         buf: &mut CompactString,
         macro_args: Option<&MacroArgs>,
         sections: &Sections,
-    ) -> Result<(), FormatError<'sym>> {
+    ) -> Result<(), SymbolError<'name, 'sym>> {
         let sym = name
             .and_then(|name| self.find(&name))
-            .ok_or(FormatError::NotFound)?;
-        if let Some(value) = sym.get_number(macro_args, sections) {
-            todo!()
-        } else if let Some(s) = sym.get_string() {
-            fmt.write_str(&s, buf);
-        } else if let SymbolData::Deleted(span) = sym {
-            return Err(FormatError::Deleted(span));
-        } else {
-            return Err(FormatError::BadKind);
-        };
+            .ok_or(SymbolError::NotFound(name_str))?;
 
-        Ok(())
+        if let Some(value) = sym.get_number(macro_args, sections) {
+            fmt.write_number(value as u32, buf, sym.kind_name())?;
+            Ok(())
+        } else if let Some(s) = sym.get_string() {
+            fmt.write_str(&s, buf, sym.kind_name())?;
+            Ok(())
+        } else if let SymbolData::Deleted(span) = sym {
+            Err(SymbolError::Deleted(span))
+        } else {
+            Err(SymbolError::FormatError(FormatError::BadKind {
+                sym_kind: sym.kind_name(),
+                fmt_kind: fmt.kind,
+            }))
+        }
     }
 
-    fn try_define_symbol<'map>(
-        symbols: &'map mut SymMap,
+    fn try_define_symbol(
+        symbols: &mut SymMap,
         name: Identifier,
         definition: Span,
         kind: SymbolKind,
         exported: bool,
-    ) -> Result<(), (&'map mut SymbolData, Span)> {
+    ) -> Result<(), (&mut SymbolData, Span)> {
         use std::collections::hash_map::Entry;
 
         match symbols.entry(name) {
@@ -333,10 +338,15 @@ impl Symbols {
     }
 }
 
-pub enum FormatError<'sym> {
-    NotFound,
+#[derive(Debug, displaydoc::Display, derive_more::From)]
+pub enum SymbolError<'name, 'sym> {
+    /// The symbol `{0}` doesn't exist
+    NotFound(&'name str),
+    /// A symbol by this name existed, but it has been deleted
+    #[from(ignore)]
     Deleted(&'sym Span),
-    BadKind,
+    /// {0}
+    FormatError(FormatError),
 }
 
 impl SymbolData {
@@ -347,16 +357,48 @@ impl SymbolData {
         }
     }
 
+    pub fn kind_name(&self) -> &'static str {
+        match self {
+            SymbolData::User { kind, .. } | SymbolData::Builtin(kind) => match kind {
+                SymbolKind::Numeric { mutable, .. } => {
+                    if *mutable {
+                        "variable"
+                    } else {
+                        "constant"
+                    }
+                }
+                SymbolKind::String(_) => "string",
+                SymbolKind::Macro(_) => "macro",
+                SymbolKind::Label { section_id, offset } => "label",
+                SymbolKind::Ref => "missing",
+            },
+            SymbolData::Pc => "label",
+            SymbolData::Narg => "constant",
+            SymbolData::Dot | SymbolData::DotDot => "string",
+            SymbolData::Deleted(_) => "deleted",
+        }
+    }
+
     pub fn get_number(&self, macro_args: Option<&MacroArgs>, sections: &Sections) -> Option<i32> {
         match self {
             Self::User { kind, .. } | Self::Builtin(kind) => match kind {
                 SymbolKind::Numeric { value, .. } => Some(*value),
                 SymbolKind::String(..) => None,
                 SymbolKind::Macro(_) => None,
-                SymbolKind::Label { section_id, offset } => todo!(),
+                SymbolKind::Label { section_id, offset } => sections
+                    .find(*section_id)
+                    .address()
+                    .map(|base_addr| base_addr as i32 + *offset as i32),
                 SymbolKind::Ref => None,
             },
-            Self::Pc => todo!(),
+            Self::Pc => sections
+                .active_section
+                .as_ref()
+                .and_then(|(_data_sect, sym_sect)| {
+                    sections.sections[sym_sect.id]
+                        .address()
+                        .map(|addr| addr.into())
+                }),
             Self::Narg => macro_args.map(|args| args.max_valid() as i32),
             Self::Dot => None,
             Self::DotDot => None,

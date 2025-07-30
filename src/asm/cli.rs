@@ -93,7 +93,7 @@ impl Cli {
         let mut runtime_opts = RuntimeOptions {
             binary_digits: ['0', '1'],
             gfx_chars: ['0', '1', '2', '3'],
-            pad_value: 0,
+            pad_byte: 0,
             q_precision: 16,
             recursion_depth: 64,
             warnings: Default::default(),
@@ -224,7 +224,7 @@ impl From<DynCharParseErr> for GfxCharsParseErr {
 
 impl RuntimeOptions {
     pub fn parse_p(&mut self, arg: &str) -> Result<(), RecDepthParseErr> {
-        self.pad_value = crate::common::cli::parse_number(arg)?;
+        self.pad_byte = crate::common::cli::parse_number(arg)?;
         Ok(())
     }
 }
@@ -246,7 +246,7 @@ pub enum FixPrecParseErr {
     BadNum(std::num::ParseIntError),
     /// Fixed-point precision must be between 1 and 31, not {0}
     #[from(ignore)]
-    OutOfRange(u8),
+    OutOfRange(usize),
 }
 
 impl RuntimeOptions {

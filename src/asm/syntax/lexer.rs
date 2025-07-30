@@ -1,9 +1,11 @@
 //! The innermost part of the language's processing.
 //!
 //! `rgbasm`'s lexer is unusual because of the language's design.
-//! In particular, macro arguments (`\1` etc.) and interpolation (`{DUCK}`) work at a textual level; this is enforced by their semantics.
+//! In particular, macro arguments (`\1` etc.) and interpolation (`{DUCK}`) work at a textual level;
+//! this is enforced by their semantics, particularly the implicit token pasting.
 //!
-//! The first (known) design of the lexer handled them in the various token functions, but this meant that there was a lot of duplicated handling, and this caused a lot of bugs ([#63], [#362], [#531]...)
+//! The first (known) design of the lexer handled them in the various token functions,
+//! but this meant that there was a lot of duplicated handling, and this caused a lot of bugs ([#63], [#362], [#531]...)
 //! Instead, we handle them at the lowest level, thus handling them in a manner transparent to the rest of the lexer.
 //!
 //! TODO: describe the "char stream" / remainder split more
@@ -12,18 +14,19 @@
 //! [#362]: https://github.com/gbdev/rgbds/issues/362
 //! [#531]: https://github.com/gbdev/rgbds/issues/531
 
-use std::{cell::Cell, fmt::format, iter::Peekable, ops::Deref, rc::Rc, str::CharIndices};
+use std::{cell::Cell, iter::Peekable, ops::Deref, rc::Rc, str::CharIndices};
 
 use compact_str::CompactString;
 use unicase::UniCase;
 
 use crate::{
     diagnostics::{self, ReportBuilder},
+    format::FormatSpec,
     macro_args::{MacroArgs, UniqueId},
     section::Sections,
     sources::{NormalSpan, Source, Span, SpanKind},
     symbols::Symbols,
-    Identifier, Identifiers, Options, RuntimeOptions,
+    Identifier, Identifiers, Options,
 };
 
 use super::tokens::{tok, Token, TokenPayload, KEYWORDS};
@@ -180,18 +183,7 @@ impl Lexer {
                 Some(trigger_span) => Span::Normal(trigger_span.as_ref().clone()),
                 None => Span::CommandLine,
             };
-            diagnostics::error(
-                &span,
-                |error| {
-                    error.set_message("Maximum recursion depth exceeded");
-                    error.add_label(diagnostics::error_label(&span).with_message(format!(
-                        "Depth is {} contexts here, cannot enter a new one",
-                        self.contexts.len()
-                    )));
-                },
-                nb_errors_left,
-                options,
-            );
+            Self::report_depth_overflow(self.contexts.len(), &span, nb_errors_left, options);
         } else {
             self.contexts.push(Context {
                 cur_byte: span.bytes.start,
@@ -263,7 +255,7 @@ impl Lexer {
     }
 
     fn peek(&mut self, params: &mut LexerParams) -> Option<char> {
-        while let Some(ctx) = self.active_context() {
+        while let (depth, Some(ctx)) = (self.contexts.len(), self.active_context()) {
             let text = ctx.remaining_text();
             let mut chars = text.char_indices().peekable();
             let (zero, ch) = chars.next()?; // We might be at EOF in the current context.
@@ -342,7 +334,52 @@ impl Lexer {
                 }
 
                 '{' => {
-                    todo!();
+                    let mut contents = CompactString::default();
+                    let res = Self::read_interpolation(
+                        &mut chars,
+                        ctx,
+                        &mut contents,
+                        params.identifiers,
+                        params.symbols,
+                        &params.macro_args.as_deref(),
+                        params.sections,
+                        depth,
+                        params.nb_errors_left,
+                        params.options,
+                    );
+
+                    // `chars.offset()` is not stable yet.
+                    let interpolation_len = match chars.next() {
+                        Some((ofs, _ch)) => ofs,
+                        None => text.len(),
+                    };
+                    let mut trigger_span = ctx.new_span();
+                    trigger_span.bytes.end += interpolation_len;
+
+                    // Consume all the characters implicated in the interpolation.
+                    ctx.cur_byte += interpolation_len;
+
+                    let (span_kind, name) = match res {
+                        Ok(ident) => (
+                            SpanKind::Expansion(ident),
+                            params.identifiers.resolve(ident).unwrap(),
+                        ),
+                        Err(()) => (SpanKind::Invalid, "<invalid>"),
+                    };
+                    self.push_context(
+                        NormalSpan::new(
+                            Rc::new(Source {
+                                name: name.into(),
+                                contents: contents.into(),
+                            }),
+                            span_kind,
+                            Some(Rc::new(trigger_span)),
+                        ),
+                        Default::default(),
+                        params.nb_errors_left,
+                        params.options,
+                    );
+                    continue; // Try again, reading from the new expansion.
                 }
 
                 _ => {} // Other chars do not get any special treatment.
@@ -354,7 +391,9 @@ impl Lexer {
     }
 
     fn consume(&mut self, span: &mut NormalSpan) {
-        if Rc::ptr_eq(&span.src, &self.active_context().unwrap().span.src) {
+        // This check is nice, but breaks down in the presence of empty expansions.
+        #[cfg(never)]
+        if Rc::ptr_eq(&span.src, &self.contexts.last().unwrap().span.src) {
             debug_assert_eq!(span.bytes.end, self.active_context().unwrap().cur_byte);
         }
 
@@ -404,7 +443,9 @@ impl Lexer {
 
         if Rc::ptr_eq(&span.src, &ctx.span.src) {
             // The span is pointing at the active buffer.
-            debug_assert_eq!(span.bytes.end, ctx.cur_byte); // The span should be pointing at the char before this one.
+
+            // This check works in most cases, but breaks down in the presence of expansions.
+            // debug_assert_eq!(span.bytes.end, ctx.cur_byte); // The span should be pointing at the char before this one.
             span.bytes.end = ctx.cur_byte + c.len_utf8(); // Advance the span by as much, so it encompasses the character we just shifted.
         } else {
             debug_assert!(
@@ -496,7 +537,7 @@ impl Lexer {
                         }
                     },
 
-                    Err(Some(chars!(ident_start))) => {
+                    Err(Some(chars!(ident_start) | '@')) => {
                         let (ofs, _ch) = chars.next().unwrap();
                         let end_ofs = loop {
                             match chars.peek() {
@@ -514,7 +555,7 @@ impl Lexer {
                         match identifiers.get(name).and_then(|ident| symbols.find(&ident)) {
                             None => return Some(Err(MacroArgError::NoSuchSym(name))),
                             Some(sym) => match sym.get_number(macro_args.as_deref(), sections) {
-                                None => return Some(Err(MacroArgError::SymNotNumeric(name))),
+                                None => return Some(Err(MacroArgError::SymNotConst(name))),
                                 Some(idx) => idx as usize,
                             },
                         }
@@ -561,33 +602,160 @@ impl Lexer {
         }
     }
 
-    /// Tries to read an interpolation's contents, and returns the symbol name and format flags.
-    ///
-    /// Advances the iterator by however many characters are part of the interpolation;
-    /// **on success**, those characters must not be considered again.
     fn read_interpolation(
-        chars: impl Iterator<Item = char>,
+        chars: &mut Peekable<CharIndices>,
+        ctx: &Context,
+        output: &mut CompactString,
         identifiers: &Identifiers,
         symbols: &Symbols,
         macro_args: &Option<&MacroArgs>,
         sections: &Sections,
         cur_depth: usize,
+        nb_errors_left: &Cell<usize>,
         options: &Options,
-    ) -> Result<Option<Identifier>, ()> {
-        for ch in chars {
+    ) -> Result<Identifier, ()> {
+        let mut name = CompactString::default();
+        let mut fmt = None;
+        let mut first_ofs = chars.peek().map(|(ofs, _ch)| *ofs);
+
+        while let Some((ofs, ch)) = chars.next() {
             match ch {
                 chars!(newline) => break,
+
                 '{' => {
-                    todo!();
+                    if cur_depth == options.runtime_opts.recursion_depth {
+                        let mut span = ctx.new_span();
+                        span.bytes.start += ofs;
+                        span.bytes.end = span.bytes.start + ch.len_utf8();
+                        Self::report_depth_overflow(
+                            cur_depth,
+                            &Span::Normal(span),
+                            nb_errors_left,
+                            options,
+                        );
+                        return Err(());
+                    } else {
+                        Self::read_interpolation(
+                            chars,
+                            ctx,
+                            &mut name,
+                            identifiers,
+                            symbols,
+                            macro_args,
+                            sections,
+                            cur_depth + 1,
+                            nb_errors_left,
+                            options,
+                        )?;
+                    }
+                }
+                ':' => {
+                    if fmt.is_some() {
+                        let mut span = ctx.new_span();
+                        span.bytes.start += ofs;
+                        span.bytes.end = span.bytes.start + ch.len_utf8();
+                        let span = Span::Normal(span);
+                        diagnostics::error(
+                            &span,
+                            |error| {
+                                error.set_message("Multiple ':' characters found in interpolation");
+                                error.add_label(
+                                    diagnostics::error_label(&span)
+                                        .with_message("This ':' is invalid"),
+                                );
+                            },
+                            nb_errors_left,
+                            options,
+                        );
+                    } else {
+                        match FormatSpec::parse(&name, options.runtime_opts.q_precision) {
+                            Ok(spec) => fmt = Some(spec),
+                            Err(err) => {
+                                let mut span = ctx.new_span();
+                                span.bytes.start += first_ofs.unwrap();
+                                span.bytes.end += ofs;
+                                let span = Span::Normal(span);
+                                diagnostics::error(
+                                    &span,
+                                    |error| {
+                                        error.set_message(&err);
+                                        error.add_label(
+                                            diagnostics::error_label(&span).with_message(
+                                                "Error parsing this format specification",
+                                            ),
+                                        );
+                                    },
+                                    nb_errors_left,
+                                    options,
+                                );
+                                // Still, continue parsing the interpolation.
+                            }
+                        }
+                    }
+                    name.clear();
+                    first_ofs = Some(ofs);
                 }
                 '}' => {
-                    todo!();
+                    let ident = identifiers.get(&name);
+                    if let Err(err) = symbols.format_as(
+                        ident,
+                        &name,
+                        &fmt.unwrap_or_default(),
+                        output,
+                        macro_args.as_deref(),
+                        sections,
+                    ) {
+                        let mut span = ctx.new_span();
+                        span.bytes.start += first_ofs.unwrap();
+                        span.bytes.end += ofs;
+                        let span = Span::Normal(span);
+                        diagnostics::error(
+                            &span,
+                            |error| {
+                                error.set_message(&err);
+                                error.add_label(
+                                    diagnostics::error_label(&span)
+                                        .with_message("This interpolation is invalid"),
+                                );
+                            },
+                            nb_errors_left,
+                            options,
+                        );
+                    }
+                    return ident.ok_or(());
                 }
-                _ => {}
+
+                chars!(ident) => name.push(ch),
+                _ => {
+                    let mut span = ctx.new_span();
+                    span.bytes.start += ofs;
+                    span.bytes.end = span.bytes.start + ch.len_utf8();
+                    let span = Span::Normal(span);
+                    return Err(());
+                }
             }
         }
-        // Unterminated
+
         Err(())
+    }
+
+    fn report_depth_overflow(
+        depth: usize,
+        span: &Span,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        diagnostics::error(
+            &span,
+            |error| {
+                error.set_message("Maximum recursion depth exceeded");
+                error.add_label(diagnostics::error_label(&span).with_message(format!(
+                    "Depth is {depth} contexts here, cannot enter a new one"
+                )))
+            },
+            nb_errors_left,
+            options,
+        )
     }
 
     fn read_line_comment(chars: &mut Peekable<CharIndices>) {
@@ -621,12 +789,9 @@ impl Lexer {
     }
 
     fn read_line_continuation(
-        ctx: &Context,
-        text: &str,
         chars: &mut Peekable<CharIndices>,
-        params: &LexerParams,
     ) -> Result<(), LineContinuationErr> {
-        while let Some(&(ofs, ch)) = chars.peek() {
+        while let Some(&(_ofs, ch)) = chars.peek() {
             match ch {
                 chars!(newline) => {
                     chars.next();
@@ -767,7 +932,7 @@ impl Lexer {
                         let backslash = chars.next();
                         debug_assert_eq!(backslash, Some((0, '\\')));
 
-                        let res = Self::read_line_continuation(ctx, text, &mut chars, &params);
+                        let res = Self::read_line_continuation(&mut chars);
                         let cont_len = match chars.next() {
                             Some((ofs, _ch)) => ofs,
                             None => text.len(),
@@ -1121,7 +1286,7 @@ impl Lexer {
             Some((_ofs, '0')) => Some('\0'),
 
             Some((_ofs, chars!(line_cont))) => {
-                if let Err(err) = Self::read_line_continuation(ctx, text, chars, params) {
+                if let Err(err) = Self::read_line_continuation(chars) {
                     let mut span = ctx.new_span();
                     span.bytes.start += backslash_ofs;
                     span.bytes.end = span.bytes.start + '\\'.len_utf8();
@@ -1220,9 +1385,7 @@ impl Lexer {
                         }
 
                         // Line continuations count as “whitespace”.
-                        if let Err(err) =
-                            Lexer::read_line_continuation(ctx, text, &mut chars, &params)
-                        {
+                        if let Err(err) = Lexer::read_line_continuation(&mut chars) {
                             let mut span = ctx.new_span();
                             span.bytes.start += ofs;
                             span.bytes.end += match chars.peek() {
@@ -1476,8 +1639,8 @@ enum MacroArgError<'text> {
     InvalidBracketedChar,
     /// no such symbol `{0}`
     NoSuchSym(&'text str),
-    /// the symbol `{0}` is not numeric
-    SymNotNumeric(&'text str),
+    /// the symbol `{0}` is not constant
+    SymNotConst(&'text str),
 }
 impl MacroArgError<'_> {
     fn label_msg(&self) -> String {
@@ -1494,7 +1657,9 @@ impl MacroArgError<'_> {
             }
             Self::InvalidBracketedChar => "invalid character for bracketed macro argument".into(),
             Self::NoSuchSym(_name) => "no symbol by this name is defined at this point".into(),
-            Self::SymNotNumeric(_name) => "a symbol by this name exists, but is not numeric".into(),
+            Self::SymNotConst(_name) => {
+                "a symbol by this name exists, but is not a constant".into()
+            }
         }
     }
     fn help_msg(&self) -> Option<String> {
@@ -1509,12 +1674,6 @@ impl MacroArgError<'_> {
             _ => None,
         }
     }
-}
-
-#[derive(Debug, displaydoc::Display)]
-enum InterpolationErr {
-    /// unterminated interpolation
-    Unterminated,
 }
 
 #[derive(displaydoc::Display)]
