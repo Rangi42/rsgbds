@@ -63,6 +63,17 @@ pub enum FormatError {
         sym_kind: &'static str,
         fmt_kind: FormatKind,
     },
+    /// a {flag_name} is incompatible with {sym_kind} formatting
+    IncompatibleFlag {
+        flag_name: &'static str,
+        sym_kind: &'static str,
+    },
+    /// a {flag_name} can only be used with fractional formatting
+    FractionalFlag { flag_name: &'static str },
+    /// fractional width cannot be more than 255
+    FracWidthOver255,
+    /// fixed-point constant precision cannot be more than 31
+    FixPointPrecOver31,
 }
 
 impl FormatSpec {
@@ -92,7 +103,32 @@ impl FormatSpec {
             Some('b') => Ok(FormatKind::Binary),
             Some('o') => Ok(FormatKind::Octal),
             Some('f') => Ok(FormatKind::FixedPoint),
-            Some('s') => Ok(FormatKind::String),
+
+            Some('s') => {
+                if force_sign.is_some() {
+                    Err(FormatError::IncompatibleFlag {
+                        flag_name: "sign",
+                        sym_kind: "string",
+                    })
+                } else if pad_with_zeros {
+                    Err(FormatError::IncompatibleFlag {
+                        flag_name: "zero-padding flag",
+                        sym_kind: "string",
+                    })
+                } else if frac.is_some() {
+                    Err(FormatError::IncompatibleFlag {
+                        flag_name: "fractional width",
+                        sym_kind: "string",
+                    })
+                } else if precision != 0 {
+                    Err(FormatError::IncompatibleFlag {
+                        flag_name: "precision",
+                        sym_kind: "string",
+                    })
+                } else {
+                    Ok(FormatKind::String)
+                }
+            }
 
             Some(unexpected) => Err(FormatError::UnexpectedChar {
                 unexpected,
@@ -102,12 +138,6 @@ impl FormatSpec {
                 for_what: "print type",
             }),
         }?;
-        if let Some(unexpected) = chars.next() {
-            return Err(FormatError::UnexpectedChar {
-                unexpected,
-                for_what: "after the print type",
-            });
-        }
 
         fn parse_decimal(chars: &mut Peekable<Chars>, first_digit: usize) -> usize {
             let mut width = first_digit;
@@ -118,6 +148,38 @@ impl FormatSpec {
                 };
                 width = width * 10 + digit as usize;
             }
+        }
+
+        if let Some(unexpected) = chars.next() {
+            return Err(FormatError::UnexpectedChar {
+                unexpected,
+                for_what: "after the print type",
+            });
+        }
+        if !matches!(kind, FormatKind::FixedPoint) {
+            if frac.is_some() {
+                return Err(FormatError::FractionalFlag {
+                    flag_name: "fractional width",
+                });
+            }
+            if precision != 0 {
+                return Err(FormatError::FractionalFlag {
+                    flag_name: "fractional precision",
+                });
+            }
+        }
+
+        if precision > 31 {
+            return Err(FormatError::FixPointPrecOver31);
+        }
+        if let Some(256..) = frac {
+            return Err(FormatError::FracWidthOver255);
+        }
+        if pad_with_zeros && align_left {
+            return Err(FormatError::IncompatibleFlag {
+                flag_name: "zero-padded number",
+                sym_kind: "left-aligned",
+            });
         }
 
         Ok(Self {
@@ -133,6 +195,22 @@ impl FormatSpec {
     }
 }
 
+impl FormatKind {
+    fn exact_prefix(&self) -> Option<char> {
+        match self {
+            FormatKind::Default => Some('$'),
+            FormatKind::Signed => None,
+            FormatKind::Unsigned => None,
+            FormatKind::LowerHex => Some('$'),
+            FormatKind::UpperHex => Some('$'),
+            FormatKind::Binary => Some('%'),
+            FormatKind::Octal => Some('&'),
+            FormatKind::FixedPoint => Some('\0'),
+            FormatKind::String => Some('\0'), // Will never be printed, but must be `Some` to indicate that the flag is accepted.
+        }
+    }
+}
+
 impl FormatSpec {
     pub fn write_number(
         &self,
@@ -142,20 +220,132 @@ impl FormatSpec {
     ) -> Result<(), FormatError> {
         use std::fmt::Write;
 
-        // TODO: format flags
         match self.kind {
-            FormatKind::Signed => Ok(write!(buf, "{}", number as i32).unwrap()),
-            FormatKind::Unsigned => Ok(write!(buf, "{number}").unwrap()),
-            FormatKind::LowerHex => Ok(write!(buf, "{number:x}").unwrap()),
-            FormatKind::UpperHex | FormatKind::Default => Ok(write!(buf, "{number:X}").unwrap()),
-            FormatKind::Binary => Ok(write!(buf, "{number:b}").unwrap()),
-            FormatKind::Octal => Ok(write!(buf, "{}", todo!()).unwrap()),
-            FormatKind::FixedPoint => Ok(write!(buf, "{}", todo!()).unwrap()),
+            FormatKind::Signed
+            | FormatKind::Unsigned
+            | FormatKind::LowerHex
+            | FormatKind::UpperHex
+            | FormatKind::Default
+            | FormatKind::Binary
+            | FormatKind::Octal
+            | FormatKind::FixedPoint => {
+                let fmt = NumberFormatter {
+                    number,
+                    force_sign: self.force_sign,
+                    be_exact: self.be_exact,
+                    precision: self.precision,
+                    frac: self.frac.unwrap_or(5), // 5 digits is enough for the default Q16.16
+                    width: self.width,
+                    pad_with_zeros: self.pad_with_zeros,
+                    kind: self.kind,
+                };
+                if self.pad_with_zeros {
+                    // Padding will be processed internally.
+                    debug_assert!(!self.align_left);
+                    write!(buf, "{fmt}")
+                } else {
+                    write!(
+                        buf,
+                        "{}",
+                        Padding {
+                            width: self.width,
+                            align_left: self.align_left,
+                            inner: fmt
+                        }
+                    )
+                }
+                .unwrap();
+
+                Ok(())
+            }
             fmt_kind => Err(FormatError::BadKind { sym_kind, fmt_kind }),
         }
     }
 }
-struct NumberFormatter {}
+struct NumberFormatter {
+    number: u32,
+    force_sign: Option<char>,
+    be_exact: bool,
+    precision: usize,
+    frac: usize,
+    width: usize,
+    pad_with_zeros: bool,
+    kind: FormatKind,
+}
+impl Display for NumberFormatter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut width = self.width;
+        if self.be_exact && !matches!(self.kind, FormatKind::FixedPoint) {
+            if let Some(prefix) = self.kind.exact_prefix() {
+                debug_assert_ne!(prefix, '\0');
+                write!(f, "{prefix}")?;
+
+                width = width.saturating_sub(1);
+            }
+        }
+
+        match self.kind {
+            FormatKind::Signed => {
+                if self.pad_with_zeros {
+                    write!(f, "{:0width$}", self.number as i32)
+                } else {
+                    write!(f, "{}", self.number as i32)
+                }
+            }
+            FormatKind::Unsigned => {
+                if self.pad_with_zeros {
+                    write!(f, "{:0width$}", self.number)
+                } else {
+                    write!(f, "{}", self.number)
+                }
+            }
+            FormatKind::LowerHex => {
+                if self.pad_with_zeros {
+                    write!(f, "{:0width$x}", self.number)
+                } else {
+                    write!(f, "{:x}", self.number)
+                }
+            }
+            FormatKind::UpperHex => {
+                if self.pad_with_zeros {
+                    write!(f, "{:0width$X}", self.number)
+                } else {
+                    write!(f, "{:X}", self.number)
+                }
+            }
+            FormatKind::Default => {
+                if self.pad_with_zeros {
+                    write!(f, "${:0width$}", self.number)
+                } else {
+                    write!(f, "${}", self.number)
+                }
+            }
+            FormatKind::Binary => {
+                if self.pad_with_zeros {
+                    write!(f, "{:0width$b}", self.number)
+                } else {
+                    write!(f, "{:b}", self.number)
+                }
+            }
+            FormatKind::Octal => {
+                todo!();
+            }
+            FormatKind::FixedPoint => {
+                write!(
+                    f,
+                    "{:.*}",
+                    self.frac,
+                    self.number as i32 as f64 / (1u32 << self.precision) as f64,
+                )?;
+                if self.be_exact {
+                    write!(f, "q{}", self.precision)?;
+                }
+                Ok(())
+            }
+            FormatKind::String => unreachable!(),
+        }
+    }
+}
 
 impl FormatSpec {
     pub fn write_str(
@@ -168,16 +358,20 @@ impl FormatSpec {
 
         match self.kind {
             FormatKind::String | FormatKind::Default => {
-                let width = self.width;
                 write!(
                     buf,
-                    "{:width$}",
-                    StringFormatter {
-                        string,
-                        escape: self.be_exact
+                    "{}",
+                    Padding {
+                        width: self.width,
+                        align_left: self.align_left,
+                        inner: StringFormatter {
+                            string,
+                            escape: self.be_exact
+                        }
                     }
                 )
                 .unwrap();
+
                 Ok(())
             }
             fmt_kind => Err(FormatError::BadKind { sym_kind, fmt_kind }),
@@ -194,6 +388,22 @@ impl Display for StringFormatter<'_> {
             write!(f, "{}", self.string.escape_default())
         } else {
             write!(f, "{}", self.string)
+        }
+    }
+}
+
+struct Padding<D: Display> {
+    width: usize,
+    align_left: bool,
+    inner: D,
+}
+impl<D: Display> Display for Padding<D> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let width = self.width;
+        if self.align_left {
+            write!(f, "{:<width$}", &self.inner)
+        } else {
+            write!(f, "{:>width$}", &self.inner)
         }
     }
 }

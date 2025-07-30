@@ -123,6 +123,7 @@ pub(in super::super) fn parse_rept(keyword: Token, parse_ctx: &mut parse_ctx!())
     let lookahead = parse_ctx.next_token(); // Lex this token before switching parse contexts!
 
     match expr.try_const_eval() {
+        Ok((0, _span)) => {} // `REPT 0` acts like `IF 0`.
         Ok((nb_iters, _span)) => {
             let Span::Normal(span) = &keyword.span else {
                 unreachable!()
@@ -180,6 +181,7 @@ impl parse_ctx!() {
             self.nb_errors_remaining,
             self.options,
         );
+        self.unique_id.enter_unique_ctx();
     }
 
     pub fn pop_context(&mut self) -> bool {
@@ -197,9 +199,9 @@ impl parse_ctx!() {
             }
 
             SpanKind::Loop(nth) => {
+                self.unique_id.exit_unique_ctx();
                 let mut loop_state = &mut ctx.loop_state;
-                if *nth == loop_state.nb_iters {
-                    self.unique_id.exit_unique_ctx();
+                if *nth == loop_state.nb_iters - 1 {
                     let has_more = self.lexer.pop_context();
                     debug_assert!(has_more);
                     has_more
@@ -209,6 +211,7 @@ impl parse_ctx!() {
                         todo!()
                     }
                     ctx.reset();
+                    self.unique_id.enter_unique_ctx();
                     true // We haven't popped this context, so there's more to process.
                 }
             }

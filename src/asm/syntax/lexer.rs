@@ -20,7 +20,7 @@ use compact_str::CompactString;
 use unicase::UniCase;
 
 use crate::{
-    diagnostics::{self, ReportBuilder},
+    diagnostics::{self, warning, ReportBuilder},
     format::FormatSpec,
     macro_args::{MacroArgs, UniqueId},
     section::Sections,
@@ -446,6 +446,7 @@ impl Lexer {
 
             // This check works in most cases, but breaks down in the presence of expansions.
             // debug_assert_eq!(span.bytes.end, ctx.cur_byte); // The span should be pointing at the char before this one.
+
             span.bytes.end = ctx.cur_byte + c.len_utf8(); // Advance the span by as much, so it encompasses the character we just shifted.
         } else {
             debug_assert!(
@@ -725,14 +726,8 @@ impl Lexer {
                     return ident.ok_or(());
                 }
 
-                chars!(ident) => name.push(ch),
-                _ => {
-                    let mut span = ctx.new_span();
-                    span.bytes.start += ofs;
-                    span.bytes.end = span.bytes.start + ch.len_utf8();
-                    let span = Span::Normal(span);
-                    return Err(());
-                }
+                // Accept any and all chars, since this could be a formatting specifier.
+                _ => name.push(ch),
             }
         }
 
@@ -746,10 +741,10 @@ impl Lexer {
         options: &Options,
     ) {
         diagnostics::error(
-            &span,
+            span,
             |error| {
                 error.set_message("Maximum recursion depth exceeded");
-                error.add_label(diagnostics::error_label(&span).with_message(format!(
+                error.add_label(diagnostics::error_label(span).with_message(format!(
                     "Depth is {depth} contexts here, cannot enter a new one"
                 )))
             },
@@ -885,22 +880,27 @@ impl Lexer {
         span_before_whitespace.bytes.end += ch.len_utf8();
 
         let mut span = self.active_context().unwrap().new_span();
+        macro_rules! token {
+            ($what:tt $(($($params:tt)+))?) => {
+                token!($what $(($($params)+))?, span)
+            };
+            ($what:tt $(($($params:tt)+))?, $span:expr) => {
+                Token {
+                    payload: tok!($what $(($($params)+))?),
+                    span: Span::Normal($span),
+                }
+            };
+        }
         loop {
             match self.peek(&mut params) {
                 None => {
-                    return Token {
-                        span: Span::Normal(self.active_context().unwrap().new_span()),
-                        payload: tok!("end of input"),
-                    };
+                    break token!("end of input", span_before_whitespace);
                 }
 
                 Some(ch @ chars!(newline)) => {
                     self.consume(&mut span);
                     self.handle_crlf(ch, &mut span, &mut params);
-                    return Token {
-                        payload: tok!("end of line"),
-                        span: Span::Normal(span_before_whitespace),
-                    };
+                    break token!("end of line", span_before_whitespace);
                 }
 
                 // All the stuff that gets ignored.
@@ -962,56 +962,287 @@ impl Lexer {
                 // Unambiguous single-char tokens.
                 Some('~') => {
                     self.consume(&mut span);
-                    break Token {
-                        payload: tok!("~"),
-                        span: Span::Normal(span),
-                    };
+                    break token!("~");
                 }
                 Some('@') => {
                     self.consume(&mut span);
-                    break Token {
-                        // TODO(perf): this could be `.get("@").unwrap()`
-                        payload: tok!("identifier"(identifiers.get_or_intern_static("@"), false)),
-                        span: Span::Normal(span),
-                    };
+                    // TODO(perf): this could be `.get("@").unwrap()`
+                    break token!("identifier"(identifiers.get_or_intern_static("@"), false));
                 }
                 Some('[') => {
                     self.consume(&mut span);
-                    break Token {
-                        payload: tok!("["),
-                        span: Span::Normal(span),
-                    };
+                    break token!("[");
                 }
                 Some(']') => {
                     self.consume(&mut span);
-                    break Token {
-                        payload: tok!("]"),
-                        span: Span::Normal(span),
-                    };
+                    break token!("]");
                 }
                 Some('(') => {
                     self.consume(&mut span);
-                    break Token {
-                        payload: tok!("("),
-                        span: Span::Normal(span),
-                    };
+                    break token!("(");
                 }
                 Some(')') => {
                     self.consume(&mut span);
-                    break Token {
-                        payload: tok!(")"),
-                        span: Span::Normal(span),
-                    };
+                    break token!(")");
                 }
                 Some(',') => {
                     self.consume(&mut span);
-                    break Token {
-                        payload: tok!(","),
-                        span: Span::Normal(span),
-                    };
+                    break token!(",");
                 }
 
-                // TODO: more tokens
+                // 1- or 2-char tokens.
+                Some('+') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some('=') => {
+                            self.consume(&mut span);
+                            break token!("+=");
+                        }
+                        _ => break token!("+"),
+                    }
+                }
+                Some('-') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some('=') => {
+                            self.consume(&mut span);
+                            break token!("-=");
+                        }
+                        _ => break token!("-"),
+                    }
+                }
+                Some('*') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some('=') => {
+                            self.consume(&mut span);
+                            break token!("*=");
+                        }
+                        Some('*') => {
+                            self.consume(&mut span);
+                            break token!("**");
+                        }
+                        _ => break token!("*"),
+                    }
+                }
+                Some('/') => {
+                    self.with_active_context_raw(&mut span, |ctx, text| {
+                        let mut chars = text.char_indices().peekable();
+
+                        let Some((zero, slash)) = chars.next() else {
+                            return 0;
+                        };
+                        debug_assert_eq!((zero, slash), (0, '/'));
+                        let Some((_ofs, '*')) = chars.next() else {
+                            return 0;
+                        };
+
+                        if let Err(err) = Self::read_block_comment(&mut chars) {
+                            let mut span = ctx.new_span();
+                            span.bytes.end = span.bytes.start + "/*".len();
+                            let span = Span::Normal(span);
+                            params.error(&span, |error| {
+                                error.set_message(&err);
+                                error.add_label(
+                                    diagnostics::error_label(&span).with_message(err.label_msg()),
+                                )
+                            });
+                        }
+
+                        match chars.next() {
+                            Some((ofs, _ch)) => ofs,
+                            None => text.len(),
+                        }
+                    });
+
+                    if span.bytes.is_empty() {
+                        self.consume(&mut span);
+                        match self.peek(&mut params) {
+                            Some('=') => {
+                                self.consume(&mut span);
+                                break token!("/=");
+                            }
+                            _ => break token!("/"),
+                        }
+                    }
+                }
+                Some('|') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some('=') => break token!("|="),
+                        Some('|') => break token!("||"),
+                        _ => break token!("|"),
+                    }
+                }
+                Some('^') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some('=') => {
+                            self.consume(&mut span);
+                            break token!("^=");
+                        }
+                        _ => break token!("^"),
+                    }
+                }
+                Some('=') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some('=') => {
+                            self.consume(&mut span);
+                            break token!("==");
+                        }
+                        _ => break token!("="),
+                    }
+                }
+                Some('!') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some('=') => {
+                            self.consume(&mut span);
+                            break token!("!=");
+                        }
+                        _ => break token!("!"),
+                    }
+                }
+                Some('<') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some('=') => break token!("<="),
+                        Some('<') => {
+                            self.consume(&mut span);
+                            match self.peek(&mut params) {
+                                Some('=') => {
+                                    self.consume(&mut span);
+                                    break token!("<<=");
+                                }
+                                _ => {
+                                    break token!("<<");
+                                }
+                            }
+                        }
+                        _ => break token!("<"),
+                    }
+                }
+                Some('>') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some('=') => break token!(">="),
+                        Some('>') => {
+                            self.consume(&mut span);
+                            match self.peek(&mut params) {
+                                Some('=') => {
+                                    self.consume(&mut span);
+                                    break token!(">>=");
+                                }
+                                Some('>') => {
+                                    self.consume(&mut span);
+                                    match self.peek(&mut params) {
+                                        Some('=') => {
+                                            self.consume(&mut span);
+                                            break token!(">>>=");
+                                        }
+                                        _ => break token!(">>>"),
+                                    }
+                                }
+                                _ => {
+                                    break token!(">>");
+                                }
+                            }
+                        }
+                        _ => break token!(">"),
+                    }
+                }
+                Some(':') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some(':') => {
+                            self.consume(&mut span);
+                            break token!("::");
+                        }
+                        Some(ch @ ('+' | '-')) => {
+                            self.consume(&mut span);
+                            break Token {
+                                payload: self.read_anon_label_ref(ch, &mut span, &mut params),
+                                span: Span::Normal(span),
+                            };
+                        }
+                        _ => break token!(":"),
+                    }
+                }
+
+                Some('0') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some('x' | 'X') => {
+                            self.consume(&mut span);
+                            if let Some(first_digit) =
+                                self.peek(&mut params).and_then(|ch| ch.to_digit(16))
+                            {
+                                let value =
+                                    self.read_number(16, first_digit, &mut span, &mut params);
+                                break token!("number"(value));
+                            } else {
+                                let err_span = Span::Normal(span.clone());
+                                params.error(&err_span, |error| {
+                                    error.set_message(
+                                        "Missing hexadecimal digit(s) after `0x` prefix",
+                                    );
+                                    error.add_label(
+                                        diagnostics::error_label(&err_span).with_message(
+                                            "Expected at least one hex digit after this",
+                                        ),
+                                    );
+                                });
+                                span.bytes.end = span.bytes.start;
+                            }
+                        }
+                        Some('o' | 'O') => {
+                            self.consume(&mut span);
+                            if let Some(first_digit) =
+                                self.peek(&mut params).and_then(|ch| ch.to_digit(8))
+                            {
+                                let value =
+                                    self.read_number(8, first_digit, &mut span, &mut params);
+                                break token!("number"(value));
+                            } else {
+                                let err_span = Span::Normal(span.clone());
+                                params.error(&err_span, |error| {
+                                    error.set_message("Missing octal digit(s) after `0o` prefix");
+                                    error.add_label(
+                                        diagnostics::error_label(&err_span).with_message(
+                                            "Expected at least one octal digit after this",
+                                        ),
+                                    );
+                                });
+                                span.bytes.end = span.bytes.start;
+                            }
+                        }
+                        Some('b' | 'B') => {
+                            self.consume(&mut span);
+                            todo!();
+                        }
+                        Some('0'..='9') => {
+                            let value = self.read_number(10, 0, &mut span, &mut params);
+                            if let Some('.') = self.peek(&mut params) {
+                                todo!();
+                            } else {
+                                break token!("number"(value));
+                            }
+                        }
+                        _ => break token!("number"(0)),
+                    }
+                }
+                Some(ch @ '1'..='9') => {
+                    self.consume(&mut span);
+                    let value = ch.to_digit(10).unwrap();
+                    let value = self.read_number(10, value, &mut span, &mut params);
+                    if let Some('.') = self.peek(&mut params) {
+                        todo!();
+                    } else {
+                        break token!("number"(value));
+                    }
+                }
+                // TODO: &, %, $, and `
 
                 // String.
                 Some('"') => {
@@ -1092,6 +1323,60 @@ impl Lexer {
                 }
             }
         }
+    }
+
+    fn read_anon_label_ref(
+        &mut self,
+        ch: char,
+        span: &mut NormalSpan,
+        params: &mut LexerParams,
+    ) -> TokenPayload {
+        let (mut offset, increment) = if ch == '+' { (0, 1) } else { (-1, -1) };
+        while self.peek(params) == Some(ch) {
+            self.consume(span);
+            offset += increment;
+        }
+        tok!("anonymous label reference"(offset))
+    }
+
+    fn read_number(
+        &mut self,
+        radix: u32,
+        mut value: u32,
+        span: &mut NormalSpan,
+        params: &mut LexerParams,
+    ) -> i32 {
+        let mut overflowed = false;
+
+        loop {
+            match self.peek(params) {
+                Some('_') => self.consume(span),
+                Some(ch) if ch.is_digit(radix) => {
+                    self.consume(span);
+
+                    let digit = ch.to_digit(radix).unwrap();
+                    let (new_val, overflow) = value.overflowing_mul(radix);
+                    overflowed |= overflow;
+                    let (new_val, overflow) = new_val.overflowing_add(digit);
+                    overflowed |= overflow;
+                    value = new_val;
+                }
+                _ => break,
+            }
+        }
+
+        if overflowed {
+            let span = Span::Normal(span.clone());
+            params.warn(warning!("large-constant"), &span, |warning| {
+                warning.set_message(format!("Integer constant is larger than {}", u32::MAX));
+                warning.add_label(
+                    diagnostics::warning_label(&span)
+                        .with_message(format!("This was truncated to {value}")),
+                )
+            })
+        }
+
+        value as i32
     }
 
     fn read_identifier(
@@ -1709,7 +1994,16 @@ impl BlockCommentErr {
 
 impl LexerParams<'_, '_, '_, '_, '_, '_, '_> {
     pub fn error<'span, F: FnOnce(&mut ReportBuilder<'span>)>(&self, span: &'span Span, build: F) {
-        diagnostics::error(span, build, self.nb_errors_left, self.options)
+        diagnostics::error(span, build, self.nb_errors_left, self.options);
+    }
+
+    pub fn warn<'span, F: FnOnce(&mut ReportBuilder<'span>)>(
+        &self,
+        id: diagnostics::WarningKind,
+        span: &'span Span,
+        build: F,
+    ) {
+        diagnostics::warn(id, span, build, self.nb_errors_left, self.options);
     }
 }
 

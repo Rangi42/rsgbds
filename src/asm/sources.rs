@@ -73,6 +73,7 @@ impl NormalSpan {
         }
     }
 
+    // TODO: this is almost unused, better add a method to `Context`s that takes a `cur_byte`-relative range.
     pub fn sub_span(&self, sub_range: Range<usize>) -> Self {
         debug_assert!(self.is_offset_valid(sub_range.start));
         debug_assert!(self.is_offset_valid(sub_range.end));
