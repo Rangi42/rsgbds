@@ -1219,7 +1219,32 @@ impl Lexer {
                         }
                         Some('b' | 'B') => {
                             self.consume(&mut span);
-                            todo!();
+                            if let Some(first_digit) = self.peek(&mut params).and_then(|ch| {
+                                params
+                                    .options
+                                    .runtime_opts
+                                    .binary_digits
+                                    .iter()
+                                    .position(|&digit| digit == ch)
+                            }) {
+                                let value = self.read_bin_number(
+                                    first_digit as u32,
+                                    &mut span,
+                                    &mut params,
+                                );
+                                break token!("number"(value));
+                            } else {
+                                let err_span = Span::Normal(span.clone());
+                                params.error(&err_span, |error| {
+                                    error.set_message("Missing octal digit(s) after `0o` prefix");
+                                    error.add_label(
+                                        diagnostics::error_label(&err_span).with_message(
+                                            "Expected at least one octal digit after this",
+                                        ),
+                                    );
+                                });
+                                span.bytes.end = span.bytes.start;
+                            }
                         }
                         Some('0'..='9') => {
                             let value = self.read_number(10, 0, &mut span, &mut params);
@@ -1236,13 +1261,96 @@ impl Lexer {
                     self.consume(&mut span);
                     let value = ch.to_digit(10).unwrap();
                     let value = self.read_number(10, value, &mut span, &mut params);
-                    if let Some('.') = self.peek(&mut params) {
-                        todo!();
-                    } else {
-                        break token!("number"(value));
+                    match self.peek(&mut params) {
+                        Some('.') => {
+                            todo!();
+                        }
+                        _ => break token!("number"(value)),
                     }
                 }
-                // TODO: &, %, $, and `
+                Some('&') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some('=') => {
+                            self.consume(&mut span);
+                            break token!("&=");
+                        }
+                        Some('&') => {
+                            self.consume(&mut span);
+                            break token!("&&");
+                        }
+                        Some(ch @ '0'..='7') => {
+                            self.consume(&mut span);
+                            let value = self.read_number(
+                                8,
+                                ch.to_digit(8).unwrap(),
+                                &mut span,
+                                &mut params,
+                            );
+                            break Token {
+                                payload: tok!("number"(value)),
+                                span: Span::Normal(span),
+                            };
+                        }
+                        _ => break token!("&"),
+                    }
+                }
+                Some('%') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some('=') => {
+                            self.consume(&mut span);
+                            break token!("%=");
+                        }
+                        Some(ch) if params.options.runtime_opts.binary_digits.contains(&ch) => {
+                            self.consume(&mut span);
+                            let first_digit = params
+                                .options
+                                .runtime_opts
+                                .binary_digits
+                                .iter()
+                                .position(|&digit| digit == ch)
+                                .unwrap();
+                            let value =
+                                self.read_bin_number(first_digit as u32, &mut span, &mut params);
+                            break token!("number"(value));
+                        }
+                        _ => break token!("%"),
+                    }
+                }
+                Some('$') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some(ch @ ('0'..='9' | 'A'..='F' | 'a'..='f')) => {
+                            self.consume(&mut span);
+                            let value = self.read_number(
+                                16,
+                                ch.to_digit(16).unwrap(),
+                                &mut span,
+                                &mut params,
+                            );
+                            break Token {
+                                payload: tok!("number"(value)),
+                                span: Span::Normal(span),
+                            };
+                        }
+                        _ => {
+                            let err_span = Span::Normal(span.clone());
+                            params.error(&err_span, |error| {
+                                error.set_message("Lone '$'");
+                                error.add_label(
+                                    diagnostics::error_label(&err_span)
+                                        .with_message("Expected a hex digit after this"),
+                                );
+                                error.set_help(
+                                    "In rgbasm, the current address is notated `@`, not `$`",
+                                );
+                            });
+                            span.bytes.start = span.bytes.end;
+                        }
+                    }
+                }
+                // TODO: `
 
                 // String.
                 Some('"') => {
@@ -1350,12 +1458,53 @@ impl Lexer {
 
         loop {
             match self.peek(params) {
-                Some('_') => self.consume(span),
+                Some('_') => self.consume(span), // TODO: disallow trailing underscores
                 Some(ch) if ch.is_digit(radix) => {
                     self.consume(span);
 
                     let digit = ch.to_digit(radix).unwrap();
                     let (new_val, overflow) = value.overflowing_mul(radix);
+                    overflowed |= overflow;
+                    let (new_val, overflow) = new_val.overflowing_add(digit);
+                    overflowed |= overflow;
+                    value = new_val;
+                }
+                _ => break,
+            }
+        }
+
+        if overflowed {
+            let span = Span::Normal(span.clone());
+            params.warn(warning!("large-constant"), &span, |warning| {
+                warning.set_message(format!("Integer constant is larger than {}", u32::MAX));
+                warning.add_label(
+                    diagnostics::warning_label(&span)
+                        .with_message(format!("This was truncated to {value}")),
+                )
+            })
+        }
+
+        value as i32
+    }
+
+    fn read_bin_number(
+        &mut self,
+        mut value: u32,
+        span: &mut NormalSpan,
+        params: &mut LexerParams,
+    ) -> i32 {
+        let mut overflowed = false;
+
+        loop {
+            let next_up = self.peek(params);
+            let digits = params.options.runtime_opts.binary_digits;
+            match next_up {
+                Some('_') => self.consume(span), // TODO: disallow trailing underscores
+                Some(ch) if digits.contains(&ch) => {
+                    self.consume(span);
+
+                    let digit = digits.iter().position(|&digit| digit == ch).unwrap() as u32;
+                    let (new_val, overflow) = value.overflowing_mul(2);
                     overflowed |= overflow;
                     let (new_val, overflow) = new_val.overflowing_add(digit);
                     overflowed |= overflow;
