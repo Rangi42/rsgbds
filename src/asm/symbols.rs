@@ -236,6 +236,27 @@ impl Symbols {
                         };
                         Ok(())
                     }
+                    SymbolData::User {
+                        kind:
+                            SymbolKind::Numeric {
+                                value,
+                                mutable: true,
+                            },
+                        ..
+                    }
+                    | SymbolData::Builtin(SymbolKind::Numeric {
+                        value,
+                        mutable: true,
+                    }) => match kind {
+                        SymbolKind::Numeric {
+                            value: new_value,
+                            mutable: true,
+                        } => {
+                            *value = new_value;
+                            Ok(())
+                        }
+                        _ => Err((existing, definition)),
+                    },
                     _ => Err((existing, definition)),
                 }
             }
@@ -311,6 +332,28 @@ impl Symbols {
             identifiers,
             definition,
             SymbolKind::Label { section_id, offset },
+            exported,
+            nb_errors_left,
+            options,
+        )
+    }
+
+    pub fn define_constant(
+        &mut self,
+        name: Identifier,
+        identifiers: &Identifiers,
+        definition: Span,
+        value: i32,
+        mutable: bool,
+        exported: bool,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        self.define_symbol(
+            name,
+            identifiers,
+            definition,
+            SymbolKind::Numeric { value, mutable },
             exported,
             nb_errors_left,
             options,

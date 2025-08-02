@@ -1,7 +1,7 @@
-use std::rc::Rc;
+use std::{cmp::Ordering, rc::Rc};
 
 use crate::{
-    diagnostics,
+    diagnostics::{self, warning},
     macro_args::MacroArgs,
     sources::{NormalSpan, Source, Span, SpanKind},
     syntax::{
@@ -11,7 +11,7 @@ use crate::{
     Identifier,
 };
 
-use super::super::{expect_one_of, expr, parse_ctx, require, string, Token};
+use super::super::{expect_one_of, expr, matches_tok, parse_ctx, require, string, Token};
 
 pub(in super::super) fn parse_include(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     let (maybe_string, lookahead) = string::expect_string_expr(parse_ctx.next_token(), parse_ctx);
@@ -81,7 +81,7 @@ pub(in super::super) fn parse_rept(keyword: Token, parse_ctx: &mut parse_ctx!())
 
     let (body, res) = parse_ctx
         .lexer
-        .capture_until_keyword("ENDR", &["REPT", "FOR"], "loop");
+        .capture_until_keyword("endr", &["rept", "for"], "loop");
     if let Err(err) = res {
         parse_ctx.error(&keyword.span, |error| {
             error.set_message(&err);
@@ -115,8 +115,149 @@ pub(in super::super) fn parse_rept(keyword: Token, parse_ctx: &mut parse_ctx!())
     lookahead
 }
 
-pub(in super::super) fn parse_for(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(in super::super) fn parse_for(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+    let mut step_span = None;
+
+    let (ident_maybe, start, stop, step, lookahead) = expect_one_of! { parse_ctx.next_token() => {
+        Token { span } |"identifier"(ident, _)| => {
+            expect_one_of! { parse_ctx.next_token() => {
+                |","| => {
+                    let (start_expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
+                    let start = match start_expr.try_const_eval() {
+                        Ok((value, _span)) => value,
+                        Err(err) => {
+                            parse_ctx.report_expr_error(err);
+                            0
+                        },
+                    };
+
+                    let (start, end, lookahead) = if matches_tok!(lookahead, ",") {
+                        let (end_expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
+                        match end_expr.try_const_eval() {
+                            Ok((value, _span)) => (start, value, lookahead),
+                            Err(err) => {
+                                parse_ctx.report_expr_error(err);
+                                (start, start, lookahead)
+                            }
+                        }
+                    } else {
+                        (0, start, lookahead)
+                    };
+
+                    let (step, lookahead) = if matches_tok!(lookahead, ",") {
+                        let (step_expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
+                        match step_expr.try_const_eval() {
+                            Ok((value, span)) => {
+                                step_span = Some(span);
+                                (value, lookahead)
+                            }
+                            Err(err) => {
+                                parse_ctx.report_expr_error(err);
+                                (1, lookahead)
+                            }
+                        }
+                    } else {
+                        (1, lookahead)
+                    };
+
+                    (Some((ident, span)), start, end, step, expect_eol(lookahead, parse_ctx))
+                },
+                else |unexpected| => {
+                    parse_ctx.report_syntax_error(&unexpected, |error,span| {
+                        error.add_label(diagnostics::error_label(span).with_message("expected a comma after the identifier here"))
+                    });
+
+                    (None, 0, 0, 1, discard_rest_of_line(unexpected, parse_ctx))
+                }
+            }}
+        },
+        else |unexpected| => {
+            parse_ctx.report_syntax_error(&unexpected, |error,span| {
+                error.add_label(diagnostics::error_label(span).with_message("expected an identifier here"))
+            });
+
+            (None, 0, 0, 1, discard_rest_of_line(unexpected, parse_ctx))
+        }
+    }};
+    debug_assert!(matches_tok!(lookahead, "end of input" | "end of line"));
+
+    let (body, res) = parse_ctx
+        .lexer
+        .capture_until_keyword("endr", &["rept", "for"], "loop");
+    if let Err(err) = res {
+        parse_ctx.error(&keyword.span, |error| {
+            error.set_message(&err);
+            error.add_label(
+                diagnostics::error_label(&keyword.span).with_message("loop starting here"),
+            );
+        })
+    }
+
+    let lookahead = parse_ctx.next_token();
+
+    // Parsing is (finally!) done; time to push the loop.
+
+    let ident = if let Some((ident, span)) = ident_maybe {
+        parse_ctx.symbols.define_constant(
+            ident,
+            parse_ctx.identifiers,
+            span,
+            start,
+            true,
+            false,
+            parse_ctx.nb_errors_remaining,
+            parse_ctx.options,
+        );
+        Some(ident)
+    } else {
+        None
+    };
+
+    let nb_iters = match (step.cmp(&0), stop.cmp(&start)) {
+        (Ordering::Equal, _) => {
+            let span = step_span.unwrap();
+            parse_ctx.error(&span, |error| {
+                error.set_message("`for` loops cannot have a step value of 0");
+                error.add_label(
+                    diagnostics::error_label(&span).with_message("this step is invalid"),
+                );
+            });
+            0 // Don't run the loop.
+        }
+        (_, Ordering::Equal) => 0, // If `start == stop`, the loop isn't run at all.
+        (Ordering::Greater, Ordering::Greater) => ((stop - start - 1) / step) as u32 + 1,
+        (Ordering::Less, Ordering::Less) => ((start - stop - 1) / -step) as u32 + 1,
+        (Ordering::Less, Ordering::Greater) | (Ordering::Greater, Ordering::Less) => {
+            parse_ctx.warn(warning!("backwards-for"), &keyword.span, |warning| {
+                warning.set_message("`for` loop is backwards");
+                warning.add_label(
+                    diagnostics::warning_label(&keyword.span).with_message(format!(
+                        "this loop wants to go from {start} to {stop} by increments of {step}"
+                    )),
+                )
+            });
+            0
+        }
+    };
+
+    // A `for` that doesn't run is equivalent to a `if 0`, except it also defines a variable.
+    if nb_iters != 0 {
+        let Span::Normal(span) = keyword.span else {
+            unreachable!()
+        };
+        parse_ctx.push_loop(
+            body,
+            Rc::new(span),
+            LoopInfo {
+                nb_iters,
+                for_var: ident,
+                for_value: start,
+                for_step: step,
+            },
+        );
+    }
+
+    lookahead
 }
 
 impl parse_ctx!() {
@@ -175,7 +316,7 @@ impl parse_ctx!() {
 
             SpanKind::Loop(nth) => {
                 self.unique_id.exit_unique_ctx();
-                let mut loop_state = &mut ctx.loop_state;
+                let loop_state = &mut ctx.loop_state;
                 if *nth == loop_state.nb_iters - 1 {
                     let has_more = self
                         .lexer
@@ -185,7 +326,25 @@ impl parse_ctx!() {
                 } else {
                     *nth += 1;
                     if let Some(ident) = loop_state.for_var {
-                        todo!()
+                        loop_state.for_value =
+                            loop_state.for_value.wrapping_add(loop_state.for_step);
+
+                        let span = ctx
+                            .span
+                            .parent
+                            .as_deref()
+                            .expect("Loop context should have a parent")
+                            .clone();
+                        self.symbols.define_constant(
+                            ident,
+                            self.identifiers,
+                            Span::Normal(span),
+                            loop_state.for_value,
+                            true,  // Mutable.
+                            false, // Unexported.
+                            self.nb_errors_remaining,
+                            self.options,
+                        );
                     }
                     self.lexer
                         .reset_loop_context(self.nb_errors_remaining, self.options);

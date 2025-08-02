@@ -292,7 +292,7 @@ impl Display for NumberFormatter {
                     write!(f, "{}", self.number as i32)
                 }
             }
-            FormatKind::Unsigned => {
+            FormatKind::Unsigned | FormatKind::Default => {
                 if self.pad_with_zeros {
                     write!(f, "{:0width$}", self.number)
                 } else {
@@ -311,13 +311,6 @@ impl Display for NumberFormatter {
                     write!(f, "{:0width$X}", self.number)
                 } else {
                     write!(f, "{:X}", self.number)
-                }
-            }
-            FormatKind::Default => {
-                if self.pad_with_zeros {
-                    write!(f, "${:0width$}", self.number)
-                } else {
-                    write!(f, "${}", self.number)
                 }
             }
             FormatKind::Binary => {
