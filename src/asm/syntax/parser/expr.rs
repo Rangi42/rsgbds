@@ -113,10 +113,6 @@ fn parse_subexpr(
     });
 
     let lookahead = loop {
-        // If at end of input, the expression is over.
-        if matches_tok!(token, "end of input") {
-            break token;
-        };
         // If the next token is not a binary operator, stop parsing the expression.
         let Some(operator) = BinOp::from_token(&token.payload) else {
             break token;
@@ -132,8 +128,8 @@ fn parse_subexpr(
 
         let (rhs, lookahead) = expect_subexpr(parse_ctx.next_token(), parse_ctx, right_power);
 
+        lhs = lhs.binary_op(operator, rhs, token.span);
         token = lookahead;
-        lhs = lhs.binary_op(operator, rhs);
     };
 
     (Some(lhs), lookahead)

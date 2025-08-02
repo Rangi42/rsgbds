@@ -232,7 +232,7 @@ pub(in super::super) fn parse_for(keyword: Token, parse_ctx: &mut parse_ctx!()) 
                 warning.set_message("`for` loop is backwards");
                 warning.add_label(
                     diagnostics::warning_label(&keyword.span).with_message(format!(
-                        "this loop wants to go from {start} to {stop} by increments of {step}"
+                        "this loop wants to go from {start} to {stop} in increments of {step}"
                     )),
                 )
             });

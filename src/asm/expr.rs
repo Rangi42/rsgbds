@@ -76,7 +76,7 @@ impl Expr {
 }
 
 impl Expr {
-    pub fn binary_op(mut self, operator: BinOp, mut other: Self) -> Self {
+    pub fn binary_op(mut self, operator: BinOp, mut other: Self, op_span: Span) -> Self {
         let (Some(lhs), Some(rhs)) = (self.payload.last(), other.payload.last()) else {
             self.payload.clear();
             return self;
@@ -84,7 +84,7 @@ impl Expr {
 
         let new_op = Op {
             kind: OpKind::Binary(operator),
-            span: lhs.span.merged_with(&rhs.span),
+            span: op_span,
         };
         self.payload.reserve(other.payload.len() + 1);
         self.payload.append(&mut other.payload);
@@ -97,7 +97,7 @@ impl Expr {
         if let Some(last) = self.payload.last() {
             self.payload.push(Op {
                 kind: OpKind::Unary(operator),
-                span: op_span.merged_with(&last.span),
+                span: op_span,
             });
         }
         self

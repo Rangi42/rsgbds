@@ -1192,6 +1192,9 @@ impl Lexer {
                             }
                             _ => break token!("/"),
                         }
+                    } else {
+                        // Ignore the block comment.
+                        span.bytes.start = span.bytes.end;
                     }
                 }
                 Some('|') => {
