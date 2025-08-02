@@ -64,7 +64,7 @@ impl SpanKind {
 
 impl NormalSpan {
     pub fn new(src: Rc<Source>, kind: SpanKind, parent: Option<Rc<NormalSpan>>) -> Self {
-        let bytes = 0..src.contents.len();
+        let bytes = 0..src.contents.text().len();
         Self {
             src,
             bytes,
