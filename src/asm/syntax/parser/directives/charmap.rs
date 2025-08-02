@@ -18,7 +18,7 @@ pub(in super::super) fn parse_charmap(_keyword: Token, parse_ctx: &mut parse_ctx
         |lookahead, parse_ctx| {
             let (expr, lookahead) = expr::expect_numeric_expr(lookahead, parse_ctx);
             (
-                match expr.try_const_eval() {
+                match parse_ctx.try_const_eval(&expr) {
                     Ok((value, _span)) => Some(value),
                     Err(err) if err.is_nothing() => None,
                     Err(err) => {
@@ -69,7 +69,7 @@ pub(in super::super) fn parse_newcharmap(_keyword: Token, parse_ctx: &mut parse_
         return other;
     }};
 
-    require! { parse_ctx.next_token() => Token { span } @ |"identifier"(ident, _colon)| else |other| {
+    require! { parse_ctx.next_token() => |"identifier"(ident, _colon)| else |other| {
         parse_ctx.report_syntax_error(&other, |error, span| {
             error.add_label(
                 diagnostics::error_label(span).with_message("expected a charmap name here"),

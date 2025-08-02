@@ -100,7 +100,7 @@ fn parse_section_attrs(
         let (expr, after_expr) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
 
         debug_assert_eq!(attrs.address, AddrConstraint::None);
-        match expr.try_const_eval() {
+        match parse_ctx.try_const_eval(&expr) {
             Ok((addr, _)) => match addr.try_into() {
                 Ok(addr) => attrs.address = AddrConstraint::Addr(addr),
                 Err(err) => todo!(),
@@ -145,7 +145,7 @@ fn parse_section_attrs(
                 }};
 
                 let (expr, after_expr) = expr::expect_numeric_expr(lookahead, parse_ctx);
-                attrs.bank = Some(match expr.try_const_eval() {
+                attrs.bank = Some(match parse_ctx.try_const_eval(&expr) {
                     Ok((value, _span)) => value as u32,
                     Err(err) => {
                         parse_ctx.report_expr_error(err);
@@ -182,7 +182,7 @@ fn parse_section_attrs(
                 }};
 
                 let (expr, after_expr) = expr::expect_numeric_expr(lookahead, parse_ctx);
-                let align = match expr.try_const_eval() {
+                let align = match parse_ctx.try_const_eval(&expr) {
                     Ok((value, span)) => if (value as u32) > 16 {
                         parse_ctx.error(&span, |error| {
                             error.set_message("specified alignment is larger than 16");
@@ -207,7 +207,7 @@ fn parse_section_attrs(
                     let (maybe_expr, after_expr) = expr::parse_numeric_expr(lookahead, parse_ctx);
                     lookahead = after_expr;
                     maybe_expr.map_or(0, |expr| {
-                        match expr.try_const_eval() {
+                        match parse_ctx.try_const_eval(&expr) {
                             Ok((value, span)) => if (value as u32) >= (1 << align) {
                                 parse_ctx.error(&span, |error| {
                                     error.set_message("alignment offset is larger than the alignment");

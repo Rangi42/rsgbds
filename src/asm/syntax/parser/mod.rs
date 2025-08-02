@@ -20,6 +20,7 @@ use compact_str::CompactString;
 use crate::{
     charmap::Charmaps,
     diagnostics::{self, ReportBuilder, WarningKind},
+    expr::Expr,
     macro_args::{MacroArgs, UniqueId},
     section::Sections,
     sources::{Source, Span},
@@ -491,6 +492,10 @@ impl parse_ctx!() {
         )
     }
 
+    fn try_const_eval(&self, expr: &Expr) -> Result<(i32, Span), crate::expr::Error> {
+        expr.try_const_eval(self.symbols, self.macro_args.last(), self.sections)
+    }
+
     fn error<'span, F: FnOnce(&mut ReportBuilder<'span>)>(&self, span: &'span Span, callback: F) {
         diagnostics::error(span, callback, self.nb_errors_remaining, self.options);
     }
@@ -505,7 +510,7 @@ impl parse_ctx!() {
         })
     }
     fn report_expr_error(&self, error: crate::expr::Error) {
-        error.report(self.nb_errors_remaining, self.options);
+        error.report(&self.identifiers, self.nb_errors_remaining, self.options);
     }
 
     fn warn<'span, F: FnOnce(&mut ReportBuilder<'span>)>(

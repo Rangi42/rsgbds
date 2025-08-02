@@ -2,9 +2,12 @@ use std::cell::Cell;
 
 use crate::{
     diagnostics,
+    macro_args::MacroArgs,
+    section::Sections,
     sources::Span,
+    symbols::{SymbolData, SymbolKind, Symbols},
     syntax::tokens::{tok, TokenPayload},
-    Identifier, Options,
+    Identifier, Identifiers, Options,
 };
 
 #[derive(Debug)]
@@ -21,7 +24,7 @@ struct Op {
     kind: OpKind,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum OpKind {
     Number(i32),
     Symbol(Identifier),
@@ -39,12 +42,21 @@ pub struct Error {
 
 #[derive(Debug)]
 enum ErrKind {
-    SymNotFound,
+    SymNotFound(Identifier),
+    SymDeleted(Span),
+    // The boolean indicates whether the expression contains just the symbol,
+    //   or if the error has bubbled up some.
+    // This is used to resolve non-constant symbols in some constant ways,
+    //   such as subtraction of labels, or ANDing of aligned labels.
+    SymNotConst {
+        name: Identifier,
+        just_the_sym: bool,
+    },
     DivBy0,
     // This error kind is special, in that it's never reported.
     // It's required so that expressions with bad syntax can be "evaluated" gracefully,
-    // but since bad syntax already causes a syntax error to be reported, emitting an
-    // error for this would just create duplicates.
+    //   but since bad syntax already causes a syntax error to be reported, emitting an
+    //   error for this would just create duplicates.
     NoExpr,
 }
 
@@ -106,17 +118,41 @@ impl Expr {
 
 impl Expr {
     // TODO: there may be more than one reason!
-    pub fn try_const_eval(&self) -> Result<(i32, Span), Error> {
+    pub fn try_const_eval(
+        &self,
+        symbols: &Symbols,
+        macro_args: Option<&MacroArgs>,
+        sections: &Sections,
+    ) -> Result<(i32, Span), Error> {
         debug_assert!(!self.payload.is_empty());
         let mut eval_stack = vec![];
         for op in &self.payload {
-            match &op.kind {
-                OpKind::Number(value) => eval_stack.push(Ok((*value, op.span.clone()))),
-                OpKind::Symbol(name) => todo!(),
+            match op.kind {
+                OpKind::Number(value) => eval_stack.push(Ok((value, op.span.clone()))),
+                OpKind::Symbol(name) => eval_stack.push(match symbols.find(&name) {
+                    None => Err(Error {
+                        span: op.span.clone(),
+                        kind: ErrKind::SymNotFound(name),
+                    }),
+                    Some(SymbolData::Deleted(span)) => Err(Error {
+                        span: op.span.clone(),
+                        kind: ErrKind::SymDeleted(span.clone()),
+                    }),
+                    Some(sym) => match sym.get_number(macro_args, sections) {
+                        Some(value) => Ok((value, op.span.clone())),
+                        None => Err(Error {
+                            span: op.span.clone(),
+                            kind: ErrKind::SymNotConst {
+                                name,
+                                just_the_sym: true,
+                            },
+                        }),
+                    },
+                }),
                 OpKind::Binary(operator) => {
                     let rhs = eval_stack.pop().unwrap();
                     let lhs = eval_stack.pop().unwrap();
-                    eval_stack.push(operator.const_eval(lhs, rhs));
+                    eval_stack.push(operator.const_eval(lhs, rhs, symbols, sections));
                 }
                 OpKind::Unary(operator) => {
                     let value = eval_stack.pop().unwrap();
@@ -165,6 +201,8 @@ impl BinOp {
         &self,
         lhs: Result<(i32, Span), Error>,
         rhs: Result<(i32, Span), Error>,
+        symbols: &Symbols,
+        sections: &Sections,
     ) -> Result<(i32, Span), Error> {
         // Most operators are "greedy", and require both operands to be known in order to be
         // const-evaluable themselves.
@@ -174,13 +212,13 @@ impl BinOp {
                     (Ok(($left, left_span)), Ok(($right, right_span))) => {
                         $res.map(|value| (value, left_span.merged_with(&right_span)))
                     }
-                    (Ok(_), Err(err)) | (Err(err), _) => Err(err),
+                    (Ok(_), Err(err)) | (Err(err), _) => Err(err.bubble_up()),
                 }
             };
             (|($left:ident, $left_span:ident), ($right:ident, $right_span:ident)| $res:expr) => {
                 match (lhs, rhs) {
                     (Ok(($left, $left_span)), Ok(($right, $right_span))) => $res,
-                    (Ok(_), Err(err)) | (Err(err), _) => Err(err),
+                    (Ok(_), Err(err)) | (Err(err), _) => Err(err.bubble_up()),
                 }
             };
         }
@@ -224,7 +262,54 @@ impl BinOp {
             BinOp::GreaterEq => greedy!(|lhs, rhs| Ok(from_bool(lhs >= rhs))),
             BinOp::Greater => greedy!(|lhs, rhs| Ok(from_bool(lhs > rhs))),
             BinOp::Add => greedy!(|lhs, rhs| Ok(lhs.wrapping_add(rhs))),
-            BinOp::Subtract => greedy!(|lhs, rhs| Ok(lhs.wrapping_sub(rhs))),
+            BinOp::Subtract => match (lhs, rhs) {
+                // Subtracting two labels that belong to the same section is constant.
+                (
+                    Err(Error {
+                        span: left_span,
+                        kind:
+                            ErrKind::SymNotConst {
+                                name: left_name,
+                                just_the_sym: true,
+                            },
+                    }),
+                    Err(Error {
+                        span: right_span,
+                        kind:
+                            ErrKind::SymNotConst {
+                                name: right_name,
+                                just_the_sym: true,
+                            },
+                    }),
+                ) => {
+                    let left_sym = symbols.find(&left_name).unwrap();
+                    let right_sym = symbols.find(&right_name).unwrap();
+                    match (
+                        left_sym.get_section_and_offset(sections),
+                        right_sym.get_section_and_offset(sections),
+                    ) {
+                        (Some((left_sect, left_ofs)), Some((right_sect, right_ofs)))
+                            if left_sect == right_sect =>
+                        {
+                            Ok((
+                                right_ofs.wrapping_sub(left_ofs) as i32,
+                                left_span.merged_with(&right_span),
+                            ))
+                        }
+                        // The symbols aren't two labels belonging to the same section, bubble up the (left-hand) error.
+                        (_, _) => Err(Error {
+                            span: left_span,
+                            kind: ErrKind::SymNotConst {
+                                name: left_name,
+                                just_the_sym: false,
+                            },
+                        }),
+                    }
+                }
+                (Ok((lhs, left_span)), Ok((rhs, right_span))) => (Ok(lhs.wrapping_sub(rhs)))
+                    .map(|value| (value, left_span.merged_with(&right_span))),
+                (Ok(_), Err(err)) | (Err(err), _) => Err(err),
+            },
             BinOp::And => greedy!(|lhs, rhs| Ok(lhs & rhs)),
             BinOp::Or => greedy!(|lhs, rhs| Ok(lhs | rhs)),
             BinOp::Xor => greedy!(|lhs, rhs| Ok(lhs ^ rhs)),
@@ -252,8 +337,10 @@ impl UnOp {
         value: Result<(i32, Span), Error>,
         operator_span: &Span,
     ) -> Result<(i32, Span), Error> {
-        let map =
-            |f: fn(i32) -> i32| value.map(|(num, span)| (f(num), operator_span.merged_with(&span)));
+        let map = |f: fn(i32) -> i32| match value {
+            Ok((num, span)) => Ok((f(num), operator_span.merged_with(&span))),
+            Err(err) => Err(err.bubble_up()),
+        };
         match self {
             UnOp::Complement => map(|n| !n),
             UnOp::Identity => map(|n| n),
@@ -264,7 +351,12 @@ impl UnOp {
 }
 
 impl Error {
-    pub fn report(&self, nb_errors_left: &Cell<usize>, options: &Options) {
+    pub fn report(
+        &self,
+        identifiers: &Identifiers,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
         // Do not report these, as they stem from syntax errors, and thus are duplicates.
         if self.is_nothing() {
             return;
@@ -273,7 +365,7 @@ impl Error {
         diagnostics::error(
             &self.span,
             |error| {
-                let (message, label_message) = self.kind.messages();
+                let (message, label_message) = self.kind.messages(identifiers);
                 error.set_message(message);
                 error.add_label(diagnostics::error_label(&self.span).with_message(label_message))
             },
@@ -285,13 +377,39 @@ impl Error {
     pub fn is_nothing(&self) -> bool {
         matches!(self.kind, ErrKind::NoExpr)
     }
+
+    fn bubble_up(self) -> Self {
+        let kind = match self.kind {
+            ErrKind::SymNotConst { name, .. } => ErrKind::SymNotConst {
+                name,
+                just_the_sym: false,
+            },
+            kind => kind,
+        };
+        Self {
+            span: self.span,
+            kind,
+        }
+    }
 }
 impl ErrKind {
-    fn messages(&self) -> (&'static str, &'static str) {
+    fn messages(&self, identifiers: &Identifiers) -> (String, String) {
         match self {
-            ErrKind::SymNotFound => todo!(),
-            ErrKind::DivBy0 => ("Division by zero", "This is equal to zero"),
-            ErrKind::NoExpr => unreachable!(),
+            Self::SymNotFound(ident) => (
+                format!(
+                    "no symbol called `{}`",
+                    identifiers.resolve(*ident).unwrap(),
+                ),
+                "no symbol by this name exists at this point".into(),
+            ),
+            Self::SymDeleted(span) => todo!(),
+            // TODO: suggest that difference between symbols and/or alignment can be constant?
+            Self::SymNotConst { name, .. } => (
+                format!("`{}` is not constant", identifiers.resolve(*name).unwrap()),
+                "this symbol's value is not known at this point".into(),
+            ),
+            Self::DivBy0 => ("division by zero".into(), "this is equal to zero".into()),
+            Self::NoExpr => unreachable!(),
         }
     }
 }
@@ -310,7 +428,7 @@ macro_rules! binary_operators {
         $(BinOp[$assoc:ident] $first_name:ident($first_token:tt) $(, $name:ident($token:tt))*)?
         $(UnOp $($un_name:ident $un_tok:tt),+)?
     );*) => {
-        #[derive(Debug)]
+        #[derive(Debug, Clone, Copy)]
         pub enum BinOp {
             $($( $first_name, $( $name, )*)?)*
         }
@@ -338,7 +456,7 @@ macro_rules! unary_operators {
         $(BinOp[$assoc:ident] $($bin_name:ident $bin_tok:tt),+)?
         $(UnOp $first_name:ident($first_token:tt) $(, $name:ident($token:tt))*)?
     );*) => {
-        #[derive(Debug)]
+        #[derive(Debug, Clone, Copy)]
         pub enum UnOp {
             $($( $first_name, $( $name, )*)?)*
         }

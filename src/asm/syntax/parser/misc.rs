@@ -51,7 +51,7 @@ pub(super) fn parse_str_or_const_expr(
 
     let (maybe_expr, lookahead) = expr::parse_numeric_expr(lookahead, parse_ctx);
     if let Some(expr) = maybe_expr {
-        if let Ok((value, _span)) = expr.try_const_eval() {
+        if let Ok((value, _span)) = parse_ctx.try_const_eval(&expr) {
             (Some(StrOrNum::Num(value)), lookahead)
         } else {
             (None, lookahead)

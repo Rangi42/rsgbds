@@ -93,7 +93,7 @@ pub(in super::super) fn parse_rept(keyword: Token, parse_ctx: &mut parse_ctx!())
 
     let lookahead = parse_ctx.next_token(); // Lex this token before switching parse contexts!
 
-    match expr.try_const_eval() {
+    match parse_ctx.try_const_eval(&expr) {
         Ok((0, _span)) => {} // `REPT 0` acts like `IF 0`.
         Ok((nb_iters, _span)) => {
             let Span::Normal(span) = &keyword.span else {
@@ -123,7 +123,7 @@ pub(in super::super) fn parse_for(keyword: Token, parse_ctx: &mut parse_ctx!()) 
             expect_one_of! { parse_ctx.next_token() => {
                 |","| => {
                     let (start_expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
-                    let start = match start_expr.try_const_eval() {
+                    let start = match parse_ctx.try_const_eval(&start_expr) {
                         Ok((value, _span)) => value,
                         Err(err) => {
                             parse_ctx.report_expr_error(err);
@@ -133,7 +133,7 @@ pub(in super::super) fn parse_for(keyword: Token, parse_ctx: &mut parse_ctx!()) 
 
                     let (start, end, lookahead) = if matches_tok!(lookahead, ",") {
                         let (end_expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
-                        match end_expr.try_const_eval() {
+                        match parse_ctx.try_const_eval(&end_expr) {
                             Ok((value, _span)) => (start, value, lookahead),
                             Err(err) => {
                                 parse_ctx.report_expr_error(err);
@@ -146,7 +146,7 @@ pub(in super::super) fn parse_for(keyword: Token, parse_ctx: &mut parse_ctx!()) 
 
                     let (step, lookahead) = if matches_tok!(lookahead, ",") {
                         let (step_expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
-                        match step_expr.try_const_eval() {
+                        match parse_ctx.try_const_eval(&step_expr) {
                             Ok((value, span)) => {
                                 step_span = Some(span);
                                 (value, lookahead)

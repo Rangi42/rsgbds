@@ -48,7 +48,7 @@ pub enum AddrConstraint {
 #[derive(Debug, Clone)]
 pub struct ActiveSection {
     pub id: usize,
-    offset: usize,
+    pub offset: usize,
 }
 
 #[derive(Debug)]

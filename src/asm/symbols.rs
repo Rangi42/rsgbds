@@ -412,13 +412,30 @@ impl SymbolData {
                 }
                 SymbolKind::String(_) => "string",
                 SymbolKind::Macro(_) => "macro",
-                SymbolKind::Label { section_id, offset } => "label",
+                SymbolKind::Label { .. } => "label",
                 SymbolKind::Ref => "missing",
             },
             SymbolData::Pc => "label",
             SymbolData::Narg => "constant",
             SymbolData::Dot | SymbolData::DotDot => "string",
             SymbolData::Deleted(_) => "deleted",
+        }
+    }
+
+    pub fn get_string(&self) -> Option<CompactString> {
+        match self {
+            Self::User { kind, .. } | Self::Builtin(kind) => match kind {
+                SymbolKind::Numeric { .. } => None,
+                SymbolKind::String(string) => Some(string.clone()),
+                SymbolKind::Macro(_) => None,
+                SymbolKind::Label { .. } => None,
+                SymbolKind::Ref => None,
+            },
+            Self::Pc => None,
+            Self::Narg => None,
+            Self::Dot => todo!(),
+            Self::DotDot => todo!(),
+            Self::Deleted(..) => None,
         }
     }
 
@@ -449,20 +466,23 @@ impl SymbolData {
         }
     }
 
-    pub fn get_string(&self) -> Option<CompactString> {
+    pub fn get_section_and_offset(&self, sections: &Sections) -> Option<(usize, usize)> {
         match self {
-            Self::User { kind, .. } | Self::Builtin(kind) => match kind {
+            SymbolData::User { kind, .. } | SymbolData::Builtin(kind) => match kind {
+                SymbolKind::Label { section_id, offset } => Some((*section_id, *offset)),
                 SymbolKind::Numeric { .. } => None,
-                SymbolKind::String(string) => Some(string.clone()),
+                SymbolKind::String(_) => None,
                 SymbolKind::Macro(_) => None,
-                SymbolKind::Label { .. } => None,
                 SymbolKind::Ref => None,
             },
-            Self::Pc => None,
-            Self::Narg => None,
-            Self::Dot => todo!(),
-            Self::DotDot => todo!(),
-            Self::Deleted(..) => None,
+            SymbolData::Pc => sections
+                .active_section
+                .as_ref()
+                .map(|(_data_sect, sym_sect)| (sym_sect.id, sym_sect.offset)),
+            SymbolData::Narg => None,
+            SymbolData::Dot => None,
+            SymbolData::DotDot => None,
+            SymbolData::Deleted(_) => None,
         }
     }
 }

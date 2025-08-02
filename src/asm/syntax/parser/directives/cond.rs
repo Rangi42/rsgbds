@@ -7,7 +7,7 @@ use super::{parse_ctx, Token};
 
 pub(in super::super) fn parse_if(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     let (expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
-    let should_skip = match expr.try_const_eval() {
+    let should_skip = match parse_ctx.try_const_eval(&expr) {
         Ok((value, _span)) => value == 0,
         Err(err) => {
             parse_ctx.report_expr_error(err);
@@ -53,7 +53,7 @@ pub(in super::super) fn parse_elif(keyword: Token, parse_ctx: &mut parse_ctx!())
         }
         _ => {
             let (expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
-            let should_skip = match expr.try_const_eval() {
+            let should_skip = match parse_ctx.try_const_eval(&expr) {
                 Ok((value, _span)) => value == 0,
                 Err(err) => {
                     parse_ctx.report_expr_error(err);
