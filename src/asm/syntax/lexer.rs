@@ -20,6 +20,7 @@ use compact_str::CompactString;
 use unicase::UniCase;
 
 use crate::{
+    cond::{self, Condition},
     diagnostics::{self, warning, ReportBuilder},
     format::FormatSpec,
     macro_args::{MacroArgs, UniqueId},
@@ -34,6 +35,7 @@ use super::tokens::{tok, Token, TokenPayload, KEYWORDS};
 #[derive(Debug)]
 pub struct Lexer {
     contexts: Vec<Context>,
+    pub cond_stack: Vec<Condition>,
 }
 
 #[derive(Debug)]
@@ -45,7 +47,10 @@ pub struct Context {
     ///
     /// This is akin to the C preprocessor's “blue paint”.
     ofs_scanned_for_expansion: usize,
+    /// This is only used by loop nodes.
     pub loop_state: LoopInfo,
+    /// Depth of the conditional stack on entry.
+    pub cond_stack_depth: usize,
 }
 #[derive(Debug, Default)]
 pub struct LoopInfo {
@@ -57,7 +62,10 @@ pub struct LoopInfo {
 
 impl Lexer {
     pub fn new() -> Self {
-        Self { contexts: vec![] }
+        Self {
+            contexts: vec![],
+            cond_stack: vec![],
+        }
     }
 
     pub fn push_file(
@@ -134,6 +142,9 @@ macro_rules! chars {
 pub fn is_whitespace(ch: char) -> bool {
     matches!(ch, chars!(whitespace))
 }
+pub fn is_newline(ch: char) -> bool {
+    matches!(ch, chars!(newline))
+}
 
 impl Context {
     fn is_empty(&self) -> bool {
@@ -149,13 +160,6 @@ impl Context {
         let mut span = self.span.clone();
         span.bytes = self.cur_byte..self.cur_byte;
         span
-    }
-
-    /// This is only meant to be used to restart a loop.
-    pub fn reset(&mut self) {
-        debug_assert!(matches!(self.span.kind, SpanKind::Loop(..)));
-        self.cur_byte = self.span.bytes.start;
-        self.ofs_scanned_for_expansion = self.span.bytes.start;
     }
 }
 
@@ -195,6 +199,7 @@ impl Lexer {
                 },
                 span,
                 loop_state: loop_info,
+                cond_stack_depth: self.cond_stack.len(),
             })
         }
     }
@@ -230,21 +235,82 @@ impl Lexer {
         ctx
     }
 
+    pub fn reset_loop_context(&mut self, nb_errors_left: &Cell<usize>, options: &Options) {
+        let ctx = loop {
+            let ctx = self
+                .contexts
+                .last_mut()
+                .expect("Attempting to reset a lexer context when there are no more!?");
+            // Pop any remaining implicitly-ending contexts.
+            // (e.g. if the current top-level “hard“ context ends with an expansion).
+            if !ctx.span.kind.ends_implicitly() {
+                break ctx;
+            }
+            debug_assert_eq!(
+                ctx.span.bytes.start, ctx.span.bytes.end,
+                "Implicitly-ending context not empty when resetting!?"
+            );
+            self.contexts.pop();
+        };
+
+        debug_assert!(matches!(ctx.span.kind, SpanKind::Loop(..)));
+
+        Lexer::report_unterminated_conditionals(&mut self.cond_stack, ctx, nb_errors_left, options);
+
+        ctx.cur_byte = ctx.span.bytes.start;
+        ctx.ofs_scanned_for_expansion = ctx.span.bytes.start;
+    }
+
     /// Returns whether there are still more contexts after popping the top (active) one.
     #[must_use]
-    pub fn pop_context(&mut self) -> bool {
-        loop {
+    pub fn pop_context(&mut self, nb_errors_left: &Cell<usize>, options: &Options) -> bool {
+        let ctx = loop {
             let ctx = self
                 .contexts
                 .pop()
                 .expect("Attempting to pop a lexer context when there are no more!?");
-            // Pop any remaining implicitly-ending contexts
+            // Pop any remaining implicitly-ending contexts.
             // (e.g. if the current top-level “hard“ context ends with an expansion).
             if !ctx.span.kind.ends_implicitly() {
-                break;
+                break ctx;
             }
-        }
+            debug_assert_eq!(
+                ctx.span.bytes.start, ctx.span.bytes.end,
+                "Implicitly-ending context not empty when popping!?"
+            );
+        };
+
+        Self::report_unterminated_conditionals(&mut self.cond_stack, &ctx, nb_errors_left, options);
+
         !self.contexts.is_empty()
+    }
+
+    fn report_unterminated_conditionals(
+        cond_stack: &mut Vec<Condition>,
+        ctx: &Context,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        debug_assert!(
+            cond_stack.len() >= ctx.cond_stack_depth,
+            "Fewer conditionals active than when the context was created!?",
+        );
+
+        while cond_stack.len() > ctx.cond_stack_depth {
+            let condition = cond_stack.pop().unwrap();
+            diagnostics::error(
+                &condition.opening_span,
+                |error| {
+                    error.set_message("Unterminated conditional block");
+                    error.add_label(
+                        diagnostics::error_label(&condition.opening_span)
+                            .with_message("This `IF` is missing a corresponding `ENDC`"),
+                    );
+                },
+                nb_errors_left,
+                options,
+            );
+        }
     }
 
     pub fn debug_check_done(&self) {
@@ -1982,8 +2048,6 @@ impl Lexer {
         end_keyword: &str,
         nesting_keywords: &[&str],
         kind: &'static str,
-        nb_errors_left: &Cell<usize>,
-        options: &Options,
     ) -> (NormalSpan, Result<(), CaptureBlockErr>) {
         let mut span = self
             .active_context()
@@ -2006,8 +2070,7 @@ impl Lexer {
             let mut capture = text;
             let mut nesting_depth = 0usize;
             loop {
-                let (line, remainder) = match capture.split_once(|ch| matches!(ch, chars!(newline)))
-                {
+                let (line, remainder) = match capture.split_once(is_newline) {
                     Some((line, remainder)) => (line, Some(remainder)),
                     None => (capture, None),
                 };
@@ -2051,6 +2114,87 @@ impl Lexer {
         span.bytes.end = span.bytes.start + capture_len;
 
         (span, res)
+    }
+
+    pub fn skip_to_eol(&mut self) {
+        let mut span = self
+            .active_context()
+            .expect("Cannot skip to EOL without a context active")
+            .new_span();
+
+        self.with_active_context_raw(&mut span, |ctx, text| {
+            match text.char_indices().find(|(_ofs, ch)| is_newline(*ch)) {
+                Some((ofs, _ch)) => ofs,
+                None => text.len(),
+            }
+        });
+    }
+
+    pub fn skip_conditional_block(&mut self) -> Result<(), CaptureBlockErr> {
+        let mut span = self
+            .active_context()
+            .expect("Cannot skip a block without a context active")
+            .new_span();
+
+        let mut capture_len = 0;
+        let mut res = Ok(());
+        self.with_active_context_raw(&mut span, |ctx, text| {
+            debug_assert!(
+                matches!(
+                    ctx.span.src.contents.text()[ctx.cur_byte - 1..ctx.cur_byte]
+                        .chars()
+                        .next(),
+                    Some(chars!(newline))
+                ),
+                "Conditional block not started at beginning of line",
+            );
+
+            const END_KEYWORD: &str = "ENDC";
+            const NESTING_KEYWORD: &str = "IF";
+            let mut block = text;
+            let mut nesting_depth = 0usize;
+            loop {
+                let (line, remainder) = match block.split_once(is_newline) {
+                    Some((line, remainder)) => (line, Some(remainder)),
+                    None => (text, None),
+                };
+
+                let trimmed = line.trim_start_matches(is_whitespace);
+                // SAFETY: `trimmed` is derived from `text`.
+                let block_len = unsafe { trimmed.as_ptr().offset_from(text.as_ptr()) } as usize;
+
+                if let Some(first_word) = trimmed.get(..END_KEYWORD.len()) {
+                    if unicase::eq_ascii(first_word, END_KEYWORD) {
+                        // Found the ending keyword!
+                        match nesting_depth.checked_sub(1) {
+                            Some(new_depth) => nesting_depth = new_depth,
+                            None => break block_len,
+                        }
+                    } else if nesting_depth == 0
+                        && (unicase::eq_ascii(first_word, "ELIF")
+                            || unicase::eq_ascii(first_word, "ELSE"))
+                    {
+                        break block_len;
+                    }
+                } else if let Some(first_word) = trimmed.get(..NESTING_KEYWORD.len()) {
+                    if unicase::eq_ascii(first_word, NESTING_KEYWORD) {
+                        nesting_depth += 1;
+                    }
+                }
+
+                // Try again with the next line.
+                let Some(remainder) = remainder else {
+                    res = Err(CaptureBlockErr::Unterminated {
+                        name: "conditional block",
+                    });
+                    capture_len = text.len();
+                    break text.len();
+                };
+                block = remainder;
+            }
+        });
+
+        res
     }
 }
 

@@ -271,19 +271,19 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
         }
         tok!("if") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "if");
-            directives::parse_if(first_token, parse_ctx)
+            directives::cond::parse_if(first_token, parse_ctx)
         }
         tok!("elif") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "elif");
-            directives::parse_elif(first_token, parse_ctx)
+            directives::cond::parse_elif(first_token, parse_ctx)
         }
         tok!("else") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "else");
-            directives::parse_else(first_token, parse_ctx)
+            directives::cond::parse_else(first_token, parse_ctx)
         }
         tok!("endc") => {
             reject_prior_label_def(parse_ctx, label_span, &first_token.span, "endc");
-            directives::parse_endc(first_token, parse_ctx)
+            directives::cond::parse_endc(first_token, parse_ctx)
         }
 
         tok!("adc") => instructions::parse_adc(first_token, parse_ctx),
@@ -405,6 +405,19 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
     });
 
     Some(())
+}
+
+fn expect_eol(mut lookahead: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+    if !matches_tok!(lookahead, "end of line" | "end of input") {
+        parse_ctx.report_syntax_error(&lookahead, |error, span| {
+            error.add_label(
+                diagnostics::error_label(span).with_message("Expected nothing else on this line"),
+            );
+        });
+        discard_rest_of_line(lookahead, parse_ctx)
+    } else {
+        lookahead
+    }
 }
 
 fn discard_rest_of_line(mut lookahead: Token, parse_ctx: &mut parse_ctx!()) -> Token {

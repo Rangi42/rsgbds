@@ -26,18 +26,6 @@ pub(super) fn parse_dw(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
-pub(super) fn parse_elif(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_else(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_endc(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
 pub(super) fn parse_endm(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     parse_ctx.report_syntax_error(&keyword, |error, span| {
         error.add_label(
@@ -67,10 +55,6 @@ pub(super) fn parse_export(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Tok
 }
 
 pub(super) fn parse_fatal(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_if(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
@@ -115,6 +99,7 @@ pub(super) fn parse_union(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Toke
 }
 
 pub mod charmap;
+pub mod cond;
 pub mod context;
 pub mod opt;
 pub mod output;

@@ -9,6 +9,7 @@ mod cli;
 use cli::Cli;
 #[path = "../common/mod.rs"]
 mod common;
+mod cond;
 mod diagnostics;
 use diagnostics::{WarningState, NB_META_WARNINGS, NB_WARNINGS};
 mod expr;
