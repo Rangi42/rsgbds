@@ -403,11 +403,13 @@ impl Lexer {
                     let mut contents = CompactString::default();
                     let res = Self::read_interpolation(
                         &mut chars,
+                        text,
                         ctx,
                         &mut contents,
                         params.identifiers,
                         params.symbols,
-                        &params.macro_args.as_deref(),
+                        &mut params.macro_args,
+                        params.unique_id,
                         params.sections,
                         depth,
                         params.nb_errors_left,
@@ -671,11 +673,13 @@ impl Lexer {
 
     fn read_interpolation(
         chars: &mut Peekable<CharIndices>,
+        text: &str,
         ctx: &Context,
         output: &mut CompactString,
         identifiers: &Identifiers,
         symbols: &Symbols,
-        macro_args: &Option<&MacroArgs>,
+        macro_args: &mut Option<&mut MacroArgs>,
+        unique_id: &mut UniqueId,
         sections: &Sections,
         cur_depth: usize,
         nb_errors_left: &Cell<usize>,
@@ -689,6 +693,62 @@ impl Lexer {
             match ch {
                 chars!(newline) => break,
 
+                '\\' => {
+                    let mut macro_chars = chars.clone();
+                    if let Some(res) = Self::read_macro_arg(
+                        &mut macro_chars,
+                        text,
+                        identifiers,
+                        symbols,
+                        macro_args,
+                        unique_id,
+                        sections,
+                    ) {
+                        *chars = macro_chars; // Consume the macro's contents.
+
+                        if cur_depth == options.runtime_opts.recursion_depth {
+                            let mut span = ctx.new_span();
+                            span.bytes.start += ofs;
+                            span.bytes.end = span.bytes.start + ch.len_utf8();
+                            Self::report_depth_overflow(
+                                cur_depth,
+                                &Span::Normal(span),
+                                nb_errors_left,
+                                options,
+                            );
+                            return Err(());
+                        } else {
+                            match res {
+                                Ok(_) => todo!(),
+                                Err(err) => {
+                                    let mut span = ctx.new_span();
+                                    span.bytes.start += ofs;
+                                    span.bytes.end += match chars.peek() {
+                                        Some((ofs, _ch)) => *ofs,
+                                        None => text.len(),
+                                    };
+                                    let span = Span::Normal(span);
+                                    diagnostics::error(
+                                        &span,
+                                        |error| {
+                                            error.set_message(&err);
+                                            error.add_label(
+                                                diagnostics::error_label(&span)
+                                                    .with_message(err.label_msg()),
+                                            );
+                                            if let Some(help_msg) = err.help_msg() {
+                                                error.set_help(help_msg);
+                                            }
+                                        },
+                                        nb_errors_left,
+                                        options,
+                                    );
+                                    return Err(());
+                                }
+                            }
+                        }
+                    }
+                }
                 '{' => {
                     if cur_depth == options.runtime_opts.recursion_depth {
                         let mut span = ctx.new_span();
@@ -704,11 +764,13 @@ impl Lexer {
                     } else {
                         Self::read_interpolation(
                             chars,
+                            text,
                             ctx,
                             &mut name,
                             identifiers,
                             symbols,
                             macro_args,
+                            unique_id,
                             sections,
                             cur_depth + 1,
                             nb_errors_left,
@@ -1495,7 +1557,6 @@ impl Lexer {
                     self.consume(&mut span);
 
                     let payload = self.read_identifier(ch, &mut span, true, &mut params);
-                    // TODO: `elif` hack (lexer.cpp:1937)
                     break Token {
                         payload,
                         span: Span::Normal(span),
@@ -1717,6 +1778,7 @@ impl Lexer {
         params: &mut LexerParams,
     ) -> Option<TokenPayload> {
         let mut string = CompactString::default();
+        let depth = self.contexts.len();
         self.with_active_context_raw(span, |ctx, text| {
             fn is_quote(&(_, ch): &(usize, char)) -> bool {
                 ch == '"'
@@ -1727,7 +1789,7 @@ impl Lexer {
             if chars.next_if(is_quote).is_none() {
                 return 0; // Not a string.
             }
-            Self::read_string_inner(&mut string, raw, &mut chars, ctx, text, params)
+            Self::read_string_inner(&mut string, raw, &mut chars, ctx, depth, text, params)
         });
 
         (!span.bytes.is_empty()).then_some(tok!("string"(string)))
@@ -1738,6 +1800,7 @@ impl Lexer {
         raw: bool,
         chars: &mut Peekable<CharIndices>,
         ctx: &Context,
+        ctx_depth: usize,
         text: &str,
         params: &mut LexerParams,
     ) -> usize {
@@ -1830,7 +1893,20 @@ impl Lexer {
                     }
                 }
                 '{' if !raw => {
-                    todo!();
+                    let _ = Self::read_interpolation(
+                        chars,
+                        text,
+                        ctx,
+                        string,
+                        params.identifiers,
+                        params.symbols,
+                        &mut params.macro_args,
+                        params.unique_id,
+                        params.sections,
+                        ctx_depth,
+                        params.nb_errors_left,
+                        params.options,
+                    );
                 }
 
                 ch => string.push(ch),
@@ -1944,6 +2020,7 @@ impl Lexer {
         let mut string = CompactString::default();
         let mut last_char = None;
 
+        let depth = self.contexts.len();
         self.with_active_context_raw(&mut span, |ctx, text| {
             let mut chars = text.char_indices().peekable();
 
@@ -1999,6 +2076,7 @@ impl Lexer {
                             false,
                             &mut chars,
                             ctx,
+                            depth,
                             text,
                             &mut params,
                         );
@@ -2014,6 +2092,7 @@ impl Lexer {
                                 true,
                                 &mut chars,
                                 ctx,
+                                depth,
                                 text,
                                 &mut params,
                             );
@@ -2204,7 +2283,7 @@ impl Lexer {
             .expect("Cannot skip to EOL without a context active")
             .new_span();
 
-        self.with_active_context_raw(&mut span, |ctx, text| {
+        self.with_active_context_raw(&mut span, |_ctx, text| {
             match text.char_indices().find(|(_ofs, ch)| is_newline(*ch)) {
                 Some((ofs, _ch)) => ofs,
                 None => text.len(),
