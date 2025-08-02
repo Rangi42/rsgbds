@@ -35,10 +35,10 @@ fn parse_subexpr(
                 |")"| => parse_ctx.next_token(),
                 else |unexpected| => {
                     parse_ctx.report_syntax_error(&unexpected, |error, cur_span| {
-                        error.set_message("Syntax error: unclosed parenthesis");
+                        error.set_message("syntax error: unclosed parenthesis");
                         error.add_labels([
                             diagnostics::error_label(&span)
-                                .with_message("This parenthesis should be closed..."),
+                                .with_message("this parenthesis should be closed..."),
                             diagnostics::note_label(cur_span)
                                 .with_message("...before this point"),
                         ]);
@@ -88,9 +88,9 @@ fn parse_subexpr(
                         parse_ctx.error(
                             &span,
                             |error| {
-                                error.set_message("Invalid string-to-number conversion");
+                                error.set_message("invalid string-to-number conversion");
                                 error.add_label(diagnostics::error_label(&span)
-                                    .with_message(format!("This string encodes to {nb_values} charmap units instead of 1")));
+                                    .with_message(format!("this string encodes to {nb_values} charmap units instead of 1")));
                             },
                         );
                         (Expr::nothing(span), lookahead)
@@ -154,7 +154,7 @@ fn expect_subexpr(
             parse_ctx.report_syntax_error(&lookahead, |error, span| {
                 error.add_label(
                     diagnostics::error_label(span)
-                        .with_message("Expected a number or an expression here"),
+                        .with_message("expected a number or an expression here"),
                 )
             });
             // If no expression has been parsed, then the lookahead must point to a non-expression

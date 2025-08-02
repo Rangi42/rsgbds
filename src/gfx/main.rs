@@ -61,7 +61,7 @@ fn run(options: Options, pal_spec: Option<PalSpec>) -> Result<(), ExitCode> {
         match pal_spec.expect("The CLI should enforce either an input path or a pal spec!") {
             PalSpec::Embedded => {
                 build_error()
-                    .with_message("An embedded color spec cannot be used without an input image")
+                    .with_message("an embedded color spec cannot be used without an input image")
                     .finish()
                     .eprint_();
                 Err(ExitCode::Usage)
@@ -71,7 +71,7 @@ fn run(options: Options, pal_spec: Option<PalSpec>) -> Result<(), ExitCode> {
             }
         }
     } else {
-        let mut builder = build_error().with_message("No operation was specified");
+        let mut builder = build_error().with_message("no operation was specified");
         if matches!(pal_spec, Some(PalSpec::Explicit(_))) {
             builder.set_help(
                 "To dump the color spec to a file, please specify that file's path with `-p`",

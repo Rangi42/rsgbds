@@ -58,10 +58,10 @@ pub(super) fn parse_str_or_const_expr(
         }
     } else {
         parse_ctx.error(&lookahead.span, |error| {
-            error.set_message(format!("Syntax error: unexpected {}", lookahead.payload));
+            error.set_message(format!("syntax error: unexpected {}", lookahead.payload));
             error.add_label(
                 diagnostics::error_label(&lookahead.span)
-                    .with_message("Expected a numeric or string expression"),
+                    .with_message("expected a numeric or string expression"),
             );
         });
         (None, lookahead)

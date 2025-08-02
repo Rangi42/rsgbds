@@ -158,7 +158,7 @@ impl Charmap {
                 |warning| {
                     warning.set_message(format!("'{}' is not mapped", c.escape_default(),));
                     warning
-                        .add_label(diagnostics::warning_label(span).with_message("In this string"));
+                        .add_label(diagnostics::warning_label(span).with_message("in this string"));
                 },
                 nb_errors_left,
                 options,
@@ -175,7 +175,7 @@ impl Charmap {
                         &self.name,
                     ));
                     warning
-                        .add_label(diagnostics::warning_label(span).with_message("In this string"));
+                        .add_label(diagnostics::warning_label(span).with_message("in this string"));
                 },
                 nb_errors_left,
                 options,
@@ -252,17 +252,17 @@ impl CharmapError {
     pub fn make_diag<'span>(&'span self, error: &mut crate::diagnostics::ReportBuilder<'span>) {
         match self {
             CharmapError::Conflict(name, this_def, existing) => {
-                error.set_message(format!("A charmap called \"{name}\" already exists"));
+                error.set_message(format!("a charmap called \"{name}\" already exists"));
                 error.add_labels([
                     diagnostics::error_label(this_def)
-                        .with_message("Attempting to create it here..."),
+                        .with_message("attempting to create it here..."),
                     diagnostics::error_label(existing)
                         .with_message("...but it was previously defined here"),
                 ])
             }
             CharmapError::NoSuchCharmap(name, span) => {
-                error.set_message(format!("No charmap called \"{name}\" exists"));
-                error.add_label(diagnostics::error_label(span).with_message("Requested here"));
+                error.set_message(format!("no charmap called \"{name}\" exists"));
+                error.add_label(diagnostics::error_label(span).with_message("requested here"));
             }
         }
     }

@@ -54,15 +54,15 @@ fn process_option(string: &str, span: Span, parse_ctx: &mut parse_ctx!()) {
             parse_ctx,
         ),
         Some(c) => parse_ctx.error(&span, |error| {
-            error.set_message(format!("Unknown option '{}'", c.escape_default()));
+            error.set_message(format!("unknown option '{}'", c.escape_default()));
             error.add_label(
-                diagnostics::error_label(&span).with_message("This option string is invalid"),
+                diagnostics::error_label(&span).with_message("this option string is invalid"),
             );
         }),
         None => parse_ctx.error(&span, |error| {
-            error.set_message("Empty option string");
+            error.set_message("empty option string");
             error.add_label(
-                diagnostics::error_label(&span).with_message("An option string is expected here"),
+                diagnostics::error_label(&span).with_message("an option string is expected here"),
             );
         }),
     }
@@ -79,7 +79,7 @@ fn process_option(string: &str, span: Span, parse_ctx: &mut parse_ctx!()) {
 pub(in super::super) fn parse_opt(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     match parse_ctx.next_token_raw() {
         None => parse_ctx.error(&keyword.span, |error| {
-            error.set_message("Syntax error: missing option string");
+            error.set_message("syntax error: missing option string");
             error.add_label(
                 diagnostics::error_label(&keyword.span)
                     .with_message("`OPT` must be followed by at least one option"),
@@ -115,9 +115,9 @@ pub(in super::super) fn parse_popo(keyword: Token, parse_ctx: &mut parse_ctx!())
     match parse_ctx.options.runtime_opt_stack.pop() {
         Some(runtime_opts) => parse_ctx.options.runtime_opts = runtime_opts,
         None => parse_ctx.error(&keyword.span, |error| {
-            error.set_message("Cannot pop from empty option stack");
+            error.set_message("cannot pop from empty option stack");
             error.add_label(
-                diagnostics::error_label(&keyword.span).with_message("Attempting to pop here"),
+                diagnostics::error_label(&keyword.span).with_message("attempting to pop here"),
             );
         }),
     }

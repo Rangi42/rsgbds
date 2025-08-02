@@ -264,7 +264,7 @@ impl Symbols {
                     ));
                     error.add_labels([
                         diagnostics::note_label(existing.def_span())
-                            .with_message("The name is used here..."),
+                            .with_message("the name is used here..."),
                         diagnostics::error_label(&definition)
                             .with_message("...so it's not available for this definition"),
                     ]);

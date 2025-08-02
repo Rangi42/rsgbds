@@ -49,7 +49,7 @@ pub(in super::super) fn parse_fail(keyword: Token, parse_ctx: &mut parse_ctx!())
         |"end of line"| => {},
         else |unexpected| => {
             parse_ctx.report_syntax_error(&unexpected, |error, span| {
-                error.add_label(diagnostics::error_label(span).with_message("Expected nothing else on this line"))
+                error.add_label(diagnostics::error_label(span).with_message("expected nothing else on this line"))
             });
         }
     }};
@@ -58,7 +58,7 @@ pub(in super::super) fn parse_fail(keyword: Token, parse_ctx: &mut parse_ctx!())
         parse_ctx.error(&keyword.span, |error| {
             error.set_message(message);
             error.add_label(
-                diagnostics::error_label(&keyword.span).with_message("Assembly aborted here"),
+                diagnostics::error_label(&keyword.span).with_message("assembly aborted here"),
             );
         });
     }

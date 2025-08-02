@@ -28,7 +28,7 @@ pub(in super::super) fn parse_include(keyword: Token, parse_ctx: &mut parse_ctx!
                 parse_ctx.push_file(source, Some(Rc::new(span.clone())))
             }
             Err(err) => parse_ctx.error(&span, |error| {
-                error.set_message(format!("Unable to read path \"{}\"", string));
+                error.set_message(format!("unable to read path \"{}\"", string));
                 error.add_label(diagnostics::error_label(&span).with_message(err));
             }),
         };
@@ -41,7 +41,7 @@ pub(in super::super) fn parse_macro(_keyword: Token, parse_ctx: &mut parse_ctx!(
     let lookahead = parse_ctx.next_token();
     require! { lookahead => Token { span } @ |"identifier"(name, _colon)| else |unexpected| {
         parse_ctx.report_syntax_error(&unexpected, |error, span| {
-            error.add_label(diagnostics::error_label(span).with_message("Expected the macro's name"));
+            error.add_label(diagnostics::error_label(span).with_message("expected the macro's name"));
         });
 
         return discard_rest_of_line(unexpected, parse_ctx);
@@ -56,7 +56,7 @@ pub(in super::super) fn parse_macro(_keyword: Token, parse_ctx: &mut parse_ctx!(
         parse_ctx.error(&span, |error| {
             error.set_message(&err);
             error.add_label(
-                diagnostics::error_label(&span).with_message("Macro definition starting here"),
+                diagnostics::error_label(&span).with_message("macro definition starting here"),
             );
         })
     }
@@ -86,7 +86,7 @@ pub(in super::super) fn parse_rept(keyword: Token, parse_ctx: &mut parse_ctx!())
         parse_ctx.error(&keyword.span, |error| {
             error.set_message(&err);
             error.add_label(
-                diagnostics::error_label(&keyword.span).with_message("Loop starting here"),
+                diagnostics::error_label(&keyword.span).with_message("loop starting here"),
             );
         })
     }

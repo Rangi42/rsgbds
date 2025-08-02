@@ -351,7 +351,7 @@ impl Cli {
         })
         .ok_or_else(|| {
             crate::build_error()
-                .with_message("Palettes cannot contain zero colors")
+                .with_message("palettes cannot contain zero colors")
                 .finish()
                 .eprint_()
         })?;

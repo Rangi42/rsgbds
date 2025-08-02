@@ -215,9 +215,9 @@ impl Lexer {
             diagnostics::error(
                 opt_span,
                 |error| {
-                    error.set_message("Recursion is deeper than new limit");
+                    error.set_message("recursion is deeper than new limit");
                     error.add_label(diagnostics::error_label(opt_span).with_message(format!(
-                        "Depth is {} contexts at this point",
+                        "depth is {} contexts at this point",
                         self.contexts.len()
                     )))
                 },
@@ -301,10 +301,10 @@ impl Lexer {
             diagnostics::error(
                 &condition.opening_span,
                 |error| {
-                    error.set_message("Unterminated conditional block");
+                    error.set_message("unterminated conditional block");
                     error.add_label(
                         diagnostics::error_label(&condition.opening_span)
-                            .with_message("This `IF` is missing a corresponding `ENDC`"),
+                            .with_message("this `IF` is missing a corresponding `ENDC`"),
                     );
                 },
                 nb_errors_left,
@@ -725,10 +725,10 @@ impl Lexer {
                         diagnostics::error(
                             &span,
                             |error| {
-                                error.set_message("Multiple ':' characters found in interpolation");
+                                error.set_message("multiple ':' characters found in interpolation");
                                 error.add_label(
                                     diagnostics::error_label(&span)
-                                        .with_message("This ':' is invalid"),
+                                        .with_message("this ':' is invalid"),
                                 );
                             },
                             nb_errors_left,
@@ -782,7 +782,7 @@ impl Lexer {
                                 error.set_message(&err);
                                 error.add_label(
                                     diagnostics::error_label(&span)
-                                        .with_message("This interpolation is invalid"),
+                                        .with_message("this interpolation is invalid"),
                                 );
                             },
                             nb_errors_left,
@@ -809,9 +809,9 @@ impl Lexer {
         diagnostics::error(
             span,
             |error| {
-                error.set_message("Maximum recursion depth exceeded");
+                error.set_message("maximum recursion depth exceeded");
                 error.add_label(diagnostics::error_label(span).with_message(format!(
-                    "Depth is {depth} contexts here, cannot enter a new one"
+                    "depth is {depth} contexts here, cannot enter a new one"
                 )))
             },
             nb_errors_left,
@@ -1273,7 +1273,7 @@ impl Lexer {
                             } else {
                                 let err_span = Span::Normal(span.clone());
                                 params.error(&err_span, |error| {
-                                    error.set_message("Missing octal digit(s) after `0o` prefix");
+                                    error.set_message("missing octal digit(s) after `0o` prefix");
                                     error.add_label(
                                         diagnostics::error_label(&err_span).with_message(
                                             "Expected at least one octal digit after this",
@@ -1302,7 +1302,7 @@ impl Lexer {
                             } else {
                                 let err_span = Span::Normal(span.clone());
                                 params.error(&err_span, |error| {
-                                    error.set_message("Missing octal digit(s) after `0o` prefix");
+                                    error.set_message("missing octal digit(s) after `0o` prefix");
                                     error.add_label(
                                         diagnostics::error_label(&err_span).with_message(
                                             "Expected at least one octal digit after this",
@@ -1403,10 +1403,10 @@ impl Lexer {
                         _ => {
                             let err_span = Span::Normal(span.clone());
                             params.error(&err_span, |error| {
-                                error.set_message("Lone '$'");
+                                error.set_message("lone '$'");
                                 error.add_label(
                                     diagnostics::error_label(&err_span)
-                                        .with_message("Expected a hex digit after this"),
+                                        .with_message("expected a hex digit after this"),
                                 );
                                 error.set_help(
                                     "In rgbasm, the current address is notated `@`, not `$`",
@@ -1444,9 +1444,9 @@ impl Lexer {
                             _ => {
                                 let span = Span::Normal(span.clone());
                                 params.error(&span, |error| {
-                                    error.set_message("Invalid '#'");
+                                    error.set_message("invalid '#'");
                                     error.add_label(diagnostics::error_label(&span).with_message(
-                                        "This doesn't start a raw string or raw identifier",
+                                        "this doesn't start a raw string or raw identifier",
                                     ));
                                 });
                                 continue;
@@ -1479,10 +1479,10 @@ impl Lexer {
                     let err_span = Span::Normal(span);
                     params.error(&err_span, |error| {
                         error
-                            .set_message(format!("Unexpected character '{}'", ch.escape_default()));
+                            .set_message(format!("unexpected character '{}'", ch.escape_default()));
                         error.add_label(
                             diagnostics::error_label(&err_span)
-                                .with_message("This character was not expected at this point"),
+                                .with_message("this character was not expected at this point"),
                         );
                     });
 
@@ -1542,10 +1542,10 @@ impl Lexer {
         if overflowed {
             let span = Span::Normal(span.clone());
             params.warn(warning!("large-constant"), &span, |warning| {
-                warning.set_message(format!("Integer constant is larger than {}", u32::MAX));
+                warning.set_message(format!("integer constant is larger than {}", u32::MAX));
                 warning.add_label(
                     diagnostics::warning_label(&span)
-                        .with_message(format!("This was truncated to {value}")),
+                        .with_message(format!("this was truncated to {value}")),
                 )
             })
         }
@@ -1583,10 +1583,10 @@ impl Lexer {
         if overflowed {
             let span = Span::Normal(span.clone());
             params.warn(warning!("large-constant"), &span, |warning| {
-                warning.set_message(format!("Integer constant is larger than {}", u32::MAX));
+                warning.set_message(format!("integer constant is larger than {}", u32::MAX));
                 warning.add_label(
                     diagnostics::warning_label(&span)
-                        .with_message(format!("This was truncated to {value}")),
+                        .with_message(format!("this was truncated to {value}")),
                 )
             })
         }
@@ -1760,9 +1760,9 @@ impl Lexer {
         err_span.bytes.end = ctx.cur_byte + end_ofs;
         let err_span = Span::Normal(err_span);
         params.error(&err_span, |error| {
-            error.set_message("Unterminated string literal");
+            error.set_message("unterminated string literal");
             error.add_label(diagnostics::error_label(&err_span).with_message(format!(
-                "No closing quote before the end of {}",
+                "no closing quote before the end of {}",
                 if multiline { "input" } else { "the line" }
             )))
         });
@@ -1808,10 +1808,10 @@ impl Lexer {
                     ctx.cur_byte + backslash_ofs..ctx.cur_byte + escaped_ofs + ch.len_utf8();
                 let span = Span::Normal(span);
                 params.error(&span, |error| {
-                    error.set_message("Invalid character escape");
+                    error.set_message("invalid character escape");
                     error.add_label(
                         diagnostics::error_label(&span)
-                            .with_message("Cannot escape this character"),
+                            .with_message("cannot escape this character"),
                     );
                 });
 
@@ -1822,9 +1822,9 @@ impl Lexer {
                 span.bytes = ctx.cur_byte + backslash_ofs..ctx.cur_byte + text.len();
                 let span = Span::Normal(span);
                 params.error(&span, |error| {
-                    error.set_message("Invalid character escape");
+                    error.set_message("invalid character escape");
                     error.add_label(
-                        diagnostics::error_label(&span).with_message("No character to escape"),
+                        diagnostics::error_label(&span).with_message("no character to escape"),
                     );
                 });
 

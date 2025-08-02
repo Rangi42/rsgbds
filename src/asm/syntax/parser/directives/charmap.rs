@@ -9,7 +9,7 @@ pub(in super::super) fn parse_charmap(_keyword: Token, parse_ctx: &mut parse_ctx
     };
     require! { lookahead => |","| else |other| {
         parse_ctx.report_syntax_error(&other, |error, span| {
-            error.add_label(diagnostics::error_label(span).with_message("Expected a comma here"));
+            error.add_label(diagnostics::error_label(span).with_message("expected a comma here"));
         });
         return other;
     }};
@@ -39,8 +39,8 @@ pub(in super::super) fn parse_charmap(_keyword: Token, parse_ctx: &mut parse_ctx
         .is_none()
     {
         parse_ctx.error(&span, |error| {
-            error.set_message("Cannot charmap an empty string");
-            diagnostics::error_label(&span).with_message("This string shouldn't be empty");
+            error.set_message("cannot charmap an empty string");
+            diagnostics::error_label(&span).with_message("this string shouldn't be empty");
         });
     }
     lookahead
@@ -50,7 +50,7 @@ pub(in super::super) fn parse_newcharmap(_keyword: Token, parse_ctx: &mut parse_
     require! { parse_ctx.next_token() => Token { span } @ |"identifier"(ident, _colon)| else |other| {
         parse_ctx.report_syntax_error(&other, |error, span| {
             error.add_label(
-                diagnostics::error_label(span).with_message("Expected a charmap name here"),
+                diagnostics::error_label(span).with_message("expected a charmap name here"),
             );
         });
         return other;
@@ -72,7 +72,7 @@ pub(in super::super) fn parse_newcharmap(_keyword: Token, parse_ctx: &mut parse_
     require! { parse_ctx.next_token() => Token { span } @ |"identifier"(ident, _colon)| else |other| {
         parse_ctx.report_syntax_error(&other, |error, span| {
             error.add_label(
-                diagnostics::error_label(span).with_message("Expected a charmap name here"),
+                diagnostics::error_label(span).with_message("expected a charmap name here"),
             );
         });
         return other;
@@ -95,7 +95,7 @@ pub(in super::super) fn parse_setcharmap(_keyword: Token, parse_ctx: &mut parse_
     require! { parse_ctx.next_token() => Token { span } @ |"identifier"(ident, _colon)| else |other| {
         parse_ctx.report_syntax_error(&other, |error, span| {
             error.add_label(
-                diagnostics::error_label(span).with_message("Expected a charmap name here"),
+                diagnostics::error_label(span).with_message("expected a charmap name here"),
             );
         });
         return other;
@@ -104,9 +104,9 @@ pub(in super::super) fn parse_setcharmap(_keyword: Token, parse_ctx: &mut parse_
     let charmap_name = parse_ctx.identifiers.resolve(ident).unwrap();
     if parse_ctx.charmaps.switch_to(charmap_name).is_none() {
         parse_ctx.error(&span, |error| {
-            error.set_message(format!("No charmap named \"{charmap_name}\" exists"));
+            error.set_message(format!("no charmap named \"{charmap_name}\" exists"));
             error.add_label(
-                diagnostics::error_label(&span).with_message("Cannot switch to this charmap"),
+                diagnostics::error_label(&span).with_message("cannot switch to this charmap"),
             );
         });
     }
@@ -124,9 +124,9 @@ pub(in super::super) fn parse_pushc(_keyword: Token, parse_ctx: &mut parse_ctx!(
     let charmap_name = parse_ctx.identifiers.resolve(ident).unwrap();
     if parse_ctx.charmaps.switch_to(charmap_name).is_none() {
         parse_ctx.error(&span, |error| {
-            error.set_message(format!("No charmap named \"{charmap_name}\" exists"));
+            error.set_message(format!("no charmap named \"{charmap_name}\" exists"));
             error.add_label(
-                diagnostics::error_label(&span).with_message("Cannot switch to this charmap"),
+                diagnostics::error_label(&span).with_message("cannot switch to this charmap"),
             );
         });
     }
@@ -137,8 +137,8 @@ pub(in super::super) fn parse_pushc(_keyword: Token, parse_ctx: &mut parse_ctx!(
 pub(in super::super) fn parse_popc(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     if parse_ctx.charmaps.pop_active_charmap().is_none() {
         parse_ctx.error(&keyword.span, |error| {
-            error.set_message("No entries in the charmap stack");
-            error.add_label(diagnostics::error_label(&keyword.span).with_message("Cannot pop"));
+            error.set_message("no entries in the charmap stack");
+            error.add_label(diagnostics::error_label(&keyword.span).with_message("cannot pop"));
         })
     }
 

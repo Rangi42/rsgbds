@@ -60,7 +60,7 @@ pub(crate) fn process(
 
     if image.nb_frames() != 1 {
         crate::build_warning()
-            .with_message("The input image has multiple animation frames")
+            .with_message("the input image has multiple animation frames")
             .with_note("Only the first frame will be processed")
             .finish()
             .eprint_();
@@ -91,7 +91,7 @@ pub(crate) fn process(
                 dimension_in_tiles(image.height(), "Image height too large!"),
             ) else {
                 crate::build_error()
-                    .with_message("The input image cannot be empty")
+                    .with_message("the input image cannot be empty")
                     .finish()
                     .eprint_();
                 return Err(ExitCode::DataErr);
@@ -152,9 +152,9 @@ pub(crate) fn process(
     // then they are likely to produce nonsensical results. So bail right now.
     if palettes.len() > options.nb_palettes.into() {
         crate::build_error()
-            .with_message("Generated more palettes than the maximum")
+            .with_message("generated more palettes than the maximum")
             .with_note(format!(
-                "Generated {} palettes, over the limit of {}",
+                "generated {} palettes, over the limit of {}",
                 palettes.len(),
                 options.nb_palettes
             ))
@@ -167,7 +167,7 @@ pub(crate) fn process(
     // Do not do this if there are too many palettes only because the limit was exceeded, though.
     if palettes.len() > 8 && options.attrmap_path.is_some() && options.palmap_path.is_none() {
         crate::build_warning()
-            .with_message("More than 8 palettes were generated, but this cannot be reflected in the attribute map")
+            .with_message("more than 8 palettes were generated, but this cannot be reflected in the attribute map")
             .with_note(
                 format!("{} palettes were generated", palettes.len())).with_help(
                 "You can generate a palette map to get palette IDs up to 256")
@@ -211,9 +211,9 @@ pub(crate) fn process(
 
             // Check the tile count.
             if nb_tiles > (bank0 + bank1).into() {
-                let nb_tiles_msg = format!("The image contains {nb_tiles} (unoptimized) tiles");
+                let nb_tiles_msg = format!("the image contains {nb_tiles} (unoptimized) tiles");
                 crate::build_error()
-                    .with_message("The image contains more tiles than the limit")
+                    .with_message("the image contains more tiles than the limit")
                     .with_note(nb_tiles_msg)
                     .finish()
                     .eprint_();
@@ -256,9 +256,9 @@ pub(crate) fn process_palettes_only(
 
     if palettes.len() > options.nb_palettes.into() {
         crate::build_error()
-            .with_message("Generated more palettes than the maximum")
+            .with_message("generated more palettes than the maximum")
             .with_note(format!(
-                "Generated {} palettes, over the limit of {}",
+                "generated {} palettes, over the limit of {}",
                 palettes.len(),
                 options.nb_palettes
             ))
@@ -341,7 +341,7 @@ fn collect_image_colors(
             Rgba::OPACITY_THRESHOLD,
         );
         crate::build_error()
-            .with_message("Some colors have ambiguous transparency")
+            .with_message("some colors have ambiguous transparency")
             .with_note(offending_colors)
             .with_help(acceptable_alpha)
             .finish()
@@ -536,7 +536,7 @@ fn make_palettes_as_specified(
             write!(note, "\nNo palette contains colors {set}").unwrap()
         }
         crate::build_error()
-            .with_message("Some tiles cannot be displayed with the specified palettes")
+            .with_message("some tiles cannot be displayed with the specified palettes")
             .with_note(note)
             .finish()
             .eprint_();

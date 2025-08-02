@@ -74,7 +74,7 @@ pub(super) fn expect_string_expr(
                 parse_ctx.report_syntax_error(&lookahead, |error, span| {
                     error.add_label(
                         diagnostics::error_label(span)
-                            .with_message("Expected a string expression here"),
+                            .with_message("expected a string expression here"),
                     )
                 });
                 None

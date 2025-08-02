@@ -40,7 +40,7 @@ fn parse_section_attrs(
 
     require! { lookahead => |","| else |other| {
         parse_ctx.report_syntax_error(&other, |error,span| {
-            error.add_label(diagnostics::error_label(span).with_message("Expected a comma here"));
+            error.add_label(diagnostics::error_label(span).with_message("expected a comma here"));
         });
     }};
 
@@ -79,7 +79,7 @@ fn parse_section_attrs(
         },
         else |other, expected| => {
             parse_ctx.report_syntax_error(&other, |error,span| {
-                error.add_label(diagnostics::error_label(span).with_message("Expected TODO here"))
+                error.add_label(diagnostics::error_label(span).with_message("expected TODO here"))
             });
 
             // Process the next token if it is expected later in the directive.
@@ -110,10 +110,10 @@ fn parse_section_attrs(
 
         require! { after_expr => |"]"| else |other| {
             parse_ctx.report_syntax_error(&other, |error, span| {
-                error.set_message("Missing `]` after the section's address");
+                error.set_message("missing `]` after the section's address");
                 error.add_label(
                     diagnostics::error_label(span)
-                        .with_message("Expected a closing brace here")
+                        .with_message("expected a closing brace here")
                 );
             });
         }};
@@ -137,7 +137,7 @@ fn parse_section_attrs(
                         parse_ctx.report_syntax_error(&other, |error, span| {
                             error.add_label(
                                 diagnostics::error_label(span)
-                                    .with_message("The previous section attribute must be followed by a number between braces")
+                                    .with_message("the previous section attribute must be followed by a number between braces")
                             )
                         });
                         lookahead = other; // Keep trying to parse.
@@ -159,7 +159,7 @@ fn parse_section_attrs(
                         parse_ctx.report_syntax_error(&other, |error, span| {
                             error.add_label(
                                 diagnostics::error_label(span)
-                                    .with_message("Missing closing brace after the previous section attribute")
+                                    .with_message("missing closing brace after the previous section attribute")
                             )
                         });
                         lookahead = other;
@@ -174,7 +174,7 @@ fn parse_section_attrs(
                         parse_ctx.report_syntax_error(&other, |error, span| {
                             error.add_label(
                                 diagnostics::error_label(span)
-                                    .with_message("The previous section attribute must be followed by one or two numbers between braces")
+                                    .with_message("the previous section attribute must be followed by one or two numbers between braces")
                             )
                         });
                         lookahead = other; // Keep trying to parse.
@@ -185,10 +185,10 @@ fn parse_section_attrs(
                 let align = match expr.try_const_eval() {
                     Ok((value, span)) => if (value as u32) > 16 {
                         parse_ctx.error(&span, |error| {
-                            error.set_message("Specified alignment is larger than 16");
+                            error.set_message("specified alignment is larger than 16");
                             error.add_label(
                                 diagnostics::error_label(&span)
-                                    .with_message(format!("This expression evaluates to {value}"))
+                                    .with_message(format!("this expression evaluates to {value}"))
                             );
                         });
                         16
@@ -210,10 +210,10 @@ fn parse_section_attrs(
                         match expr.try_const_eval() {
                             Ok((value, span)) => if (value as u32) >= (1 << align) {
                                 parse_ctx.error(&span, |error| {
-                                    error.set_message("Alignment offset is larger than the alignment");
+                                    error.set_message("alignment offset is larger than the alignment");
                                     error.add_label(
                                         diagnostics::error_label(&span)
-                                            .with_message(format!("This expression evaluates to {value}, which is larger than 1 << {align}"))
+                                            .with_message(format!("this expression evaluates to {value}, which is larger than 1 << {align}"))
                                     );
                                 });
                                 (1 << align) - 1
@@ -250,7 +250,7 @@ fn parse_section_attrs(
                         parse_ctx.report_syntax_error(&other, |error, span| {
                             error.add_label(
                                 diagnostics::error_label(span)
-                                    .with_message("Missing closing brace after the previous section attribute")
+                                    .with_message("missing closing brace after the previous section attribute")
                             )
                         });
                         lookahead = other;
@@ -262,7 +262,7 @@ fn parse_section_attrs(
                 parse_ctx.report_syntax_error(&other, |error, span| {
                     error.add_label(
                         diagnostics::error_label(span)
-                            .with_message("Expected a section attribute here (TODO)")
+                            .with_message("expected a section attribute here (TODO)")
                     );
                 });
                 lookahead = if matches_tok!(other, ",") {
@@ -307,7 +307,7 @@ pub(in super::super) fn parse_load(keyword: Token, parse_ctx: &mut parse_ctx!())
             error.set_message("`LOAD` cannot designate the active section");
             error.add_label(
                 diagnostics::error_label(&keyword.span)
-                    .with_message("Section \"{}\" is active here"),
+                    .with_message("section \"{}\" is active here"),
             );
         });
 
@@ -328,7 +328,7 @@ pub(in super::super) fn parse_endl(_keyword: Token, parse_ctx: &mut parse_ctx!()
                 error.set_message("`ENDL` used outside of a `LOAD` block");
                 error.add_label(
                     diagnostics::error_label(&_keyword.span)
-                        .with_message("This directive is invalid"),
+                        .with_message("this directive is invalid"),
                 );
             });
         }
@@ -336,7 +336,7 @@ pub(in super::super) fn parse_endl(_keyword: Token, parse_ctx: &mut parse_ctx!()
         parse_ctx.error(&_keyword.span, |error| {
             error.set_message("`ENDL` used outside of a section");
             error.add_label(
-                diagnostics::error_label(&_keyword.span).with_message("This directive is invalid"),
+                diagnostics::error_label(&_keyword.span).with_message("this directive is invalid"),
             );
         });
     }
@@ -364,8 +364,8 @@ pub(in super::super) fn parse_pushs(_keyword: Token, parse_ctx: &mut parse_ctx!(
 pub(in super::super) fn parse_pops(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     if parse_ctx.sections.pop_active_section().is_none() {
         parse_ctx.error(&keyword.span, |error| {
-            error.set_message("No entries in the section stack");
-            error.add_label(diagnostics::error_label(&keyword.span).with_message("Cannot pop"));
+            error.set_message("no entries in the section stack");
+            error.add_label(diagnostics::error_label(&keyword.span).with_message("cannot pop"));
         })
     }
 

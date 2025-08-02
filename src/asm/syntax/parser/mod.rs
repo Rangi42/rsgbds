@@ -98,7 +98,7 @@ pub fn parse_file(
             diagnostics::error(
                 &Span::CommandLine,
                 |error| {
-                    error.set_message(format!("Failed to open \"{}\"", path.display()));
+                    error.set_message(format!("failed to open \"{}\"", path.display()));
                     error.add_note(err);
                 },
                 nb_errors_remaining,
@@ -149,12 +149,12 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
     match &first_token.payload {
         tok!("+") | tok!("-") => {
             parse_ctx.error(&first_token.span, |error| {
-                error.set_message("Leftover diff marker");
+                error.set_message("leftover diff marker");
                 error.add_label(
                     diagnostics::error_label(&first_token.span)
-                        .with_message("Extraneous character here"),
+                        .with_message("this character is invalid"),
                 );
-                error.set_help("Consider applying patches using `patch` or `git apply`");
+                error.set_help("consider applying patches using `patch` or `git apply`");
             });
             first_token = parse_ctx.next_token();
         }
@@ -223,10 +223,10 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
             let name = parse_ctx.identifiers.resolve(ident).unwrap();
             match parse_ctx.symbols.find_macro(&ident) {
                 None => parse_ctx.error(&first_token.span, |error| {
-                    error.set_message(format!("Macro `{name}` does not exist"));
+                    error.set_message(format!("macro `{name}` does not exist"));
                     error.add_label(
                         diagnostics::error_label(&first_token.span)
-                            .with_message("Attempting to call the macro here"),
+                            .with_message("attempting to call the macro here"),
                     );
                 }),
                 Some(Err(other)) => parse_ctx.error(&first_token.span, |error| {
@@ -234,7 +234,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
                     error.add_labels([
                         diagnostics::error_label(&first_token.span).with_message("Macro call here"),
                         diagnostics::note_label(other.def_span())
-                            .with_message("A symbol by this name was defined here"),
+                            .with_message("a symbol by this name was defined here"),
                     ]);
                 }),
                 Some(Ok(slice)) => {
@@ -378,7 +378,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
             parse_ctx.report_syntax_error(&first_token, |error, span| {
                 error.add_label(
                     diagnostics::error_label(span)
-                        .with_message("Expected an instruction or a directive here"),
+                        .with_message("expected an instruction or a directive here"),
                 )
             });
 
@@ -399,7 +399,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
         |"end of line" / "end of input"| => {},
         else |unexpected| => {
             parse_ctx.report_syntax_error(&unexpected, |error, span| {
-                error.add_label(diagnostics::error_label(span).with_message("Expected nothing else on this line"))
+                error.add_label(diagnostics::error_label(span).with_message("expected nothing else on this line"))
             });
         }
     });
@@ -411,7 +411,7 @@ fn expect_eol(mut lookahead: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     if !matches_tok!(lookahead, "end of line" | "end of input") {
         parse_ctx.report_syntax_error(&lookahead, |error, span| {
             error.add_label(
-                diagnostics::error_label(span).with_message("Expected nothing else on this line"),
+                diagnostics::error_label(span).with_message("expected nothing else on this line"),
             );
         });
         discard_rest_of_line(lookahead, parse_ctx)
@@ -435,10 +435,10 @@ fn reject_prior_label_def(
 ) {
     if let Some(span) = label_span {
         parse_ctx.error(&span, |error| {
-            error.set_message("A label is not allowed here");
+            error.set_message("a label is not allowed here");
             error.add_labels([
                 diagnostics::error_label(&span)
-                    .with_message("This label cannot be on the same line..."),
+                    .with_message("this label cannot be on the same line..."),
                 diagnostics::note_label(directive_span)
                     .with_message(format!("...as a `{directive_name}` directive")),
             ]);
@@ -500,7 +500,7 @@ impl parse_ctx!() {
         callback: F,
     ) {
         self.error(&token.span, |error| {
-            error.set_message(format!("Syntax error: unexpected {}", &token.payload));
+            error.set_message(format!("syntax error: unexpected {}", &token.payload));
             callback(error, &token.span);
         })
     }

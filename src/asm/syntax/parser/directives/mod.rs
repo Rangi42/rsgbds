@@ -29,7 +29,7 @@ pub(super) fn parse_dw(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
 pub(super) fn parse_endm(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     parse_ctx.report_syntax_error(&keyword, |error, span| {
         error.add_label(
-            diagnostics::error_label(span).with_message("This `ENDM` is outside of a macro"),
+            diagnostics::error_label(span).with_message("this `ENDM` is outside of a macro"),
         );
     });
 
@@ -39,7 +39,7 @@ pub(super) fn parse_endm(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token 
 pub(super) fn parse_endr(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     parse_ctx.report_syntax_error(&keyword, |error, span| {
         error.add_label(
-            diagnostics::error_label(span).with_message("This `ENDR` is outside of a loop"),
+            diagnostics::error_label(span).with_message("this `ENDR` is outside of a loop"),
         );
     });
 

@@ -24,7 +24,7 @@ pub(in super::super) fn parse_if(keyword: Token, parse_ctx: &mut parse_ctx!()) -
                 error.set_message(&err);
                 error.add_label(
                     diagnostics::error_label(&keyword.span)
-                        .with_message("This `IF` is missing a corresponding `ENDC`"),
+                        .with_message("this `IF` is missing a corresponding `ENDC`"),
                 );
             });
             parse_ctx.lexer.cond_stack.pop(); // Avoid reporting the error a second time when the lexer context is exited.
@@ -81,7 +81,7 @@ pub(in super::super) fn parse_elif(keyword: Token, parse_ctx: &mut parse_ctx!())
             error.set_message(&err);
             error.add_label(
                 diagnostics::error_label(&keyword.span)
-                    .with_message("This `ELIF` is missing a corresponding `ENDC`"),
+                    .with_message("this `ELIF` is missing a corresponding `ENDC`"),
             );
         });
         parse_ctx.lexer.cond_stack.pop(); // Avoid reporting the error a second time when the lexer context is exited.
@@ -92,7 +92,7 @@ pub(in super::super) fn parse_elif(keyword: Token, parse_ctx: &mut parse_ctx!())
                 |error| {
                     error.set_message("`ELIF` found after `ELSE`");
                     error.add_labels([
-                        diagnostics::error_label(&keyword.span).with_message("This `ELIF`..."),
+                        diagnostics::error_label(&keyword.span).with_message("this `ELIF`..."),
                         diagnostics::error_label(span)
                             .with_message("...cannot be after this `ELSE`"),
                     ])
@@ -105,7 +105,7 @@ pub(in super::super) fn parse_elif(keyword: Token, parse_ctx: &mut parse_ctx!())
         parse_ctx.error(&keyword.span, |error| {
             error.set_message("`ELIF` found outside of a conditional block");
             error.add_label(
-                diagnostics::error_label(&keyword.span).with_message("No `IF` matches this"),
+                diagnostics::error_label(&keyword.span).with_message("no `IF` matches this"),
             );
         });
     }
@@ -123,7 +123,7 @@ pub(in super::super) fn parse_else(keyword: Token, parse_ctx: &mut parse_ctx!())
                 |error| {
                     error.set_message("`ELSE` found after another `ELSE`");
                     error.add_labels([
-                        diagnostics::error_label(&keyword.span).with_message("This `ELSE`..."),
+                        diagnostics::error_label(&keyword.span).with_message("this `ELSE`..."),
                         diagnostics::error_label(span)
                             .with_message("...cannot be after this `ELSE`"),
                     ]);
@@ -143,7 +143,7 @@ pub(in super::super) fn parse_else(keyword: Token, parse_ctx: &mut parse_ctx!())
                         error.set_message(&err);
                         error.add_label(
                             diagnostics::error_label(&keyword.span)
-                                .with_message("This `ELSE` is missing a corresponding `ENDC`"),
+                                .with_message("this `ELSE` is missing a corresponding `ENDC`"),
                         );
                     },
                     parse_ctx.nb_errors_remaining,
@@ -155,7 +155,7 @@ pub(in super::super) fn parse_else(keyword: Token, parse_ctx: &mut parse_ctx!())
         parse_ctx.error(&keyword.span, |error| {
             error.set_message("`ENDC` found outside of a conditional block");
             error.add_label(
-                diagnostics::error_label(&keyword.span).with_message("No `IF` matches this"),
+                diagnostics::error_label(&keyword.span).with_message("no `IF` matches this"),
             );
         });
     }
@@ -170,7 +170,7 @@ pub(in super::super) fn parse_endc(keyword: Token, parse_ctx: &mut parse_ctx!())
         parse_ctx.error(&keyword.span, |error| {
             error.set_message("`ENDC` found outside of a conditional block");
             error.add_label(
-                diagnostics::error_label(&keyword.span).with_message("No `IF` matches this"),
+                diagnostics::error_label(&keyword.span).with_message("no `IF` matches this"),
             );
         });
     }

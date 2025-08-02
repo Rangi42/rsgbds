@@ -30,7 +30,7 @@ pub(super) fn reverse(
 
     if options.allow_dedup && options.tilemap_path.is_none() {
         crate::build_warning()
-            .with_message("Tile deduplication is enabled, but no tilemap was provided?")
+            .with_message("tile deduplication is enabled, but no tilemap was provided?")
             .finish()
             .eprint_();
     }
@@ -38,7 +38,7 @@ pub(super) fn reverse(
     if options.use_color_curve {
         // TODO
         crate::build_warning()
-            .with_message("The color curve is not yet supported in reverse mode")
+            .with_message("the color curve is not yet supported in reverse mode")
             .finish()
             .eprint_();
     }
@@ -74,9 +74,9 @@ pub(super) fn reverse(
     if remainder != 0 {
         let nb_bytes = tiles.len() - remainder;
         crate::build_error()
-            .with_message("Tile data was not an integer amount of tiles")
+            .with_message("tile data was not an integer amount of tiles")
             .with_note(format!(
-                "Read {} bytes, expected {nb_tiles} ({nb_bytes} tiles) or {} ({} tiles)",
+                "read {} bytes, expected {nb_tiles} ({nb_bytes} tiles) or {} ({} tiles)",
                 tiles.len(),
                 nb_tiles + 1,
                 nb_bytes + tile_len,
@@ -104,7 +104,7 @@ pub(super) fn reverse(
     };
     let nb_tile_instances = NonZeroUsize::new(nb_tile_instances).ok_or_else(|| {
         crate::build_error()
-            .with_message("Cannot generate an empty image")
+            .with_message("cannot generate an empty image")
             .finish()
             .eprint_();
         ExitCode::DataErr
@@ -112,7 +112,7 @@ pub(super) fn reverse(
     if let Some(&[bank0, bank1]) = options.max_nb_tiles.as_ref() {
         if nb_tile_instances.get() > usize::from(bank0) + usize::from(bank1) {
             crate::build_error()
-                .with_message(format!("Read more tiles ({nb_tile_instances}) than the limit would permit ({bank0} + {bank1})"))
+                .with_message(format!("read more tiles ({nb_tile_instances}) than the limit would permit ({bank0} + {bank1})"))
                 .finish()
                 .eprint_();
             return Err(ExitCode::DataErr);
@@ -120,7 +120,7 @@ pub(super) fn reverse(
     }
 
     if nb_tile_instances.get() % NonZeroUsize::from(width) != 0 {
-        crate::build_error().with_message(format!("Total number of tiles ({nb_tile_instances}) is not a multiple of the image width ({width} tiles)"))
+        crate::build_error().with_message(format!("total number of tiles ({nb_tile_instances}) is not a multiple of the image width ({width} tiles)"))
             .finish()
             .eprint_();
         return Err(ExitCode::DataErr);
@@ -175,7 +175,7 @@ pub(super) fn reverse(
                 || std::iter::zip(&palettes, colors).any(|(effective, specified)| todo!())
             {
                 crate::build_warning()
-                        .with_message("Colors in the palette file do not match what was specified on the command line!")
+                        .with_message("colors in the palette file do not match what was specified on the command line!")
                         // TODO: format the colors
                         //.with_note(format!("File colors:\n"), format!("Command line colors;\n"))
                         .finish()
@@ -232,9 +232,9 @@ pub(super) fn reverse(
 
         if attrmap.len() != nb_tile_instances.get() {
             crate::build_error()
-                .with_message("The attribute map's size doesn't match the image's")
+                .with_message("the attribute map's size doesn't match the image's")
                 .with_note(
-                    format!("The attribute map is {} tiles long, but the image is {nb_tile_instances} instead", attrmap.len()),
+                    format!("the attribute map is {} tiles long, but the image is {nb_tile_instances} instead", attrmap.len()),
                 )
                 .finish()
                 .eprint_();
@@ -251,7 +251,7 @@ pub(super) fn reverse(
 
             if usize::from(attr & 0b111) >= palettes.len() {
                 crate::build_error()
-                    .with_message(format!("The attribute at ({x}, {y}) is referencing a palette that doesn't exist"))
+                    .with_message(format!("the attribute at ({x}, {y}) is referencing a palette that doesn't exist"))
                     .with_note(
                         pixel_coords_str(x, y),
                         ).with_help(
@@ -264,7 +264,7 @@ pub(super) fn reverse(
 
             if attr & 0x08 != 0 && tilemap.is_none() {
                 crate::build_warning()
-                    .with_message(format!("The attribute at ({x}, {y}) indicates VRAM bank 1, but no tilemap was provided"))
+                    .with_message(format!("the attribute at ({x}, {y}) indicates VRAM bank 1, but no tilemap was provided"))
                     .with_note(
                         pixel_coords_str(x, y),
                         ).with_help(
@@ -276,7 +276,7 @@ pub(super) fn reverse(
         }
         if bad {
             crate::build_error()
-                .with_message("The attribute map is invalid")
+                .with_message("the attribute map is invalid")
                 .with_note("See previous errors")
                 .finish()
                 .eprint_();
@@ -346,9 +346,9 @@ pub(super) fn reverse(
 
         if palmap.len() != nb_tile_instances.get() {
             crate::build_error()
-                .with_message("The palette map's size doesn't match the image's")
+                .with_message("the palette map's size doesn't match the image's")
                 .with_note(format!(
-                    "The palette map is {} tiles long, but the image is {nb_tile_instances} instead",
+                    "the palette map is {} tiles long, but the image is {nb_tile_instances} instead",
                     palmap.len(),
                 ))
                 .finish()
@@ -433,7 +433,7 @@ pub(super) fn reverse(
                     let color = *palette.get(usize::from(color_id))
                         .ok_or_else(|| {
                             crate::build_error()
-                                .with_message("Attempting to index out of bounds into a palette")
+                                .with_message("attempting to index out of bounds into a palette")
                                 .with_note(
                                     pixel_coords_str(tile_x, tile_y),
                                 ).with_help(format!(

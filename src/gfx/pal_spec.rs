@@ -48,7 +48,7 @@ pub fn parse_palette_file(
         parse_gbc_file(file, path, nb_colors_per_pal, use_curve)
     } else {
         crate::build_error()
-            .with_message(format!("Unknown external palette spec format \"{format}\""))
+            .with_message(format!("unknown external palette spec format \"{format}\""))
             .with_help("Supported formats are PSP, GPL, HEX, ACT, ACO, and GBC")
             .finish()
             .eprint_();
