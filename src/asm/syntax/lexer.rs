@@ -1416,7 +1416,38 @@ impl Lexer {
                         }
                     }
                 }
-                // TODO: `
+                Some('`') => {
+                    self.consume(&mut span);
+                    match self.peek(&mut params) {
+                        Some(ch) if params.options.runtime_opts.gfx_chars.contains(&ch) => {
+                            self.consume(&mut span);
+                            let value = self.read_gfx_constant(ch, &mut span, &mut params);
+                            break Token {
+                                payload: tok!("number"(value)),
+                                span: Span::Normal(span),
+                            };
+                        }
+                        _ => {
+                            let err_span = Span::Normal(span.clone());
+                            params.error(&err_span, |error| {
+                                error.set_message("lone '`'");
+                                error.add_label(
+                                    diagnostics::error_label(&err_span)
+                                        .with_message("expected a graphics character after this"),
+                                );
+                                let gfx_char = |i: usize| params.options.runtime_opts.gfx_chars[i].escape_default();
+                                error.set_help(format!(
+                                    "the graphics characters at this point are '{}', '{}', '{}', and '{}'",
+                                    gfx_char(0),
+                                    gfx_char(1),
+                                    gfx_char(2),
+                                    gfx_char(3),
+                                ));
+                            });
+                            span.bytes.start = span.bytes.end;
+                        }
+                    }
+                }
 
                 // String.
                 Some('"') => {
@@ -1592,6 +1623,57 @@ impl Lexer {
         }
 
         value as i32
+    }
+
+    fn read_gfx_constant(
+        &mut self,
+        first_char: char,
+        span: &mut NormalSpan,
+        params: &mut LexerParams,
+    ) -> i32 {
+        fn value_of(ch: char, params: &LexerParams) -> u8 {
+            params
+                .options
+                .runtime_opts
+                .gfx_chars
+                .iter()
+                .position(|&digit| digit == ch)
+                .unwrap() as u8
+        }
+        let value = value_of(first_char, params);
+        let mut low_bitplane = value & 1;
+        let mut high_bitplane = value >> 1;
+
+        let mut overflowed = false;
+        loop {
+            let next_up = self.peek(params);
+            let digits = params.options.runtime_opts.gfx_chars;
+            match next_up {
+                Some('_') => self.consume(span), // TODO: disallow trailing underscores
+                Some(ch) if digits.contains(&ch) => {
+                    self.consume(span);
+
+                    let value = value_of(ch, params);
+                    overflowed |= low_bitplane & 0x80 != 0 || high_bitplane & 0x80 != 0;
+                    low_bitplane = (low_bitplane << 1) + (value & 1);
+                    high_bitplane = (high_bitplane << 1) + (value >> 1);
+                }
+                _ => break,
+            }
+        }
+
+        if overflowed {
+            let span = Span::Normal(span.clone());
+            params.warn(warning!("large-constant"), &span, |warning| {
+                warning.set_message("graphics constant contains more than 8 pixels");
+                warning.add_label(
+                    diagnostics::warning_label(&span)
+                        .with_message(format!("this was truncated to ${value:04X}")),
+                )
+            })
+        }
+
+        ((high_bitplane as u16) << 8 | low_bitplane as u16) as i32
     }
 
     fn read_identifier(
