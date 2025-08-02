@@ -2149,8 +2149,8 @@ impl Lexer {
                 "Conditional block not started at beginning of line",
             );
 
-            const END_KEYWORD: &str = "ENDC";
-            const NESTING_KEYWORD: &str = "IF";
+            const END_KEYWORD: &str = "endc";
+            const NESTING_KEYWORD: &str = "if";
             let mut block = text;
             let mut nesting_depth = 0usize;
             loop {
@@ -2171,8 +2171,8 @@ impl Lexer {
                             None => break block_len,
                         }
                     } else if nesting_depth == 0
-                        && (unicase::eq_ascii(first_word, "ELIF")
-                            || unicase::eq_ascii(first_word, "ELSE"))
+                        && (unicase::eq_ascii(first_word, "elif")
+                            || unicase::eq_ascii(first_word, "else"))
                     {
                         break block_len;
                     }
