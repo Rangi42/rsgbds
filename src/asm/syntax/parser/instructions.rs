@@ -6,7 +6,7 @@ use crate::{
     syntax::{parser::expr, tokens::Token},
 };
 
-use super::{expect_one_of, matches_tok, misc, parse_ctx, require};
+use super::{expect_one_of, matches_tok, misc, parse_ctx};
 
 macro_rules! operand {
     ($kind:ident::$value:ident) => {
@@ -31,15 +31,71 @@ pub(super) fn parse_ld(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    let (operands, lookahead) =
+    let (mut operands, lookahead) =
         misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
 
     let res = match operands.as_slice() {
+        // ld <reg8>, <reg8>
         [lhs, rhs] if lhs.is_reg8() && rhs.is_reg8() => Some(Instruction::ld_r8_r8(
             lhs.to_reg8(),
             rhs.to_reg8(),
             instr_token.span.merged_with(&rhs.span),
         )),
+
+        // ld <reg8>, <imm>
+        [lhs, Operand {
+            kind: OperandKind::Expr(_),
+            indirect: false,
+            span,
+        }] if lhs.is_reg8() => {
+            let dest = lhs.to_reg8();
+            let span = instr_token.span.merged_with(span);
+            let Some(Operand {
+                kind: OperandKind::Expr(src),
+                ..
+            }) = operands.drain(..).nth(1)
+            else {
+                unreachable!()
+            };
+            Some(Instruction::ld_r8_imm(dest, src, span))
+        }
+
+        // `ld a, [<reg16>]`
+        [operand!(Reg8::A), Operand {
+            kind: OperandKind::Reg16(r16),
+            indirect: true,
+            span,
+        }] => Instruction::ld_a_r16_ind(false, *r16, instr_token.span.merged_with(span)),
+        // `ld [<reg16>], a`
+        [Operand {
+            kind: OperandKind::Reg16(r16),
+            indirect: true,
+            span,
+        }, operand!(Reg8::A)] => {
+            Instruction::ld_a_r16_ind(true, *r16, instr_token.span.merged_with(span))
+        }
+
+        // `ld sp, hl`
+        [operand!(Reg16::Sp), rhs @ operand!(Reg16::Hl)] => Some(Instruction::ld_sp_hl(
+            instr_token.span.merged_with(&rhs.span),
+        )),
+
+        // `ld hl, sp +/- <ofs>`
+        [operand!(Reg16::Hl), Operand {
+            kind: OperandKind::SpRel(_),
+            indirect: false,
+            span,
+        }] => {
+            let span = instr_token.span.merged_with(span);
+            let Some(Operand {
+                kind: OperandKind::SpRel(offset),
+                ..
+            }) = operands.drain(..).nth(1)
+            else {
+                unreachable!()
+            };
+            Some(Instruction::ld_hl_sp_ofs(offset, span))
+        }
 
         // TODO: the other variants of `ld`.
         _ => {
@@ -1134,7 +1190,11 @@ pub(super) fn parse_cpl(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    let (operand, lookahead) = parse_operand(parse_ctx.next_token(), parse_ctx);
+    let lookahead = parse_ctx.next_token();
+    let (operand, lookahead) = expect_one_of! { lookahead => {
+        |"end of line" / "end of input"| => (None, lookahead),
+        else |unexpected| => parse_operand(unexpected, parse_ctx)
+    }};
 
     let instruction = match operand {
         Some(operand!(Reg8::A)) | None => {
@@ -1360,7 +1420,10 @@ fn parse_operand(lookahead: Token, parse_ctx: &mut parse_ctx!()) -> (Option<Oper
             },
             else |unexpected| => {
                 parse_ctx.report_syntax_error(&unexpected, |error, span| {
-                    error.add_labels([diagnostics::error_label(span).with_message("expected a closing bracket...")]);
+                    error.add_labels([
+                        diagnostics::error_label(span).with_message("expected a closing bracket..."),
+                        diagnostics::error_label(&opening_span).with_message("...to close this one"),
+                    ]);
                 });
                 unexpected
             }

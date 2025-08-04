@@ -66,6 +66,53 @@ impl Instruction {
             patch: None,
         }
     }
+    pub fn ld_r8_imm(dest: Reg8, src: Expr, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [0x08 | dest.id() << 3, Default::default()]
+                .into_iter()
+                .collect(),
+            patch: Some(Patch {
+                kind: PatchKind::Byte,
+                offset: 1,
+                expr: src,
+            }),
+        }
+    }
+    pub fn ld_a_r16_ind(is_write: bool, reg: Reg16, span: Span) -> Option<Self> {
+        match reg {
+            Reg16::Bc => Some(0),
+            Reg16::De => Some(1),
+            Reg16::Hli => Some(2),
+            Reg16::Hld => Some(3),
+            Reg16::Hl | Reg16::Af | Reg16::Sp => None,
+        }
+        .map(|encoded| Self {
+            span,
+            bytes: [if is_write { 0x02 } else { 0x0A } | encoded << 4]
+                .into_iter()
+                .collect(),
+            patch: None,
+        })
+    }
+    pub fn ld_sp_hl(span: Span) -> Self {
+        Self {
+            span,
+            bytes: [0xF9].into_iter().collect(),
+            patch: None,
+        }
+    }
+    pub fn ld_hl_sp_ofs(offset: Expr, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [0xF8, Default::default()].into_iter().collect(),
+            patch: Some(Patch {
+                kind: PatchKind::Byte,
+                offset: 1,
+                expr: offset,
+            }),
+        }
+    }
 
     pub fn ldh_c(is_write: bool, span: Span) -> Self {
         Self {
