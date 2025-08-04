@@ -33,6 +33,7 @@ enum OpKind {
     Low,
     High,
     Rst,
+    Ldh,
     BitCheck(u8),
     /// Placeholder of sorts.
     Nothing,
@@ -58,6 +59,7 @@ enum ErrKind {
     },
     DivBy0,
     RstRange(i32),
+    LdhRange(i32),
     BitRange(i32),
     // This error kind is special, in that it's never reported.
     // It's required so that expressions with bad syntax can be "evaluated" gracefully,
@@ -119,6 +121,15 @@ impl Expr {
         self
     }
 
+    pub fn ldh(mut self, span: Span) -> Self {
+        if !self.payload.is_empty() {
+            self.payload.push(Op {
+                span,
+                kind: OpKind::Ldh,
+            });
+        }
+        self
+    }
     pub fn rst(mut self, span: Span) -> Self {
         if !self.payload.is_empty() {
             self.payload.push(Op {
@@ -209,6 +220,17 @@ impl Expr {
                                 })
                             }
                         }
+                        Err(err) => Err(err.bubble_up()),
+                    });
+                }
+                OpKind::Ldh => {
+                    let value = eval_stack.pop().unwrap();
+                    eval_stack.push(match value {
+                        Ok((number @ 0xFF00..=0xFFFF, span)) => Ok((number & 0xFF, span)),
+                        Ok((number, span)) => Err(Error {
+                            span,
+                            kind: ErrKind::LdhRange(number),
+                        }),
                         Err(err) => Err(err.bubble_up()),
                     });
                 }
@@ -487,6 +509,10 @@ impl ErrKind {
             Self::RstRange(value) => (
                 format!("destination address ${value:04X} is not valid for `rst`"),
                 "this must be one of $00, $08, $10, $18, $20, $28, $30, or $38".into(),
+            ),
+            ErrKind::LdhRange(value) => (
+                format!("${value:04X} is not a valid address for `ldh`"),
+                "this must be between $FF00 and $FFFF inclusive".into(),
             ),
             ErrKind::BitRange(value) => (
                 format!("{value} is not a valid bit number"),

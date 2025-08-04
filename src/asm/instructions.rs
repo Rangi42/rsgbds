@@ -52,20 +52,6 @@ impl Reg8 {
         *self as u8
     }
 }
-impl Reg16 {
-    fn id(&self) -> u8 {
-        match self {
-            Reg16::Bc => 0,
-            Reg16::De => 1,
-            Reg16::Hl => 2,
-            Reg16::Af => 3, // For `push` / `pop`.
-            Reg16::Sp => 3, // For `inc`, `dec`, and `add`.
-            // For `ld a, []`.
-            Reg16::Hli => 2,
-            Reg16::Hld => 3,
-        }
-    }
-}
 impl Condition {
     fn id(&self) -> u8 {
         *self as u8
@@ -73,6 +59,35 @@ impl Condition {
 }
 
 impl Instruction {
+    pub fn ld_r8_r8(dest: Reg8, src: Reg8, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [0x40 | dest.id() << 3 | src.id()].into_iter().collect(),
+            patch: None,
+        }
+    }
+
+    pub fn ldh_c(is_write: bool, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [if is_write { 0xE2 } else { 0xF2 }].into_iter().collect(),
+            patch: None,
+        }
+    }
+    pub fn ldh(is_write: bool, address: Expr, instr_span: Span, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [if is_write { 0xE0 } else { 0xF0 }, Default::default()]
+                .into_iter()
+                .collect(),
+            patch: Some(Patch {
+                kind: PatchKind::Byte,
+                offset: 1,
+                expr: address.ldh(instr_span),
+            }),
+        }
+    }
+
     pub fn add_r16(rhs: Reg16, span: Span) -> Option<Self> {
         match rhs {
             Reg16::Bc => Some(0x09),
@@ -86,6 +101,17 @@ impl Instruction {
             bytes: [byte].into_iter().collect(),
             patch: None,
         })
+    }
+    pub fn add_sp(ofs: Expr, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [0xE8, Default::default()].into_iter().collect(),
+            patch: Some(Patch {
+                kind: PatchKind::Byte,
+                offset: 1,
+                expr: ofs,
+            }),
+        }
     }
     pub fn add(rhs: Reg8, span: Span) -> Self {
         Self {
@@ -283,7 +309,7 @@ impl Instruction {
     }
 
     pub fn bit(reg: Reg8, bit: Expr, span: Span, instr_span: Span) -> Self {
-        let second_byte = bit.bit_check(0x40, instr_span);
+        let second_byte = bit.bit_check(0x40 | reg.id() << 3, instr_span);
         Self {
             span,
             bytes: [0xCB, Default::default()].into_iter().collect(),
@@ -295,7 +321,7 @@ impl Instruction {
         }
     }
     pub fn res(reg: Reg8, bit: Expr, span: Span, instr_span: Span) -> Self {
-        let second_byte = bit.bit_check(0x80, instr_span);
+        let second_byte = bit.bit_check(0x80 | reg.id() << 3, instr_span);
         Self {
             span,
             bytes: [0xCB, Default::default()].into_iter().collect(),
@@ -307,7 +333,7 @@ impl Instruction {
         }
     }
     pub fn set(reg: Reg8, bit: Expr, span: Span, instr_span: Span) -> Self {
-        let second_byte = bit.bit_check(0xC0, instr_span);
+        let second_byte = bit.bit_check(0xC0 | reg.id() << 3, instr_span);
         Self {
             span,
             bytes: [0xCB, Default::default()].into_iter().collect(),
@@ -449,7 +475,7 @@ impl Instruction {
             span,
             bytes: [byte, Default::default()].into_iter().collect(),
             patch: Some(Patch {
-                kind: PatchKind::Byte,
+                kind: PatchKind::Jr,
                 offset: 1,
                 expr: target,
             }),
@@ -466,14 +492,14 @@ impl Instruction {
             patch: None,
         }
     }
-    pub fn rst(target: Expr, span: Span) -> Self {
+    pub fn rst(target: Expr, instr_span: Span, span: Span) -> Self {
         Self {
             span,
             bytes: [Default::default()].into_iter().collect(),
             patch: Some(Patch {
                 kind: PatchKind::Byte,
                 offset: 0,
-                expr: target,
+                expr: target.rst(instr_span),
             }),
         }
     }

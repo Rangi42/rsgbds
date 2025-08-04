@@ -74,6 +74,8 @@ pub enum PatchKind {
     Byte,
     Word,
     Long,
+    Jr,
+    // TODO: transfer the HRAM, `rst`, `bit`, `set`, and `res` RPN opcodes to patch kinds
 }
 
 impl Sections {

@@ -6,7 +6,7 @@ use crate::{
     syntax::{parser::expr, tokens::Token},
 };
 
-use super::{expect_one_of, matches_tok, misc, parse_ctx};
+use super::{expect_one_of, matches_tok, misc, parse_ctx, require};
 
 macro_rules! operand {
     ($kind:ident::$value:ident) => {
@@ -31,14 +31,104 @@ pub(super) fn parse_ld(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    todo!()
+    let (operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let res = match operands.as_slice() {
+        [lhs, rhs] if lhs.is_reg8() && rhs.is_reg8() => Some(Instruction::ld_r8_r8(
+            lhs.to_reg8(),
+            rhs.to_reg8(),
+            instr_token.span.merged_with(&rhs.span),
+        )),
+
+        // TODO: the other variants of `ld`.
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span.clone(),
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `ld`");
+                    error.add_label(
+                        diagnostics::error_label(&span).with_message("these operands are invalid"),
+                    );
+                });
+            }
+            None
+        }
+    };
+    (res, lookahead)
 }
 
 pub(super) fn parse_ldh(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    todo!()
+    let (mut operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let res = match operands.as_slice() {
+        [lhs @ operand!(Reg8::A), Operand {
+            kind: OperandKind::Reg8(Reg8::C),
+            indirect: true,
+            span,
+        }] => Some(Instruction::ldh_c(false, lhs.span.merged_with(span))),
+        [Operand {
+            kind: OperandKind::Reg8(Reg8::C),
+            indirect: true,
+            span,
+        }, rhs @ operand!(Reg8::A)] => Some(Instruction::ldh_c(true, span.merged_with(&rhs.span))),
+
+        [lhs @ operand!(Reg8::A), Operand {
+            kind: OperandKind::Expr(_),
+            indirect: true,
+            span,
+        }] => {
+            let span = lhs.span.merged_with(span);
+            let Some(Operand {
+                kind: OperandKind::Expr(addr),
+                ..
+            }) = operands.drain(..).nth(1)
+            else {
+                unreachable!()
+            };
+            Some(Instruction::ldh(false, addr, instr_token.span, span))
+        }
+        [Operand {
+            kind: OperandKind::Expr(_),
+            indirect: true,
+            span,
+        }, rhs @ operand!(Reg8::A)] => {
+            let span = span.merged_with(&rhs.span);
+            let Some(Operand {
+                kind: OperandKind::Expr(addr),
+                ..
+            }) = operands.drain(..).next()
+            else {
+                unreachable!()
+            };
+            Some(Instruction::ldh(true, addr, instr_token.span, span))
+        }
+
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span.clone(),
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `ldh`");
+                    error.add_label(
+                        diagnostics::error_label(&span).with_message("expected an address and `a`"),
+                    );
+                    error.set_help("did you mean to use `ld`?");
+                });
+            }
+            None
+        }
+    };
+    (res, lookahead)
 }
 
 // Arithmetic and logic instructions.
@@ -103,6 +193,25 @@ pub(super) fn parse_add(
                 }
             };
             (instruction, lookahead)
+        },
+
+        |"sp"| => {
+            let lookahead = expect_one_of! { parse_ctx.next_token() => {
+                |","| => parse_ctx.next_token(),
+                else |unexpected| => {
+                    parse_ctx.report_syntax_error(&unexpected, |error, span| {
+                        error.add_label(diagnostics::error_label(span).with_message("expected a comma here"));
+                    });
+                    unexpected
+                }
+            }};
+
+            let (expr, lookahead) = expr::parse_numeric_expr(lookahead, parse_ctx);
+            let expr = expr.map(|expr| {
+                let span = expr.overall_span();
+                Instruction::add_sp(expr, span)
+            });
+            (expr, lookahead)
         },
 
         else |unexpected| => {
@@ -993,7 +1102,7 @@ pub(super) fn parse_rst(
     let (expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
     let span = instr_token.span.merged_with(expr.last_span());
     (
-        Some(Instruction::rst(expr.rst(instr_token.span), span)),
+        Some(Instruction::rst(expr, instr_token.span, span)),
         lookahead,
     )
 }
