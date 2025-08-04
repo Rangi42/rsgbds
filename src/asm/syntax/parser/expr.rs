@@ -5,7 +5,7 @@ use crate::{
     diagnostics,
     expr::{BinOp, Expr, UnOp},
     sources::Span,
-    syntax::tokens::{tok, Token},
+    syntax::tokens::Token,
     Options,
 };
 
@@ -28,7 +28,7 @@ fn parse_subexpr(
     min_binding_power: u8,
 ) -> (Option<Expr>, Token) {
     let (mut lhs, mut token) = expect_one_of!(lookahead => {
-        Token { span } |"("| => {
+        Token { span } @ |"("| => {
             // The inner expression's minimum power is reset, due to the parens' grouping behavior.
             let (expr, lookahead) = expect_subexpr(parse_ctx.next_token(),parse_ctx, 0);
             let lookahead = expect_one_of!(lookahead => {
@@ -49,11 +49,11 @@ fn parse_subexpr(
             (expr, lookahead)
         },
 
-        Token { span } |"number"(number)| => {
+        Token { span } @ |"number"(number)| => {
             let lookahead = parse_ctx.next_token();
             (Expr::number(number, span), lookahead)
         },
-        Token { span } |"identifier"(ident, _)| => {
+        Token { span } @ |"identifier"(ident, _)| => {
             let lookahead = parse_ctx.next_token();
             if matches_tok!(lookahead, "(") {
                 todo!(); // Function call.

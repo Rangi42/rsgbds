@@ -14,6 +14,7 @@ mod diagnostics;
 use diagnostics::{WarningState, NB_META_WARNINGS, NB_WARNINGS};
 mod expr;
 mod format;
+mod instructions;
 mod macro_args;
 mod section;
 use section::Sections;

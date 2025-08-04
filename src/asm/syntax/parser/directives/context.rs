@@ -119,7 +119,7 @@ pub(in super::super) fn parse_for(keyword: Token, parse_ctx: &mut parse_ctx!()) 
     let mut step_span = None;
 
     let (ident_maybe, start, stop, step, lookahead) = expect_one_of! { parse_ctx.next_token() => {
-        Token { span } |"identifier"(ident, _)| => {
+        Token { span } @ |"identifier"(ident, _)| => {
             expect_one_of! { parse_ctx.next_token() => {
                 |","| => {
                     let (start_expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);

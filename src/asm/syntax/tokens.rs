@@ -238,12 +238,8 @@ define_tokens! {
         Jp,
         #[name = "jr", keyword()]
         Jr,
-        #[name = "ldd", keyword()]
-        Ldd,
         #[name = "ldh", keyword()]
         Ldh,
-        #[name = "ldi", keyword()]
-        Ldi,
         #[name = "ld", keyword()]
         Ld,
         #[name = "nop", keyword()]

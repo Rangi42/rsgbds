@@ -167,7 +167,7 @@ fn parse_section_attrs(
                 }};
             },
 
-            Token { span: align_span } |"align"| => {
+            Token { span: align_span } @ |"align"| => {
                 expect_one_of! { parse_ctx.next_token() => {
                     |"["| => lookahead = parse_ctx.next_token(),
                     else |other| => {

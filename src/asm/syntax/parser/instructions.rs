@@ -1,187 +1,908 @@
-use crate::syntax::tokens::Token;
+use std::borrow::Cow;
 
-use super::parse_ctx;
+use crate::{
+    diagnostics,
+    expr::Expr,
+    instructions::{Condition, Instruction, Reg16, Reg8},
+    sources::Span,
+    syntax::{parser::expr, tokens::Token},
+};
 
-pub(super) fn parse_adc(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+use super::{expect_one_of, matches_tok, misc, parse_ctx, require, tok};
+
+macro_rules! operand {
+    ($kind:ident::$value:ident) => {
+        Operand {
+            kind: OperandKind::$kind($kind::$value),
+            indirect: false,
+            ..
+        }
+    };
+    ([$kind:ident::$value:ident]) => {
+        Operand {
+            kind: OperandKind::$kind($kind::$value),
+            indirect: true,
+            ..
+        }
+    };
+}
+
+// Instructions are ordered like in the manual page.
+
+// Load. There's a lot of variants.
+
+pub(super) fn parse_ld(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_add(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+pub(super) fn parse_ldh(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_and(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+// Arithmetic and logic instructions.
+
+pub(super) fn parse_adc(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (rhs, lookahead) = parse_arith_instr_args(&instr_token, parse_ctx.next_token(), parse_ctx);
+
+    let instruction = match rhs.kind {
+        OperandKind::Reg8(reg) => Some(Instruction::adc(reg, rhs.span)),
+        OperandKind::Expr(expr) => Some(Instruction::adc_imm(expr, rhs.span)),
+        OperandKind::Err | OperandKind::Reg16(_) | OperandKind::SpRel(_) => None,
+    };
+    (instruction, lookahead)
+}
+
+pub(super) fn parse_add(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    expect_one_of! { parse_ctx.next_token() => {
+        |"hl"| => {
+            let lookahead = expect_one_of! { parse_ctx.next_token() => {
+                |","| => parse_ctx.next_token(),
+                else |unexpected| => {
+                    parse_ctx.report_syntax_error(&unexpected, |error, span| {
+                        error.add_label(diagnostics::error_label(span).with_message("expected a comma here"));
+                    });
+                    unexpected
+                }
+            }};
+
+            let (res, lookahead) = parse_operand(lookahead, parse_ctx);
+            let instruction = match res {
+                None => {
+                    parse_ctx.error(&lookahead.span, |error| {
+                        error.set_message("missing right-hand side operand to `add hl`");
+                        error.add_label(diagnostics::error_label(&lookahead.span).with_message("expected a 16-bit register after the comma"));
+                    });
+                    None
+                },
+                Some(Operand { span, kind: OperandKind::Reg16(reg), indirect: false }) => {
+                    let instr = Instruction::add_r16(reg, instr_token.span.merged_with(&span));
+                    if instr.is_none() {
+                        parse_ctx.error(&span, |error| {
+                            error.set_message("invalid right-hand side operand to `add hl`");
+                            error.add_label(diagnostics::error_label(&span).with_message("expected one of `bc`, `de`, `hl`, or `sp`"));
+                        });
+                    }
+                    instr
+                },
+                Some(operand) => {
+                    parse_ctx.error(&operand.span, |error| {
+                        error.set_message("invalid right-hand side operand to `add hl`");
+                        error.add_label(diagnostics::error_label(&operand.span).with_message("expected a 16-bit register"));
+                    });
+                    None
+                }
+            };
+            (instruction, lookahead)
+        },
+
+        else |unexpected| => {
+            let (rhs, lookahead) = parse_arith_instr_args(&instr_token, unexpected, parse_ctx);
+
+            let instruction = match rhs.kind {
+                OperandKind::Reg8(reg) => Some(Instruction::add(reg, rhs.span)),
+                OperandKind::Expr(expr) => Some(Instruction::add_imm(expr, rhs.span)),
+                OperandKind::Err | OperandKind::Reg16(_) | OperandKind::SpRel(_) => None,
+            };
+            (instruction, lookahead)
+        }
+    }}
+}
+
+pub(super) fn parse_and(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (rhs, lookahead) = parse_arith_instr_args(&instr_token, parse_ctx.next_token(), parse_ctx);
+
+    let instruction = match rhs.kind {
+        OperandKind::Reg8(reg) => Some(Instruction::and(reg, rhs.span)),
+        OperandKind::Expr(expr) => Some(Instruction::and_imm(expr, rhs.span)),
+        OperandKind::Err | OperandKind::Reg16(_) | OperandKind::SpRel(_) => None,
+    };
+    (instruction, lookahead)
+}
+
+pub(super) fn parse_cp(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (rhs, lookahead) = parse_arith_instr_args(&instr_token, parse_ctx.next_token(), parse_ctx);
+
+    let instruction = match rhs.kind {
+        OperandKind::Reg8(reg) => Some(Instruction::cp(reg, rhs.span)),
+        OperandKind::Expr(expr) => Some(Instruction::cp_imm(expr, rhs.span)),
+        OperandKind::Err | OperandKind::Reg16(_) | OperandKind::SpRel(_) => None,
+    };
+    (instruction, lookahead)
+}
+
+pub(super) fn parse_or(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (rhs, lookahead) = parse_arith_instr_args(&instr_token, parse_ctx.next_token(), parse_ctx);
+
+    let instruction = match rhs.kind {
+        OperandKind::Reg8(reg) => Some(Instruction::or(reg, rhs.span)),
+        OperandKind::Expr(expr) => Some(Instruction::or_imm(expr, rhs.span)),
+        OperandKind::Err | OperandKind::Reg16(_) | OperandKind::SpRel(_) => None,
+    };
+    (instruction, lookahead)
+}
+
+pub(super) fn parse_sbc(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (rhs, lookahead) = parse_arith_instr_args(&instr_token, parse_ctx.next_token(), parse_ctx);
+
+    let instruction = match rhs.kind {
+        OperandKind::Reg8(reg) => Some(Instruction::sbc(reg, rhs.span)),
+        OperandKind::Expr(expr) => Some(Instruction::sbc_imm(expr, rhs.span)),
+        OperandKind::Err | OperandKind::Reg16(_) | OperandKind::SpRel(_) => None,
+    };
+    (instruction, lookahead)
+}
+
+pub(super) fn parse_sub(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (rhs, lookahead) = parse_arith_instr_args(&instr_token, parse_ctx.next_token(), parse_ctx);
+
+    let instruction = match rhs.kind {
+        OperandKind::Reg8(reg) => Some(Instruction::sub(reg, rhs.span)),
+        OperandKind::Expr(expr) => Some(Instruction::sub_imm(expr, rhs.span)),
+        OperandKind::Err | OperandKind::Reg16(_) | OperandKind::SpRel(_) => None,
+    };
+    (instruction, lookahead)
+}
+
+pub(super) fn parse_xor(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (rhs, lookahead) = parse_arith_instr_args(&instr_token, parse_ctx.next_token(), parse_ctx);
+
+    let instruction = match rhs.kind {
+        OperandKind::Reg8(reg) => Some(Instruction::xor(reg, rhs.span)),
+        OperandKind::Expr(expr) => Some(Instruction::xor_imm(expr, rhs.span)),
+        OperandKind::Err | OperandKind::Reg16(_) | OperandKind::SpRel(_) => None,
+    };
+    (instruction, lookahead)
+}
+
+fn parse_arith_instr_args(
+    instr_token: &Token,
+    lookahead: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Operand, Token) {
+    let (operands, lookahead) = misc::parse_comma_list(parse_operand, lookahead, parse_ctx);
+
+    let (kind, span) = match operands.as_slice() {
+        // `a, <rhs>` is equivalent to `<rhs>`.
+        [operand!(Reg8::A), rhs @ Operand { kind, .. }] | [rhs @ Operand { kind, .. }]
+            if rhs.is_reg8() || matches!(kind, OperandKind::Expr(_)) =>
+        {
+            let kind = match kind {
+                OperandKind::Expr(expr) => OperandKind::Expr(expr.clone()),
+                OperandKind::Reg8(r8) => OperandKind::Reg8(*r8),
+                OperandKind::Reg16(Reg16::Hl) => OperandKind::Reg8(Reg8::HlInd),
+                _ => unreachable!(),
+            };
+
+            (
+                kind,
+                instr_token.span.merged_with(&operands.last().unwrap().span),
+            )
+        }
+
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span.clone(),
+            };
+            parse_ctx.error(&span, |error| {
+                error.set_message(format!("invalid operands to {}", instr_token.payload));
+                error.add_label(diagnostics::error_label(&span).with_message(
+                    "expected an 8-bit register or an expression, optionally preceded by `a`",
+                ));
+                if matches!(
+                    operands.as_slice(),
+                    [operand!(Reg8::A), operand!(Reg16::Hl)] | [operand!(Reg16::Hl)]
+                ) {
+                    error.set_help("surround `hl` with brackets to dereference it: `[hl]`");
+                }
+            });
+            (OperandKind::Err, span)
+        }
+    };
+
+    (
+        Operand {
+            span,
+            kind,
+            indirect: false,
+        },
+        lookahead,
+    )
+}
+
+// Increment and decrement.
+
+pub(super) fn parse_dec(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (res, lookahead) = parse_operand(parse_ctx.next_token(), parse_ctx);
+
+    let instruction = match res {
+        Some(operand) if operand.is_reg8() => {
+            let reg = match operand.kind {
+                OperandKind::Reg8(reg) => reg,
+                OperandKind::Reg16(Reg16::Hl) => Reg8::HlInd,
+                _ => unreachable!(),
+            };
+            Some(Instruction::dec_r8(
+                reg,
+                instr_token.span.merged_with(&operand.span),
+            ))
+        }
+        Some(Operand {
+            span,
+            kind: OperandKind::Reg16(reg),
+            indirect: false,
+        }) => {
+            let instruction = Instruction::dec_r16(reg, span);
+            if instruction.is_none() {
+                parse_ctx.error(&instr_token.span, |error| {
+                    error.set_message("invalid operand to `dec`");
+                    error.add_label(
+                        diagnostics::error_label(&instr_token.span)
+                            .with_message("expected one of `bc`, `de`, `hl`, or `sp`"),
+                    );
+                });
+            }
+            instruction
+        }
+        Some(operand) => {
+            parse_ctx.error(&operand.span, |error| {
+                error.set_message("invalid operand to `dec`");
+                error.add_label(
+                    diagnostics::error_label(&operand.span)
+                        .with_message("expected an 8-bit or a 16-bit register"),
+                );
+            });
+            None
+        }
+        None => {
+            parse_ctx.error(&instr_token.span, |error| {
+                error.set_message("missing operand to `dec`");
+                error.add_label(
+                    diagnostics::error_label(&instr_token.span)
+                        .with_message("expected an 8-bit or 16-bit register"),
+                )
+            });
+            None
+        }
+    };
+
+    (instruction, lookahead)
+}
+
+pub(super) fn parse_inc(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (res, lookahead) = parse_operand(parse_ctx.next_token(), parse_ctx);
+
+    let instruction = match res {
+        Some(operand) if operand.is_reg8() => {
+            let reg = match operand.kind {
+                OperandKind::Reg8(reg) => reg,
+                OperandKind::Reg16(Reg16::Hl) => Reg8::HlInd,
+                _ => unreachable!(),
+            };
+            Some(Instruction::inc_r8(
+                reg,
+                instr_token.span.merged_with(&operand.span),
+            ))
+        }
+        Some(Operand {
+            span,
+            kind: OperandKind::Reg16(reg),
+            indirect: false,
+        }) => {
+            let instruction = Instruction::inc_r16(reg, span);
+            if instruction.is_none() {
+                parse_ctx.error(&instr_token.span, |error| {
+                    error.set_message("invalid operand to `inc`");
+                    error.add_label(
+                        diagnostics::error_label(&instr_token.span)
+                            .with_message("expected one of `bc`, `de`, `hl`, or `sp`"),
+                    );
+                });
+            }
+            instruction
+        }
+        Some(operand) => {
+            parse_ctx.error(&operand.span, |error| {
+                error.set_message("invalid operand to `inc`");
+                error.add_label(
+                    diagnostics::error_label(&operand.span)
+                        .with_message("expected an 8-bit or 16-bit register"),
+                );
+            });
+            None
+        }
+        None => {
+            parse_ctx.error(&instr_token.span, |error| {
+                error.set_message("missing operand to `inc`");
+                error.add_label(
+                    diagnostics::error_label(&instr_token.span)
+                        .with_message("expected an 8-bit or 16-bit register"),
+                );
+            });
+            None
+        }
+    };
+
+    (instruction, lookahead)
+}
+
+// Bit flag instructions.
+
+pub(super) fn parse_bit(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_bit(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+pub(super) fn parse_res(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_call(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+pub(super) fn parse_set(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_ccf(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+// Bit shift instructions.
+
+pub(super) fn parse_rlc(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_cp(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+pub(super) fn parse_rl(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_cpl(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+pub(super) fn parse_rrc(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_daa(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+pub(super) fn parse_rr(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_dec(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+pub(super) fn parse_sla(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_di(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+pub(super) fn parse_sra(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_ei(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+pub(super) fn parse_srl(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_halt(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+pub(super) fn parse_swap(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_inc(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+// Control flow instructions.
+
+pub(super) fn parse_call(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (cond, mut lookahead) = expect_one_of! { parse_ctx.next_token() => {
+        |"nc"| => (Some(Condition::Nc), parse_ctx.next_token()),
+        |"c"| => (Some(Condition::C), parse_ctx.next_token()),
+        |"nz"| => (Some(Condition::Nz), parse_ctx.next_token()),
+        |"z"| => (Some(Condition::Z), parse_ctx.next_token()),
+        else |unexpected| => (None, unexpected)
+    }};
+    if cond.is_some() {
+        lookahead = expect_one_of! { lookahead => {
+            |","| => parse_ctx.next_token(),
+            else |unexpected| => {
+                parse_ctx.error(&unexpected.span, |error| {
+                    error.set_message("missing comma after condition");
+                    error.add_label(diagnostics::error_label(&unexpected.span).with_message("expected a comma before this"));
+                });
+                unexpected
+            }
+        }};
+    }
+
+    let (expr, lookahead) = expr::expect_numeric_expr(lookahead, parse_ctx);
+    (
+        Some(Instruction::call(
+            cond,
+            instr_token.span.merged_with(expr.last_span()),
+        )),
+        lookahead,
+    )
+}
+
+pub(super) fn parse_jp(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (cond, mut lookahead) = expect_one_of! { parse_ctx.next_token() => {
+        Token { span } @ |"hl"| => return (
+            Some(Instruction::jp_hl(instr_token.span.merged_with(&span))),
+            parse_ctx.next_token(),
+        ),
+        |"nc"| => (Some(Condition::Nc), parse_ctx.next_token()),
+        |"c"| => (Some(Condition::C), parse_ctx.next_token()),
+        |"nz"| => (Some(Condition::Nz), parse_ctx.next_token()),
+        |"z"| => (Some(Condition::Z), parse_ctx.next_token()),
+        else |unexpected| => (None, unexpected)
+    }};
+    if cond.is_some() {
+        lookahead = expect_one_of! { lookahead => {
+            |","| => parse_ctx.next_token(),
+            else |unexpected| => {
+                parse_ctx.error(&unexpected.span, |error| {
+                    error.set_message("missing comma after condition");
+                    error.add_label(diagnostics::error_label(&unexpected.span).with_message("expected a comma before this"));
+                });
+                unexpected
+            }
+        }}
+    }
+
+    let (expr, lookahead) = expr::expect_numeric_expr(lookahead, parse_ctx);
+    (
+        Some(Instruction::jp(
+            cond,
+            instr_token.span.merged_with(expr.last_span()),
+        )),
+        lookahead,
+    )
+}
+
+pub(super) fn parse_jr(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (cond, mut lookahead) = expect_one_of! { parse_ctx.next_token() => {
+        |"nc"| => (Some(Condition::Nc), parse_ctx.next_token()),
+        |"c"| => (Some(Condition::C), parse_ctx.next_token()),
+        |"nz"| => (Some(Condition::Nz), parse_ctx.next_token()),
+        |"z"| => (Some(Condition::Z), parse_ctx.next_token()),
+        else |unexpected| => (None, unexpected)
+    }};
+    if cond.is_some() {
+        lookahead = expect_one_of! { lookahead => {
+            |","| => parse_ctx.next_token(),
+            else |unexpected| => {
+                parse_ctx.error(&unexpected.span, |error| {
+                    error.set_message("missing comma after condition");
+                    error.add_label(diagnostics::error_label(&unexpected.span).with_message("expected a comma before this"));
+                });
+                unexpected
+            }
+        }}
+    }
+
+    let (expr, lookahead) = expr::expect_numeric_expr(lookahead, parse_ctx);
+    (
+        Some(Instruction::jr(
+            cond,
+            instr_token.span.merged_with(expr.last_span()),
+        )),
+        lookahead,
+    )
+}
+
+pub(super) fn parse_ret(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (cond, span, lookahead) = expect_one_of! { parse_ctx.next_token() => {
+        Token { span } @ |"nc"| => (Some(Condition::Nc), instr_token.span.merged_with(&span), parse_ctx.next_token()),
+        Token { span } @ |"c"| => (Some(Condition::C), instr_token.span.merged_with(&span), parse_ctx.next_token()),
+        Token { span } @ |"nz"| => (Some(Condition::Nz), instr_token.span.merged_with(&span), parse_ctx.next_token()),
+        Token { span } @ |"z"| => (Some(Condition::Z), instr_token.span.merged_with(&span), parse_ctx.next_token()),
+        else |unexpected| => (None, instr_token.span, unexpected)
+    }};
+
+    (Some(Instruction::ret(cond, span)), lookahead)
+}
+
+pub(super) fn parse_rst(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
+    let span = instr_token.span.merged_with(expr.last_span());
+    (
+        Some(Instruction::rst(expr.rst(instr_token.span), span)),
+        lookahead,
+    )
+}
+
+// Stack instructions.
+
+pub(super) fn parse_pop(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_jp(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+pub(super) fn parse_push(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
     todo!()
 }
 
-pub(super) fn parse_jr(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+// `stop` optionally takes a value as an operand.
+
+pub(super) fn parse_stop(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (opt, lookahead) = expr::parse_numeric_expr(parse_ctx.next_token(), parse_ctx);
+
+    let (span, expr) = match opt {
+        Some(expr) => (expr.last_span().clone(), expr),
+        None => (
+            instr_token.span.clone(),
+            Expr::number(
+                parse_ctx.options.runtime_opts.pad_byte.into(),
+                instr_token.span,
+            ),
+        ),
+    };
+    (Some(Instruction::stop(expr, span)), lookahead)
 }
 
-pub(super) fn parse_ldd(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+// `cpl` optionally takes `a` as an operand.
+
+pub(super) fn parse_cpl(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (operand, lookahead) = parse_operand(parse_ctx.next_token(), parse_ctx);
+
+    let instruction = match operand {
+        Some(operand!(Reg8::A)) | None => {
+            let span = if let Some(operand) = operand {
+                instr_token.span.merged_with(&operand.span)
+            } else {
+                instr_token.span
+            };
+            Some(Instruction::cpl(span))
+        }
+        Some(operand) => {
+            parse_ctx.error(&operand.span, |error| {
+                error.set_message("invalid operand to `cpl`");
+                error.add_label(
+                    diagnostics::error_label(&operand.span)
+                        .with_message("the only valid operand is `a`"),
+                );
+            });
+            None
+        }
+    };
+
+    (instruction, lookahead)
 }
 
-pub(super) fn parse_ldh(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+// Instructions that don't take any operands.
+
+pub(super) fn parse_ccf(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    (
+        Some(Instruction::ccf(instr_token.span)),
+        parse_ctx.next_token(),
+    )
 }
 
-pub(super) fn parse_ldi(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(super) fn parse_daa(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    (
+        Some(Instruction::daa(instr_token.span)),
+        parse_ctx.next_token(),
+    )
 }
 
-pub(super) fn parse_ld(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(super) fn parse_di(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    (
+        Some(Instruction::di(instr_token.span)),
+        parse_ctx.next_token(),
+    )
 }
 
-pub(super) fn parse_nop(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(super) fn parse_ei(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    (
+        Some(Instruction::ei(instr_token.span)),
+        parse_ctx.next_token(),
+    )
 }
 
-pub(super) fn parse_or(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(super) fn parse_halt(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    (
+        Some(Instruction::halt(instr_token.span)),
+        parse_ctx.next_token(),
+    )
 }
 
-pub(super) fn parse_pop(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(super) fn parse_nop(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    (
+        Some(Instruction::nop(instr_token.span)),
+        parse_ctx.next_token(),
+    )
 }
 
-pub(super) fn parse_push(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(super) fn parse_reti(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    (
+        Some(Instruction::reti(instr_token.span)),
+        parse_ctx.next_token(),
+    )
 }
 
-pub(super) fn parse_res(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(super) fn parse_rla(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    (
+        Some(Instruction::rla(instr_token.span)),
+        parse_ctx.next_token(),
+    )
 }
 
-pub(super) fn parse_reti(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(super) fn parse_rlca(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    (
+        Some(Instruction::rlca(instr_token.span)),
+        parse_ctx.next_token(),
+    )
 }
 
-pub(super) fn parse_ret(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(super) fn parse_rra(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    (
+        Some(Instruction::rra(instr_token.span)),
+        parse_ctx.next_token(),
+    )
 }
 
-pub(super) fn parse_rla(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(super) fn parse_rrca(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    (
+        Some(Instruction::rrca(instr_token.span)),
+        parse_ctx.next_token(),
+    )
 }
 
-pub(super) fn parse_rlca(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(super) fn parse_scf(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    (
+        Some(Instruction::scf(instr_token.span)),
+        parse_ctx.next_token(),
+    )
 }
 
-pub(super) fn parse_rlc(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+// Utility functions.
+
+fn parse_operand(lookahead: Token, parse_ctx: &mut parse_ctx!()) -> (Option<Operand>, Token) {
+    let (opening_bracket, lookahead) = if matches_tok!(lookahead, "[") {
+        (Some(lookahead.span), parse_ctx.next_token())
+    } else {
+        (None, lookahead)
+    };
+
+    fn operand<K: Into<OperandKind>>(span: Span, kind: K) -> Operand {
+        Operand {
+            span,
+            kind: kind.into(),
+            indirect: false, // Will be adjusted before returning.
+        }
+    }
+    let (mut operand, lookahead) = expect_one_of! { lookahead => {
+        Token { span } @ |"b"| => (operand(span, Reg8::B), parse_ctx.next_token()),
+        Token { span } @ |"c"| => (operand(span, Reg8::C), parse_ctx.next_token()),
+        Token { span } @ |"d"| => (operand(span, Reg8::D), parse_ctx.next_token()),
+        Token { span } @ |"e"| => (operand(span, Reg8::E), parse_ctx.next_token()),
+        Token { span } @ |"h"| => (operand(span, Reg8::H), parse_ctx.next_token()),
+        Token { span } @ |"l"| => (operand(span, Reg8::L), parse_ctx.next_token()),
+        Token { span } @ |"a"| => (operand(span, Reg8::A), parse_ctx.next_token()),
+
+        Token { span } @ |"bc"| => (operand(span, Reg16::Bc), parse_ctx.next_token()),
+        Token { span } @ |"de"| => (operand(span, Reg16::De), parse_ctx.next_token()),
+        Token { span } @ |"hl"| => {
+            expect_one_of! { parse_ctx.next_token() => {
+                Token { span: minus_span } @ |"-"| => (operand(span.merged_with(&minus_span), Reg16::Hld), parse_ctx.next_token()),
+                Token { span: plus_span } @ |"+"| => (operand(span.merged_with(&plus_span), Reg16::Hli), parse_ctx.next_token()),
+                else |unexpected| => (operand(span, Reg16::Hl), unexpected)
+            }}
+        },
+        Token { span } @ |"af"| => (operand(span, Reg16::Af), parse_ctx.next_token()),
+        Token { span } @ |"hld"| => (operand(span, Reg16::Hld), parse_ctx.next_token()),
+        Token { span } @ |"hli"| => (operand(span, Reg16::Hli), parse_ctx.next_token()),
+        Token { span } @ |"sp"| => expect_one_of! { parse_ctx.next_token() => {
+            |"+"| => {
+                let (expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
+                (operand(span.merged_with(expr.last_span()), OperandKind::SpRel(expr)), lookahead)
+            },
+            Token { span: op_span } @ |"-"| => {
+                let (expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
+                let expr = expr.unary_op(crate::expr::UnOp::Negation, op_span);
+                (operand(span.merged_with(expr.last_span()), OperandKind::SpRel(expr)), lookahead)
+            },
+            else |unexpected| => (operand(span, Reg16::Sp), unexpected)
+        }},
+
+        Token { span } @ |"low"| => {
+            todo!();
+        },
+
+        else |unexpected| => {
+            parse_ctx.report_syntax_error(&unexpected, |error, span| {
+                error.add_label(diagnostics::error_label(span).with_message("expected a register or an expression"));
+            });
+            (operand(Span::Builtin, OperandKind::Err), unexpected)
+        }
+    }};
+
+    if let Some(opening_span) = opening_bracket {
+        operand.indirect = true;
+
+        let lookahead = expect_one_of! { lookahead => {
+            Token { span: closing_span } @ |"]"| => {
+                operand.span = opening_span.merged_with(&closing_span);
+
+                parse_ctx.next_token()
+            },
+            else |unexpected| => {
+                parse_ctx.report_syntax_error(&unexpected, |error, span| {
+                    error.add_labels([diagnostics::error_label(span).with_message("expected a closing bracket...")]);
+                });
+                unexpected
+            }
+        }};
+
+        (Some(operand), lookahead)
+    } else {
+        (Some(operand), lookahead)
+    }
+}
+#[derive(Debug)]
+struct Operand {
+    span: Span,
+    kind: OperandKind,
+    indirect: bool,
+}
+#[derive(Debug, derive_more::From)]
+enum OperandKind {
+    Err,
+    Reg8(Reg8),
+    Reg16(Reg16),
+    #[from(ignore)]
+    SpRel(Expr),
+    Expr(Expr),
 }
 
-pub(super) fn parse_rl(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_rra(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_rrca(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_rrc(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_rr(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_rst(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_sbc(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_scf(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_set(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_sla(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_sra(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_srl(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_stop(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_sub(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_swap(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_xor(instr_token: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+impl Operand {
+    fn is_reg8(&self) -> bool {
+        matches!(
+            self,
+            Self {
+                kind: OperandKind::Reg8(_),
+                indirect: false,
+                ..
+            } | Self {
+                // `[hl]` is an 8-bit register.
+                kind: OperandKind::Reg16(Reg16::Hl),
+                indirect: true,
+                ..
+            }
+        )
+    }
 }

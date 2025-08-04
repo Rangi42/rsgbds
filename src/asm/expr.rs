@@ -10,7 +10,7 @@ use crate::{
     Identifier, Identifiers, Options,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Expr {
     /// This is never empty for a valid expression; however, syntax errors yield bogus [`Expr`]s
     /// that have this list be empty.
@@ -18,7 +18,7 @@ pub struct Expr {
     payload: Vec<Op>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Op {
     span: Span,
     kind: OpKind,
@@ -30,6 +30,9 @@ enum OpKind {
     Symbol(Identifier),
     Binary(BinOp),
     Unary(UnOp),
+    Low,
+    High,
+    Rst,
     /// Placeholder of sorts.
     Nothing,
 }
@@ -53,6 +56,7 @@ enum ErrKind {
         just_the_sym: bool,
     },
     DivBy0,
+    RstRange(i32),
     // This error kind is special, in that it's never reported.
     // It's required so that expressions with bad syntax can be "evaluated" gracefully,
     //   but since bad syntax already causes a syntax error to be reported, emitting an
@@ -89,27 +93,35 @@ impl Expr {
 
 impl Expr {
     pub fn binary_op(mut self, operator: BinOp, mut other: Self, op_span: Span) -> Self {
-        let (Some(lhs), Some(rhs)) = (self.payload.last(), other.payload.last()) else {
+        if self.payload.is_empty() || other.payload.is_empty() {
             self.payload.clear();
-            return self;
-        };
-
-        let new_op = Op {
-            kind: OpKind::Binary(operator),
-            span: op_span,
-        };
-        self.payload.reserve(other.payload.len() + 1);
-        self.payload.append(&mut other.payload);
-        self.payload.push(new_op);
-
+        } else {
+            let new_op = Op {
+                kind: OpKind::Binary(operator),
+                span: op_span,
+            };
+            self.payload.reserve(other.payload.len() + 1);
+            self.payload.append(&mut other.payload);
+            self.payload.push(new_op);
+        }
         self
     }
 
     pub fn unary_op(mut self, operator: UnOp, op_span: Span) -> Self {
-        if let Some(last) = self.payload.last() {
+        if !self.payload.is_empty() {
             self.payload.push(Op {
                 kind: OpKind::Unary(operator),
                 span: op_span,
+            });
+        }
+        self
+    }
+
+    pub fn rst(mut self, span: Span) -> Self {
+        if !self.payload.is_empty() {
+            self.payload.push(Op {
+                span,
+                kind: OpKind::Rst,
             });
         }
         self
@@ -158,6 +170,36 @@ impl Expr {
                     let value = eval_stack.pop().unwrap();
                     eval_stack.push(operator.const_eval(value, &op.span));
                 }
+                OpKind::Low => {
+                    let value = eval_stack.pop().unwrap();
+                    eval_stack.push(match value {
+                        Ok((number, _span)) => Ok((number & 0xFF, op.span.clone())),
+                        Err(err) => Err(err.bubble_up()),
+                    });
+                }
+                OpKind::High => {
+                    let value = eval_stack.pop().unwrap();
+                    eval_stack.push(match value {
+                        Ok((number, _span)) => Ok(((number >> 8) & 0xFF, op.span.clone())),
+                        Err(err) => Err(err.bubble_up()),
+                    });
+                }
+                OpKind::Rst => {
+                    let value = eval_stack.pop().unwrap();
+                    eval_stack.push(match value {
+                        Ok((number, span)) => {
+                            if number & !0x38 == 0 {
+                                Ok((number | 0xC7, span))
+                            } else {
+                                Err(Error {
+                                    span,
+                                    kind: ErrKind::RstRange(number),
+                                })
+                            }
+                        }
+                        Err(err) => Err(err.bubble_up()),
+                    })
+                }
                 OpKind::Nothing => {
                     eval_stack.push(Err(Error {
                         span: op.span.clone(),
@@ -172,6 +214,9 @@ impl Expr {
 
     pub fn first_span(&self) -> &Span {
         &self.payload[0].span
+    }
+    pub fn last_span(&self) -> &Span {
+        &self.payload.last().unwrap().span
     }
 }
 
@@ -409,6 +454,10 @@ impl ErrKind {
                 "this symbol's value is not known at this point".into(),
             ),
             Self::DivBy0 => ("division by zero".into(), "this is equal to zero".into()),
+            Self::RstRange(value) => (
+                format!("destination address ${value:04X} is not valid for `rst`"),
+                "this must be one of $00, $08, $10, $18, $20, $28, $30, or $38".into(),
+            ),
             Self::NoExpr => unreachable!(),
         }
     }

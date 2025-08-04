@@ -10,7 +10,7 @@ pub(super) fn parse_string_expr(
 ) -> (Option<(CompactString, Span)>, Token) {
     expect_one_of! {
         first_token => {
-            Token { span } |"string"(string)| => {
+            Token { span } @ |"string"(string)| => {
                 (Some((string, span)), parse_ctx.next_token())
             },
             |"strslice"| => {
@@ -46,7 +46,7 @@ pub(super) fn parse_string_expr(
             |"section"| => {
                 todo!();
             },
-            Token { span } |"identifier"(ident, has_colon)| => {
+            Token { span } @ |"identifier"(ident, has_colon)| => {
                 // If the identifier resolves to a string symbol, then it expands to its value.
                 if let Some(sym) = parse_ctx.symbols.find(&ident) {
                     if let Some(string) = sym.get_string() {
