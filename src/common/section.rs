@@ -35,6 +35,10 @@ impl MemRegion {
             Self::Hram => 0xFFFE,
         }
     }
+    pub fn max_size(&self) -> u16 {
+        self.max_addr() - self.min_addr() + 1
+    }
+
     pub fn min_bank(&self) -> u32 {
         match self {
             Self::Rom0 => 0,
@@ -61,5 +65,22 @@ impl MemRegion {
     }
     pub fn is_banked(&self) -> bool {
         self.min_bank() != self.max_bank()
+    }
+
+    pub fn has_data(&self) -> bool {
+        matches!(self, Self::Rom0 | Self::Romx)
+    }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            MemRegion::Rom0 => "ROM0",
+            MemRegion::Romx => "ROMX",
+            MemRegion::Vram => "VRAM",
+            MemRegion::Sram => "SRAM",
+            MemRegion::Wram0 => "WRAM0",
+            MemRegion::Wramx => "WRAMX",
+            MemRegion::Oam => "OAM",
+            MemRegion::Hram => "HRAM",
+        }
     }
 }

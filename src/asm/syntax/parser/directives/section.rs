@@ -4,6 +4,7 @@ use crate::{
     common::section::MemRegion,
     diagnostics,
     section::{AddrConstraint, SectionAttrs, SectionKind},
+    sources::Span,
     syntax::tokens::Token,
 };
 
@@ -12,7 +13,7 @@ use super::super::{expect_one_of, expr, matches_tok, parse_ctx, require, string}
 fn parse_section_attrs(
     first_token: Token,
     parse_ctx: &mut parse_ctx!(),
-) -> (SectionAttrs, CompactString, Token) {
+) -> (Span, SectionAttrs, CompactString, Token) {
     let mut attrs = SectionAttrs {
         kind: SectionKind::Normal,
         mem_region: MemRegion::Rom0, // Dummy that doesn't matter.
@@ -33,10 +34,7 @@ fn parse_section_attrs(
     }};
 
     let (maybe_string, lookahead) = string::expect_string_expr(lookahead, parse_ctx);
-    let name = match maybe_string {
-        Some((name, _)) => name,
-        None => "<error>".into(),
-    };
+    let (name, span) = maybe_string.unwrap_or_else(|| ("<error>".into(), lookahead.span.clone()));
 
     require! { lookahead => |","| else |other| {
         parse_ctx.report_syntax_error(&other, |error,span| {
@@ -89,7 +87,7 @@ fn parse_section_attrs(
                 while !matches_tok!(lookahead, "end of input" | "end of line") {
                     lookahead = parse_ctx.next_token();
                 }
-                return (attrs, name, lookahead);
+                return (span, attrs, name, lookahead);
             }
             other
         }
@@ -274,12 +272,14 @@ fn parse_section_attrs(
         }};
     }
 
-    (attrs, name, lookahead)
+    (span, attrs, name, lookahead)
 }
 pub(in super::super) fn parse_section(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    let (attrs, name, lookahead) = parse_section_attrs(parse_ctx.next_token(), parse_ctx);
+    let (def_span, attrs, name, lookahead) = parse_section_attrs(parse_ctx.next_token(), parse_ctx);
 
-    let active_section = parse_ctx.sections.create_if_not_exists(name, attrs);
+    let active_section = parse_ctx
+        .sections
+        .create_if_not_exists(name, attrs, def_span);
     parse_ctx.sections.active_section = Some((active_section.clone(), active_section));
 
     lookahead
@@ -292,9 +292,11 @@ pub(in super::super) fn parse_endsection(_keyword: Token, parse_ctx: &mut parse_
 }
 
 pub(in super::super) fn parse_load(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    let (attrs, name, lookahead) = parse_section_attrs(parse_ctx.next_token(), parse_ctx);
+    let (def_span, attrs, name, lookahead) = parse_section_attrs(parse_ctx.next_token(), parse_ctx);
 
-    let new_active_section = parse_ctx.sections.create_if_not_exists(name, attrs);
+    let new_active_section = parse_ctx
+        .sections
+        .create_if_not_exists(name, attrs, def_span);
     let Some((data_section, symbol_section)) = parse_ctx.sections.active_section.as_mut() else {
         parse_ctx.error(&keyword.span, |error| {
             error.set_message("`LOAD` used outside of a section");
@@ -344,8 +346,8 @@ pub(in super::super) fn parse_endl(_keyword: Token, parse_ctx: &mut parse_ctx!()
     parse_ctx.next_token()
 }
 
-pub(in super::super) fn parse_pushs(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    parse_ctx.sections.push_active_section();
+pub(in super::super) fn parse_pushs(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+    parse_ctx.sections.push_active_section(keyword.span);
 
     let lookahead = parse_ctx.next_token();
     if matches_tok!(lookahead, "end of line") {
@@ -353,9 +355,11 @@ pub(in super::super) fn parse_pushs(_keyword: Token, parse_ctx: &mut parse_ctx!(
         return lookahead;
     }
 
-    let (attrs, name, lookahead) = parse_section_attrs(lookahead, parse_ctx);
+    let (def_span, attrs, name, lookahead) = parse_section_attrs(lookahead, parse_ctx);
 
-    let active_section = parse_ctx.sections.create_if_not_exists(name, attrs);
+    let active_section = parse_ctx
+        .sections
+        .create_if_not_exists(name, attrs, def_span);
     parse_ctx.sections.active_section = Some((active_section.clone(), active_section));
 
     lookahead

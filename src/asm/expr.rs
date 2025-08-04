@@ -33,6 +33,7 @@ enum OpKind {
     Low,
     High,
     Rst,
+    BitCheck(u8),
     /// Placeholder of sorts.
     Nothing,
 }
@@ -57,6 +58,7 @@ enum ErrKind {
     },
     DivBy0,
     RstRange(i32),
+    BitRange(i32),
     // This error kind is special, in that it's never reported.
     // It's required so that expressions with bad syntax can be "evaluated" gracefully,
     //   but since bad syntax already causes a syntax error to be reported, emitting an
@@ -122,6 +124,16 @@ impl Expr {
             self.payload.push(Op {
                 span,
                 kind: OpKind::Rst,
+            });
+        }
+        self
+    }
+
+    pub fn bit_check(mut self, or_mask: u8, span: Span) -> Self {
+        if !self.payload.is_empty() {
+            self.payload.push(Op {
+                span,
+                kind: OpKind::BitCheck(or_mask),
             });
         }
         self
@@ -198,7 +210,18 @@ impl Expr {
                             }
                         }
                         Err(err) => Err(err.bubble_up()),
-                    })
+                    });
+                }
+                OpKind::BitCheck(or_mask) => {
+                    let value = eval_stack.pop().unwrap();
+                    eval_stack.push(match value {
+                        Ok((number @ 0..=7, span)) => Ok((number | i32::from(or_mask), span)),
+                        Ok((number, span)) => Err(Error {
+                            span,
+                            kind: ErrKind::BitRange(number),
+                        }),
+                        Err(err) => Err(err.bubble_up()),
+                    });
                 }
                 OpKind::Nothing => {
                     eval_stack.push(Err(Error {
@@ -217,6 +240,13 @@ impl Expr {
     }
     pub fn last_span(&self) -> &Span {
         &self.payload.last().unwrap().span
+    }
+    pub fn overall_span(&self) -> Span {
+        match self.payload.as_slice() {
+            // Attempting to merge a span with itself would fail.
+            [op] => op.span.clone(),
+            ops => ops[0].span.merged_with(&ops.last().unwrap().span),
+        }
     }
 }
 
@@ -457,6 +487,10 @@ impl ErrKind {
             Self::RstRange(value) => (
                 format!("destination address ${value:04X} is not valid for `rst`"),
                 "this must be one of $00, $08, $10, $18, $20, $28, $30, or $38".into(),
+            ),
+            ErrKind::BitRange(value) => (
+                format!("{value} is not a valid bit number"),
+                "this must be between 0 and 7 inclusive".into(),
             ),
             Self::NoExpr => unreachable!(),
         }

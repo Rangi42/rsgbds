@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use crate::{
     diagnostics,
     expr::Expr,
@@ -8,7 +6,7 @@ use crate::{
     syntax::{parser::expr, tokens::Token},
 };
 
-use super::{expect_one_of, matches_tok, misc, parse_ctx, require, tok};
+use super::{expect_one_of, matches_tok, misc, parse_ctx};
 
 macro_rules! operand {
     ($kind:ident::$value:ident) => {
@@ -26,8 +24,6 @@ macro_rules! operand {
         }
     };
 }
-
-// Instructions are ordered like in the manual page.
 
 // Load. There's a lot of variants.
 
@@ -97,10 +93,12 @@ pub(super) fn parse_add(
                     instr
                 },
                 Some(operand) => {
-                    parse_ctx.error(&operand.span, |error| {
-                        error.set_message("invalid right-hand side operand to `add hl`");
-                        error.add_label(diagnostics::error_label(&operand.span).with_message("expected a 16-bit register"));
-                    });
+                    if is_valid(std::array::from_ref(&operand)) {
+                        parse_ctx.error(&operand.span, |error| {
+                            error.set_message("invalid right-hand side operand to `add hl`");
+                            error.add_label(diagnostics::error_label(&operand.span).with_message("expected a 16-bit register"));
+                        });
+                    }
                     None
                 }
             };
@@ -234,18 +232,20 @@ fn parse_arith_instr_args(
                 Some(last) => instr_token.span.merged_with(&last.span),
                 None => instr_token.span.clone(),
             };
-            parse_ctx.error(&span, |error| {
-                error.set_message(format!("invalid operands to {}", instr_token.payload));
-                error.add_label(diagnostics::error_label(&span).with_message(
-                    "expected an 8-bit register or an expression, optionally preceded by `a`",
-                ));
-                if matches!(
-                    operands.as_slice(),
-                    [operand!(Reg8::A), operand!(Reg16::Hl)] | [operand!(Reg16::Hl)]
-                ) {
-                    error.set_help("surround `hl` with brackets to dereference it: `[hl]`");
-                }
-            });
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message(format!("invalid operands to {}", instr_token.payload));
+                    error.add_label(diagnostics::error_label(&span).with_message(
+                        "expected an 8-bit register or an expression, optionally preceded by `a`",
+                    ));
+                    if matches!(
+                        operands.as_slice(),
+                        [operand!(Reg8::A), operand!(Reg16::Hl)] | [operand!(Reg16::Hl)]
+                    ) {
+                        error.set_help("surround `hl` with brackets to dereference it: `[hl]`");
+                    }
+                });
+            }
             (OperandKind::Err, span)
         }
     };
@@ -269,17 +269,10 @@ pub(super) fn parse_dec(
     let (res, lookahead) = parse_operand(parse_ctx.next_token(), parse_ctx);
 
     let instruction = match res {
-        Some(operand) if operand.is_reg8() => {
-            let reg = match operand.kind {
-                OperandKind::Reg8(reg) => reg,
-                OperandKind::Reg16(Reg16::Hl) => Reg8::HlInd,
-                _ => unreachable!(),
-            };
-            Some(Instruction::dec_r8(
-                reg,
-                instr_token.span.merged_with(&operand.span),
-            ))
-        }
+        Some(operand) if operand.is_reg8() => Some(Instruction::dec_r8(
+            operand.to_reg8(),
+            instr_token.span.merged_with(&operand.span),
+        )),
         Some(Operand {
             span,
             kind: OperandKind::Reg16(reg),
@@ -298,13 +291,15 @@ pub(super) fn parse_dec(
             instruction
         }
         Some(operand) => {
-            parse_ctx.error(&operand.span, |error| {
-                error.set_message("invalid operand to `dec`");
-                error.add_label(
-                    diagnostics::error_label(&operand.span)
-                        .with_message("expected an 8-bit or a 16-bit register"),
-                );
-            });
+            if is_valid(std::array::from_ref(&operand)) {
+                parse_ctx.error(&operand.span, |error| {
+                    error.set_message("invalid operand to `dec`");
+                    error.add_label(
+                        diagnostics::error_label(&operand.span)
+                            .with_message("expected an 8-bit or a 16-bit register"),
+                    );
+                });
+            }
             None
         }
         None => {
@@ -329,17 +324,10 @@ pub(super) fn parse_inc(
     let (res, lookahead) = parse_operand(parse_ctx.next_token(), parse_ctx);
 
     let instruction = match res {
-        Some(operand) if operand.is_reg8() => {
-            let reg = match operand.kind {
-                OperandKind::Reg8(reg) => reg,
-                OperandKind::Reg16(Reg16::Hl) => Reg8::HlInd,
-                _ => unreachable!(),
-            };
-            Some(Instruction::inc_r8(
-                reg,
-                instr_token.span.merged_with(&operand.span),
-            ))
-        }
+        Some(operand) if operand.is_reg8() => Some(Instruction::inc_r8(
+            operand.to_reg8(),
+            instr_token.span.merged_with(&operand.span),
+        )),
         Some(Operand {
             span,
             kind: OperandKind::Reg16(reg),
@@ -358,13 +346,15 @@ pub(super) fn parse_inc(
             instruction
         }
         Some(operand) => {
-            parse_ctx.error(&operand.span, |error| {
-                error.set_message("invalid operand to `inc`");
-                error.add_label(
-                    diagnostics::error_label(&operand.span)
-                        .with_message("expected an 8-bit or 16-bit register"),
-                );
-            });
+            if is_valid(std::array::from_ref(&operand)) {
+                parse_ctx.error(&operand.span, |error| {
+                    error.set_message("invalid operand to `inc`");
+                    error.add_label(
+                        diagnostics::error_label(&operand.span)
+                            .with_message("expected an 8-bit or 16-bit register"),
+                    );
+                });
+            }
             None
         }
         None => {
@@ -388,21 +378,138 @@ pub(super) fn parse_bit(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    todo!()
+    let (mut operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let res = match operands.as_slice() {
+        [Operand {
+            kind: OperandKind::Expr(_),
+            indirect: false,
+            ..
+        }, rhs]
+            if rhs.is_reg8() =>
+        {
+            let reg = rhs.to_reg8();
+            let span = instr_token.span.merged_with(&rhs.span);
+            let Some(Operand {
+                kind: OperandKind::Expr(bit),
+                ..
+            }) = operands.drain(..).next()
+            else {
+                unreachable!()
+            };
+            Some(Instruction::bit(reg, bit, span, instr_token.span))
+        }
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span.clone(),
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `bit`");
+                    error.add_label(
+                        diagnostics::error_label(&span)
+                            .with_message("expected the bit number then a 8-bit register"),
+                    );
+                });
+            }
+            None
+        }
+    };
+    (res, lookahead)
 }
 
 pub(super) fn parse_res(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    todo!()
+    let (mut operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let res = match operands.as_slice() {
+        [Operand {
+            kind: OperandKind::Expr(_),
+            indirect: false,
+            ..
+        }, rhs]
+            if rhs.is_reg8() =>
+        {
+            let reg = rhs.to_reg8();
+            let span = instr_token.span.merged_with(&rhs.span);
+            let Some(Operand {
+                kind: OperandKind::Expr(bit),
+                ..
+            }) = operands.drain(..).next()
+            else {
+                unreachable!()
+            };
+            Some(Instruction::res(reg, bit, span, instr_token.span))
+        }
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span.clone(),
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `res`");
+                    error.add_label(
+                        diagnostics::error_label(&span)
+                            .with_message("expected the bit number then a 8-bit register"),
+                    );
+                });
+            }
+            None
+        }
+    };
+    (res, lookahead)
 }
 
 pub(super) fn parse_set(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    todo!()
+    let (mut operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let res = match operands.as_slice() {
+        [Operand {
+            kind: OperandKind::Expr(_),
+            indirect: false,
+            ..
+        }, rhs]
+            if rhs.is_reg8() =>
+        {
+            let reg = rhs.to_reg8();
+            let span = instr_token.span.merged_with(&rhs.span);
+            let Some(Operand {
+                kind: OperandKind::Expr(bit),
+                ..
+            }) = operands.drain(..).next()
+            else {
+                unreachable!()
+            };
+            Some(Instruction::set(reg, bit, span, instr_token.span))
+        }
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span.clone(),
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `set`");
+                    error.add_label(
+                        diagnostics::error_label(&span)
+                            .with_message("expected the bit number then a 8-bit register"),
+                    );
+                });
+            }
+            None
+        }
+    };
+    (res, lookahead)
 }
 
 // Bit shift instructions.
@@ -411,56 +518,346 @@ pub(super) fn parse_rlc(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    todo!()
+    let (operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let res = match operands.as_slice() {
+        [operand] if operand.is_reg8() => Some(Instruction::rlc(
+            operand.to_reg8(),
+            instr_token.span.merged_with(&operand.span),
+        )),
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span,
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `rlc`");
+                    error.add_label(
+                        diagnostics::error_label(&span).with_message("expected an 8-bit register"),
+                    );
+                });
+            }
+            None
+        }
+    };
+
+    (res, lookahead)
 }
 
 pub(super) fn parse_rl(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    todo!()
+    let (operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let res = match operands.as_slice() {
+        [operand] if operand.is_reg8() => Some(Instruction::rl(
+            operand.to_reg8(),
+            instr_token.span.merged_with(&operand.span),
+        )),
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span,
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `rl`");
+                    error.add_label(
+                        diagnostics::error_label(&span).with_message("expected an 8-bit register"),
+                    );
+                });
+            }
+            None
+        }
+    };
+
+    (res, lookahead)
 }
 
 pub(super) fn parse_rrc(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    todo!()
+    let (operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let res = match operands.as_slice() {
+        [operand] if operand.is_reg8() => Some(Instruction::rrc(
+            operand.to_reg8(),
+            instr_token.span.merged_with(&operand.span),
+        )),
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span,
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `rrc`");
+                    error.add_label(
+                        diagnostics::error_label(&span).with_message("expected an 8-bit register"),
+                    );
+                });
+            }
+            None
+        }
+    };
+
+    (res, lookahead)
 }
 
 pub(super) fn parse_rr(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    todo!()
+    let (operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let res = match operands.as_slice() {
+        [operand] if operand.is_reg8() => Some(Instruction::rr(
+            operand.to_reg8(),
+            instr_token.span.merged_with(&operand.span),
+        )),
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span,
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `rr`");
+                    error.add_label(
+                        diagnostics::error_label(&span).with_message("expected an 8-bit register"),
+                    );
+                });
+            }
+            None
+        }
+    };
+
+    (res, lookahead)
 }
 
 pub(super) fn parse_sla(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    todo!()
+    let (operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let res = match operands.as_slice() {
+        [operand] if operand.is_reg8() => Some(Instruction::sla(
+            operand.to_reg8(),
+            instr_token.span.merged_with(&operand.span),
+        )),
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span,
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `sla`");
+                    error.add_label(
+                        diagnostics::error_label(&span).with_message("expected an 8-bit register"),
+                    );
+                });
+            }
+            None
+        }
+    };
+
+    (res, lookahead)
 }
 
 pub(super) fn parse_sra(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    todo!()
+    let (operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let res = match operands.as_slice() {
+        [operand] if operand.is_reg8() => Some(Instruction::sra(
+            operand.to_reg8(),
+            instr_token.span.merged_with(&operand.span),
+        )),
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span,
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `sra`");
+                    error.add_label(
+                        diagnostics::error_label(&span).with_message("expected an 8-bit register"),
+                    );
+                });
+            }
+            None
+        }
+    };
+
+    (res, lookahead)
 }
 
 pub(super) fn parse_srl(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    todo!()
+    let (operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let res = match operands.as_slice() {
+        [operand] if operand.is_reg8() => Some(Instruction::srl(
+            operand.to_reg8(),
+            instr_token.span.merged_with(&operand.span),
+        )),
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span,
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `srl`");
+                    error.add_label(
+                        diagnostics::error_label(&span).with_message("expected an 8-bit register"),
+                    );
+                });
+            }
+            None
+        }
+    };
+
+    (res, lookahead)
 }
 
 pub(super) fn parse_swap(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    todo!()
+    let (operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let res = match operands.as_slice() {
+        [operand] if operand.is_reg8() => Some(Instruction::swap(
+            operand.to_reg8(),
+            instr_token.span.merged_with(&operand.span),
+        )),
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span,
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `swap`");
+                    error.add_label(
+                        diagnostics::error_label(&span).with_message("expected an 8-bit register"),
+                    );
+                });
+            }
+            None
+        }
+    };
+
+    (res, lookahead)
+}
+
+// Stack instructions.
+
+pub(super) fn parse_pop(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let instr = match operands.as_slice() {
+        [Operand {
+            span,
+            kind: OperandKind::Reg16(reg),
+            indirect: false,
+        }] => {
+            let instr = Instruction::pop(*reg, instr_token.span.merged_with(span));
+            if instr.is_none() {
+                parse_ctx.error(span, |error| {
+                    error.set_message("invalid operand to `pop`");
+                    error.add_label(
+                        diagnostics::error_label(span)
+                            .with_message("expected `bc`, `de`, `hl`, or `af`"),
+                    );
+                });
+            }
+            instr
+        }
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span,
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `pop`");
+                    error.add_label(
+                        diagnostics::error_label(&span).with_message("expected a 16-bit register"),
+                    );
+                });
+            }
+            None
+        }
+    };
+    (instr, lookahead)
+}
+
+pub(super) fn parse_push(
+    instr_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<Instruction>, Token) {
+    let (operands, lookahead) =
+        misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
+
+    let instr = match operands.as_slice() {
+        [Operand {
+            span,
+            kind: OperandKind::Reg16(reg),
+            indirect: false,
+        }] => {
+            let instr = Instruction::push(*reg, instr_token.span.merged_with(span));
+            if instr.is_none() {
+                parse_ctx.error(span, |error| {
+                    error.set_message("invalid operand to `push`");
+                    error.add_label(
+                        diagnostics::error_label(span)
+                            .with_message("expected `bc`, `de`, `hl`, or `af`"),
+                    );
+                });
+            }
+            instr
+        }
+        _ => {
+            let span = match operands.last() {
+                Some(last) => instr_token.span.merged_with(&last.span),
+                None => instr_token.span,
+            };
+            if is_valid(&operands) {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("invalid operands to `push`");
+                    error.add_label(
+                        diagnostics::error_label(&span).with_message("expected a 16-bit register"),
+                    );
+                });
+            }
+            None
+        }
+    };
+    (instr, lookahead)
 }
 
 // Control flow instructions.
@@ -494,6 +891,7 @@ pub(super) fn parse_call(
         Some(Instruction::call(
             cond,
             instr_token.span.merged_with(expr.last_span()),
+            expr,
         )),
         lookahead,
     )
@@ -532,6 +930,7 @@ pub(super) fn parse_jp(
         Some(Instruction::jp(
             cond,
             instr_token.span.merged_with(expr.last_span()),
+            expr,
         )),
         lookahead,
     )
@@ -566,6 +965,7 @@ pub(super) fn parse_jr(
         Some(Instruction::jr(
             cond,
             instr_token.span.merged_with(expr.last_span()),
+            expr,
         )),
         lookahead,
     )
@@ -596,22 +996,6 @@ pub(super) fn parse_rst(
         Some(Instruction::rst(expr.rst(instr_token.span), span)),
         lookahead,
     )
-}
-
-// Stack instructions.
-
-pub(super) fn parse_pop(
-    instr_token: Token,
-    parse_ctx: &mut parse_ctx!(),
-) -> (Option<Instruction>, Token) {
-    todo!()
-}
-
-pub(super) fn parse_push(
-    instr_token: Token,
-    parse_ctx: &mut parse_ctx!(),
-) -> (Option<Instruction>, Token) {
-    todo!()
 }
 
 // `stop` optionally takes a value as an operand.
@@ -844,10 +1228,15 @@ fn parse_operand(lookahead: Token, parse_ctx: &mut parse_ctx!()) -> (Option<Oper
         },
 
         else |unexpected| => {
-            parse_ctx.report_syntax_error(&unexpected, |error, span| {
-                error.add_label(diagnostics::error_label(span).with_message("expected a register or an expression"));
-            });
-            (operand(Span::Builtin, OperandKind::Err), unexpected)
+            let (res, lookahead) = expr::parse_numeric_expr(unexpected, parse_ctx);
+            if let Some(expr) = res {
+                (operand(expr.overall_span(), expr), lookahead)
+            } else {
+                parse_ctx.report_syntax_error(&lookahead, |error, span| {
+                    error.add_label(diagnostics::error_label(span).with_message("expected a register or an expression"));
+                });
+                (operand(lookahead.span.clone(), OperandKind::Err), lookahead)
+            }
         }
     }};
 
@@ -905,4 +1294,17 @@ impl Operand {
             }
         )
     }
+    fn to_reg8(&self) -> Reg8 {
+        match &self.kind {
+            OperandKind::Reg8(reg) => *reg,
+            OperandKind::Reg16(Reg16::Hl) => Reg8::HlInd,
+            _ => unreachable!(),
+        }
+    }
+}
+
+fn is_valid(operands: &[Operand]) -> bool {
+    operands
+        .iter()
+        .all(|operand| !matches!(operand.kind, OperandKind::Err))
 }

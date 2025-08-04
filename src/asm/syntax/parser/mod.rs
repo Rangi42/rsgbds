@@ -21,6 +21,7 @@ use crate::{
     charmap::Charmaps,
     diagnostics::{self, ReportBuilder, WarningKind},
     expr::Expr,
+    instructions::Instruction,
     macro_args::{MacroArgs, UniqueId},
     section::Sections,
     sources::{Source, Span},
@@ -287,226 +288,50 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
             directives::cond::parse_endc(first_token, parse_ctx)
         }
 
-        tok!("adc") => {
-            let (instr, lookahead) = instructions::parse_adc(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("add") => {
-            let (instr, lookahead) = instructions::parse_add(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("and") => {
-            let (instr, lookahead) = instructions::parse_and(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("bit") => {
-            let (instr, lookahead) = instructions::parse_bit(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("call") => {
-            let (instr, lookahead) = instructions::parse_call(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("ccf") => {
-            let (instr, lookahead) = instructions::parse_ccf(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("cp") => {
-            let (instr, lookahead) = instructions::parse_cp(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("cpl") => {
-            let (instr, lookahead) = instructions::parse_cpl(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("daa") => {
-            let (instr, lookahead) = instructions::parse_daa(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("dec") => {
-            let (instr, lookahead) = instructions::parse_dec(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("di") => {
-            let (instr, lookahead) = instructions::parse_di(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("ei") => {
-            let (instr, lookahead) = instructions::parse_ei(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("halt") => {
-            let (instr, lookahead) = instructions::parse_halt(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("inc") => {
-            let (instr, lookahead) = instructions::parse_inc(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("jp") => {
-            let (instr, lookahead) = instructions::parse_jp(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("jr") => {
-            let (instr, lookahead) = instructions::parse_jr(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("ldh") => {
-            let (instr, lookahead) = instructions::parse_ldh(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("ld") => {
-            let (instr, lookahead) = instructions::parse_ld(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("nop") => {
-            let (instr, lookahead) = instructions::parse_nop(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("or") => {
-            let (instr, lookahead) = instructions::parse_or(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("pop") => {
-            let (instr, lookahead) = instructions::parse_pop(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("push") => {
-            let (instr, lookahead) = instructions::parse_push(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("res") => {
-            let (instr, lookahead) = instructions::parse_res(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("reti") => {
-            let (instr, lookahead) = instructions::parse_reti(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("ret") => {
-            let (instr, lookahead) = instructions::parse_ret(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("rla") => {
-            let (instr, lookahead) = instructions::parse_rla(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("rlca") => {
-            let (instr, lookahead) = instructions::parse_rlca(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("rlc") => {
-            let (instr, lookahead) = instructions::parse_rlc(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("rl") => {
-            let (instr, lookahead) = instructions::parse_rl(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("rra") => {
-            let (instr, lookahead) = instructions::parse_rra(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("rrca") => {
-            let (instr, lookahead) = instructions::parse_rrca(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("rrc") => {
-            let (instr, lookahead) = instructions::parse_rrc(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("rr") => {
-            let (instr, lookahead) = instructions::parse_rr(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("rst") => {
-            let (instr, lookahead) = instructions::parse_rst(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("sbc") => {
-            let (instr, lookahead) = instructions::parse_sbc(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("scf") => {
-            let (instr, lookahead) = instructions::parse_scf(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("set") => {
-            let (instr, lookahead) = instructions::parse_set(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("sla") => {
-            let (instr, lookahead) = instructions::parse_sla(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("sra") => {
-            let (instr, lookahead) = instructions::parse_sra(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("srl") => {
-            let (instr, lookahead) = instructions::parse_srl(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("stop") => {
-            let (instr, lookahead) = instructions::parse_stop(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("sub") => {
-            let (instr, lookahead) = instructions::parse_sub(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("swap") => {
-            let (instr, lookahead) = instructions::parse_swap(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
-        tok!("xor") => {
-            let (instr, lookahead) = instructions::parse_xor(first_token, parse_ctx);
-            todo!();
-            lookahead
-        }
+        tok!("adc") => emit(instructions::parse_adc(first_token, parse_ctx), parse_ctx),
+        tok!("add") => emit(instructions::parse_add(first_token, parse_ctx), parse_ctx),
+        tok!("and") => emit(instructions::parse_and(first_token, parse_ctx), parse_ctx),
+        tok!("bit") => emit(instructions::parse_bit(first_token, parse_ctx), parse_ctx),
+        tok!("call") => emit(instructions::parse_call(first_token, parse_ctx), parse_ctx),
+        tok!("ccf") => emit(instructions::parse_ccf(first_token, parse_ctx), parse_ctx),
+        tok!("cp") => emit(instructions::parse_cp(first_token, parse_ctx), parse_ctx),
+        tok!("cpl") => emit(instructions::parse_cpl(first_token, parse_ctx), parse_ctx),
+        tok!("daa") => emit(instructions::parse_daa(first_token, parse_ctx), parse_ctx),
+        tok!("dec") => emit(instructions::parse_dec(first_token, parse_ctx), parse_ctx),
+        tok!("di") => emit(instructions::parse_di(first_token, parse_ctx), parse_ctx),
+        tok!("ei") => emit(instructions::parse_ei(first_token, parse_ctx), parse_ctx),
+        tok!("halt") => emit(instructions::parse_halt(first_token, parse_ctx), parse_ctx),
+        tok!("inc") => emit(instructions::parse_inc(first_token, parse_ctx), parse_ctx),
+        tok!("jp") => emit(instructions::parse_jp(first_token, parse_ctx), parse_ctx),
+        tok!("jr") => emit(instructions::parse_jr(first_token, parse_ctx), parse_ctx),
+        tok!("ldh") => emit(instructions::parse_ldh(first_token, parse_ctx), parse_ctx),
+        tok!("ld") => emit(instructions::parse_ld(first_token, parse_ctx), parse_ctx),
+        tok!("nop") => emit(instructions::parse_nop(first_token, parse_ctx), parse_ctx),
+        tok!("or") => emit(instructions::parse_or(first_token, parse_ctx), parse_ctx),
+        tok!("pop") => emit(instructions::parse_pop(first_token, parse_ctx), parse_ctx),
+        tok!("push") => emit(instructions::parse_push(first_token, parse_ctx), parse_ctx),
+        tok!("res") => emit(instructions::parse_res(first_token, parse_ctx), parse_ctx),
+        tok!("reti") => emit(instructions::parse_reti(first_token, parse_ctx), parse_ctx),
+        tok!("ret") => emit(instructions::parse_ret(first_token, parse_ctx), parse_ctx),
+        tok!("rla") => emit(instructions::parse_rla(first_token, parse_ctx), parse_ctx),
+        tok!("rlca") => emit(instructions::parse_rlca(first_token, parse_ctx), parse_ctx),
+        tok!("rlc") => emit(instructions::parse_rlc(first_token, parse_ctx), parse_ctx),
+        tok!("rl") => emit(instructions::parse_rl(first_token, parse_ctx), parse_ctx),
+        tok!("rra") => emit(instructions::parse_rra(first_token, parse_ctx), parse_ctx),
+        tok!("rrca") => emit(instructions::parse_rrca(first_token, parse_ctx), parse_ctx),
+        tok!("rrc") => emit(instructions::parse_rrc(first_token, parse_ctx), parse_ctx),
+        tok!("rr") => emit(instructions::parse_rr(first_token, parse_ctx), parse_ctx),
+        tok!("rst") => emit(instructions::parse_rst(first_token, parse_ctx), parse_ctx),
+        tok!("sbc") => emit(instructions::parse_sbc(first_token, parse_ctx), parse_ctx),
+        tok!("scf") => emit(instructions::parse_scf(first_token, parse_ctx), parse_ctx),
+        tok!("set") => emit(instructions::parse_set(first_token, parse_ctx), parse_ctx),
+        tok!("sla") => emit(instructions::parse_sla(first_token, parse_ctx), parse_ctx),
+        tok!("sra") => emit(instructions::parse_sra(first_token, parse_ctx), parse_ctx),
+        tok!("srl") => emit(instructions::parse_srl(first_token, parse_ctx), parse_ctx),
+        tok!("stop") => emit(instructions::parse_stop(first_token, parse_ctx), parse_ctx),
+        tok!("sub") => emit(instructions::parse_sub(first_token, parse_ctx), parse_ctx),
+        tok!("swap") => emit(instructions::parse_swap(first_token, parse_ctx), parse_ctx),
+        tok!("xor") => emit(instructions::parse_xor(first_token, parse_ctx), parse_ctx),
 
         tok!("align") => directives::parse_align(first_token, parse_ctx),
         tok!("assert") => directives::output::parse_assert(first_token, parse_ctx),
@@ -557,18 +382,32 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
                 )
             });
 
-            // Discard the rest of the line.
-            loop {
-                if let token @ Token {
-                    payload: tok!("end of line") | tok!("end of input"),
-                    ..
-                } = parse_ctx.next_token()
-                {
-                    break token;
-                }
-            }
+            discard_rest_of_line(parse_ctx.next_token(), parse_ctx)
         }
     };
+
+    // Helper function shared by all instruction arms.
+    fn emit(
+        (instruction, lookahead): (Option<Instruction>, Token),
+        parse_ctx: &mut parse_ctx!(),
+    ) -> Token {
+        if let Some(instr) = instruction {
+            parse_ctx.sections.emit_instruction(
+                instr,
+                parse_ctx.nb_errors_remaining,
+                parse_ctx.options,
+            );
+        } else {
+            // An error should have been reported by the parsing function, so don't report a new one.
+            debug_assert_ne!(
+                parse_ctx.nb_errors_remaining.get(),
+                parse_ctx.options.max_errors,
+                "Failed to parse instruction but did not generate an error!?",
+            );
+        }
+
+        lookahead
+    }
 
     expect_one_of!(eol_token => {
         |"end of line" / "end of input"| => {},
@@ -582,7 +421,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
     Some(())
 }
 
-fn expect_eol(mut lookahead: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+fn expect_eol(lookahead: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     if !matches_tok!(lookahead, "end of line" | "end of input") {
         parse_ctx.report_syntax_error(&lookahead, |error, span| {
             error.add_label(
@@ -684,7 +523,7 @@ impl parse_ctx!() {
         })
     }
     fn report_expr_error(&self, error: crate::expr::Error) {
-        error.report(&self.identifiers, self.nb_errors_remaining, self.options);
+        error.report(self.identifiers, self.nb_errors_remaining, self.options);
     }
 
     fn warn<'span, F: FnOnce(&mut ReportBuilder<'span>)>(

@@ -1,19 +1,19 @@
 use arrayvec::ArrayVec;
 
-use crate::{expr::Expr, sources::Span};
+use crate::{expr::Expr, section::PatchKind, sources::Span};
 
 #[derive(Debug)]
 pub struct Instruction {
-    span: Span,
-    bytes: ArrayVec<u8, 3>,
-    patch: Option<Patch>,
+    pub span: Span,
+    pub bytes: ArrayVec<u8, 3>,
+    pub patch: Option<Patch>,
 }
 
 #[derive(Debug)]
-struct Patch {
-    size: u8,
-    offset: u8,
-    expr: Expr,
+pub struct Patch {
+    pub kind: PatchKind,
+    pub offset: u8,
+    pub expr: Expr,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -99,7 +99,7 @@ impl Instruction {
             span,
             bytes: [0xC6, Default::default()].into_iter().collect(),
             patch: Some(Patch {
-                size: 1,
+                kind: PatchKind::Byte,
                 offset: 1,
                 expr: rhs,
             }),
@@ -118,7 +118,7 @@ impl Instruction {
             span,
             bytes: [0xCE, Default::default()].into_iter().collect(),
             patch: Some(Patch {
-                size: 1,
+                kind: PatchKind::Byte,
                 offset: 1,
                 expr: rhs,
             }),
@@ -137,7 +137,7 @@ impl Instruction {
             span,
             bytes: [0xD6, Default::default()].into_iter().collect(),
             patch: Some(Patch {
-                size: 1,
+                kind: PatchKind::Byte,
                 offset: 1,
                 expr: rhs,
             }),
@@ -156,7 +156,7 @@ impl Instruction {
             span,
             bytes: [0xDE, Default::default()].into_iter().collect(),
             patch: Some(Patch {
-                size: 1,
+                kind: PatchKind::Byte,
                 offset: 1,
                 expr: rhs,
             }),
@@ -175,7 +175,7 @@ impl Instruction {
             span,
             bytes: [0xE6, Default::default()].into_iter().collect(),
             patch: Some(Patch {
-                size: 1,
+                kind: PatchKind::Byte,
                 offset: 1,
                 expr: rhs,
             }),
@@ -194,7 +194,7 @@ impl Instruction {
             span,
             bytes: [0xEE, Default::default()].into_iter().collect(),
             patch: Some(Patch {
-                size: 1,
+                kind: PatchKind::Byte,
                 offset: 1,
                 expr: rhs,
             }),
@@ -213,7 +213,7 @@ impl Instruction {
             span,
             bytes: [0xF6, Default::default()].into_iter().collect(),
             patch: Some(Patch {
-                size: 1,
+                kind: PatchKind::Byte,
                 offset: 1,
                 expr: rhs,
             }),
@@ -232,7 +232,7 @@ impl Instruction {
             span,
             bytes: [0xFE, Default::default()].into_iter().collect(),
             patch: Some(Patch {
-                size: 1,
+                kind: PatchKind::Byte,
                 offset: 1,
                 expr: rhs,
             }),
@@ -282,37 +282,177 @@ impl Instruction {
         })
     }
 
-    pub fn call(condition: Option<Condition>, span: Span) -> Self {
+    pub fn bit(reg: Reg8, bit: Expr, span: Span, instr_span: Span) -> Self {
+        let second_byte = bit.bit_check(0x40, instr_span);
+        Self {
+            span,
+            bytes: [0xCB, Default::default()].into_iter().collect(),
+            patch: Some(Patch {
+                kind: PatchKind::Byte,
+                offset: 1,
+                expr: second_byte,
+            }),
+        }
+    }
+    pub fn res(reg: Reg8, bit: Expr, span: Span, instr_span: Span) -> Self {
+        let second_byte = bit.bit_check(0x80, instr_span);
+        Self {
+            span,
+            bytes: [0xCB, Default::default()].into_iter().collect(),
+            patch: Some(Patch {
+                kind: PatchKind::Byte,
+                offset: 1,
+                expr: second_byte,
+            }),
+        }
+    }
+    pub fn set(reg: Reg8, bit: Expr, span: Span, instr_span: Span) -> Self {
+        let second_byte = bit.bit_check(0xC0, instr_span);
+        Self {
+            span,
+            bytes: [0xCB, Default::default()].into_iter().collect(),
+            patch: Some(Patch {
+                kind: PatchKind::Byte,
+                offset: 1,
+                expr: second_byte,
+            }),
+        }
+    }
+
+    pub fn rlc(reg: Reg8, span: Span) -> Self {
+        #[allow(clippy::identity_op)] // For symmetry with the other cases.
+        Self {
+            span,
+            bytes: [0xCB, 0x00 | reg.id()].into_iter().collect(),
+            patch: None,
+        }
+    }
+    pub fn rl(reg: Reg8, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [0xCB, 0x10 | reg.id()].into_iter().collect(),
+            patch: None,
+        }
+    }
+    pub fn rrc(reg: Reg8, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [0xCB, 0x08 | reg.id()].into_iter().collect(),
+            patch: None,
+        }
+    }
+    pub fn rr(reg: Reg8, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [0xCB, 0x18 | reg.id()].into_iter().collect(),
+            patch: None,
+        }
+    }
+    pub fn sla(reg: Reg8, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [0xCB, 0x20 | reg.id()].into_iter().collect(),
+            patch: None,
+        }
+    }
+    pub fn sra(reg: Reg8, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [0xCB, 0x28 | reg.id()].into_iter().collect(),
+            patch: None,
+        }
+    }
+    pub fn srl(reg: Reg8, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [0xCB, 0x38 | reg.id()].into_iter().collect(),
+            patch: None,
+        }
+    }
+    pub fn swap(reg: Reg8, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [0xCB, 0x30 | reg.id()].into_iter().collect(),
+            patch: None,
+        }
+    }
+
+    pub fn pop(reg: Reg16, span: Span) -> Option<Self> {
+        match reg {
+            Reg16::Bc => Some(0),
+            Reg16::De => Some(1),
+            Reg16::Hl => Some(2),
+            Reg16::Af => Some(3),
+            _ => None,
+        }
+        .map(|reg| Self {
+            span,
+            bytes: [0xC1 | reg << 4].into_iter().collect(),
+            patch: None,
+        })
+    }
+    pub fn push(reg: Reg16, span: Span) -> Option<Self> {
+        match reg {
+            Reg16::Bc => Some(0),
+            Reg16::De => Some(1),
+            Reg16::Hl => Some(2),
+            Reg16::Af => Some(3),
+            _ => None,
+        }
+        .map(|reg| Self {
+            span,
+            bytes: [0xC5 | reg << 4].into_iter().collect(),
+            patch: None,
+        })
+    }
+
+    pub fn call(condition: Option<Condition>, span: Span, target: Expr) -> Self {
         let byte = match condition {
             Some(cond) => 0xC4 | cond.id() << 3,
             None => 0xCD,
         };
         Self {
             span,
-            bytes: [byte].into_iter().collect(),
-            patch: None,
+            bytes: [byte, Default::default(), Default::default()]
+                .into_iter()
+                .collect(),
+            patch: Some(Patch {
+                kind: PatchKind::Word,
+                offset: 1,
+                expr: target,
+            }),
         }
     }
-    pub fn jp(condition: Option<Condition>, span: Span) -> Self {
+    pub fn jp(condition: Option<Condition>, span: Span, target: Expr) -> Self {
         let byte = match condition {
             Some(cond) => 0xC2 | cond.id() << 3,
             None => 0xC3,
         };
         Self {
             span,
-            bytes: [byte].into_iter().collect(),
-            patch: None,
+            bytes: [byte, Default::default(), Default::default()]
+                .into_iter()
+                .collect(),
+            patch: Some(Patch {
+                kind: PatchKind::Word,
+                offset: 1,
+                expr: target,
+            }),
         }
     }
-    pub fn jr(condition: Option<Condition>, span: Span) -> Self {
+    pub fn jr(condition: Option<Condition>, span: Span, target: Expr) -> Self {
         let byte = match condition {
             Some(cond) => 0x20 | cond.id() << 3,
             None => 0x18,
         };
         Self {
             span,
-            bytes: [byte].into_iter().collect(),
-            patch: None,
+            bytes: [byte, Default::default()].into_iter().collect(),
+            patch: Some(Patch {
+                kind: PatchKind::Byte,
+                offset: 1,
+                expr: target,
+            }),
         }
     }
     pub fn ret(condition: Option<Condition>, span: Span) -> Self {
@@ -331,7 +471,7 @@ impl Instruction {
             span,
             bytes: [Default::default()].into_iter().collect(),
             patch: Some(Patch {
-                size: 1,
+                kind: PatchKind::Byte,
                 offset: 0,
                 expr: target,
             }),
@@ -350,7 +490,7 @@ impl Instruction {
             span,
             bytes: [0x10, Default::default()].into_iter().collect(),
             patch: Some(Patch {
-                size: 1,
+                kind: PatchKind::Byte,
                 offset: 1,
                 expr: byte,
             }),

@@ -93,9 +93,22 @@ fn main() -> ExitCode {
         &mut options,
     );
 
-    if nb_errors_left.get() == options.max_errors {
-        ExitCode::Ok
-    } else {
-        ExitCode::DataErr
+    // TODO: unclosed UNION
+    // TODO: unclosed LOAD
+    sections.check_section_sizes(&nb_errors_left, &options);
+    // TODO: unclosed PUSHO
+    // TODO: unclosed PUSHC
+    sections.warn_if_stack_not_empty(&nb_errors_left, &options);
+
+    if nb_errors_left.get() != options.max_errors {
+        eprintln!(
+            "{} errors generated.",
+            options.max_errors - nb_errors_left.get(),
+        );
+        return ExitCode::DataErr;
     }
+
+    // TODO: emit object file
+
+    ExitCode::Ok
 }

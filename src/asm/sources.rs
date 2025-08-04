@@ -4,7 +4,6 @@ use compact_str::{CompactString, ToCompactString};
 
 use crate::Identifier;
 
-#[derive(Debug)]
 pub struct Source {
     pub name: CompactString,
     // TODO: consider only computing the `Source` when printing diagnostics? Would also avoid the `'id: 'ret` issue
@@ -166,5 +165,15 @@ impl Span {
             kind: left.kind,
             parent: left.parent.clone(),
         })
+    }
+}
+
+/// [`ariadne::Source`] has huge `Debug` output that we don't care about, so reduce it to its text contents.
+impl std::fmt::Debug for Source {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Source")
+            .field("name", &self.name)
+            .field("contents", &self.contents.text())
+            .finish()
     }
 }
