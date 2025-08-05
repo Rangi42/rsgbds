@@ -71,24 +71,37 @@ pub(in super::super) fn parse_def_or_redef(
 }
 
 pub(in super::super) fn parse_export(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    // TODO: `export <list>`, but also `export def ...`
-    todo!()
+    let lookahead = parse_ctx.next_token();
+
+    expect_one_of! { lookahead => {
+        |"def" / "redef"| => {
+            let span = lookahead.span.clone();
+            parse_def_or_redef(lookahead, parse_ctx, Some(span))
+        },
+        else |unexpected| => {
+            let (names, lookahead) = misc::parse_comma_list(misc::parse_identifier, unexpected, parse_ctx);
+
+            for (ident, span) in names {
+                parse_ctx.symbols.export(
+                    ident,
+                    span,
+                    parse_ctx.identifiers,
+                    parse_ctx.nb_errors_remaining,
+                    parse_ctx.options,
+                );
+            }
+
+            lookahead
+        }
+    }}
 }
 
 pub(in super::super) fn parse_purge(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     // Note that it's important to parse the full list first instead of deleting symbols piecemeal,
     // as the rest of the line may reference symbols purged by an earlier part.
     // Example: `purge STR, {STR}`.
-    let (names, lookahead) = misc::parse_comma_list(
-        |token, parse_ctx| {
-            expect_one_of! { token => {
-                Token { span } @ |"identifier"(ident, _has_colon)| => (Some((ident, span)), parse_ctx.next_token()),
-                else |unexpected| => (None, unexpected)
-            }}
-        },
-        parse_ctx.next_token(),
-        parse_ctx,
-    );
+    let (names, lookahead) =
+        misc::parse_comma_list(misc::parse_identifier, parse_ctx.next_token(), parse_ctx);
 
     for (ident, span) in names {
         parse_ctx.symbols.delete(

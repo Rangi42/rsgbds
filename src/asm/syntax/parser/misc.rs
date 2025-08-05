@@ -1,8 +1,8 @@
 use compact_str::CompactString;
 
-use crate::{diagnostics, syntax::tokens::Token};
+use crate::{diagnostics, sources::Span, syntax::tokens::Token, Identifier};
 
-use super::{expr, matches_tok, parse_ctx, string};
+use super::{expect_one_of, expr, matches_tok, parse_ctx, string};
 
 pub(super) fn parse_comma_list<
     'ctx_stack,
@@ -33,6 +33,15 @@ pub(super) fn parse_comma_list<
         }
     }
     (elements, lookahead)
+}
+pub(super) fn parse_identifier(
+    token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<(Identifier, Span)>, Token) {
+    expect_one_of! { token => {
+        Token { span } @ |"identifier"(ident, _has_colon)| => (Some((ident, span)), parse_ctx.next_token()),
+        else |unexpected| => (None, unexpected)
+    }}
 }
 
 pub enum StrOrNum {

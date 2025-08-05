@@ -288,6 +288,48 @@ impl Symbols {
         }
     }
 
+    pub fn export(
+        &mut self,
+        name: Identifier,
+        span: Span,
+        identifiers: &Identifiers,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        match self.symbols.entry(name) {
+            Entry::Vacant(entry) => {
+                entry.insert(SymbolData::User {
+                    definition: span,
+                    kind: SymbolKind::Ref,
+                    exported: true,
+                });
+            }
+
+            Entry::Occupied(mut entry) => match entry.get_mut() {
+                SymbolData::Deleted(..) => {
+                    entry.insert(SymbolData::User {
+                        definition: span,
+                        kind: SymbolKind::Ref,
+                        exported: true,
+                    });
+                }
+                SymbolData::User { exported, .. } => *exported = true,
+                _ => diagnostics::error(
+                    &span,
+                    |error| {
+                        error.set_message("cannot export built-in symbol");
+                        error.add_label(diagnostics::error_label(&span).with_message(format!(
+                            "cannot export `{}`",
+                            identifiers.resolve(name).unwrap()
+                        )));
+                    },
+                    nb_errors_left,
+                    options,
+                ),
+            },
+        }
+    }
+
     fn define_symbol(
         &mut self,
         name: Identifier,
