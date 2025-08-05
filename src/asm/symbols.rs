@@ -52,7 +52,12 @@ pub enum SymbolKind {
 }
 
 impl Symbols {
-    pub fn new(identifiers: &mut Identifiers) -> Self {
+    pub fn new(
+        identifiers: &mut Identifiers,
+        cli_defines: Vec<String>,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) -> Self {
         let mut this = Self {
             symbols: FxHashMap::with_hasher(FxBuildHasher),
             scope: None,
@@ -145,6 +150,19 @@ impl Symbols {
         def_builtin("__UTC_HOUR__", numeric(now_utc.hour() as i32, false));
         def_builtin("__UTC_MINUTE__", numeric(now_utc.minute() as i32, false));
         def_builtin("__UTC_SECOND__", numeric(now_utc.second() as i32, false));
+
+        for define in cli_defines {
+            let (name, value) = define.split_once('=').unwrap_or((&define, "1"));
+            let ident = identifiers.get_or_intern(name);
+            this.define_string(
+                ident,
+                identifiers,
+                Span::CommandLine,
+                value.into(),
+                nb_errors_left,
+                options,
+            );
+        }
 
         this
     }
