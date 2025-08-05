@@ -13,7 +13,7 @@ The extra boilerplate is counter-balanced by how much the aforementioned workaro
 [rgbasm-lalrpop]: https://github.com/ISSOtm/rsgbds/blob/4cd81e2920b71b335f4be744adcc3f307bdd5fd7/src/asm/language/parser.lalrpop
 */
 
-use std::{cell::Cell, path::Path, rc::Rc};
+use std::{cell::Cell, fmt::Display, path::Path, rc::Rc};
 
 use compact_str::CompactString;
 
@@ -61,6 +61,23 @@ macro_rules! expect_one_of {
     };
 }
 use expect_one_of; // Allow this macro to be used by children modules.
+
+pub struct Expected<'slice, 'string>(pub &'slice [&'string str]);
+impl Display for Expected<'_, '_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            [] => unreachable!(),
+            [single] => write!(f, "expected {single}"),
+            [names @ .., last] => {
+                write!(f, "expected ")?;
+                for name in names {
+                    write!(f, "{name}, ")?;
+                }
+                write!(f, "or {last}")
+            }
+        }
+    }
+}
 
 macro_rules! matches_tok {
     ($value:expr, $($name:tt $(($field:pat))?)|+) => {
@@ -337,6 +354,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
         tok!("assert") => directives::output::parse_assert(first_token, parse_ctx),
         tok!("break") => directives::parse_break(first_token, parse_ctx),
         tok!("charmap") => directives::charmap::parse_charmap(first_token, parse_ctx),
+        tok!("def") => directives::symbol::parse_def_or_redef(first_token, parse_ctx),
         tok!("db") => directives::parse_db(first_token, parse_ctx),
         tok!("dl") => directives::parse_dl(first_token, parse_ctx),
         tok!("ds") => directives::parse_ds(first_token, parse_ctx),
@@ -346,7 +364,6 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
         tok!("endu") => directives::parse_endu(first_token, parse_ctx),
         tok!("export") => directives::parse_export(first_token, parse_ctx),
         tok!("fail") => directives::output::parse_fail(first_token, parse_ctx)?,
-        tok!("fatal") => directives::parse_fatal(first_token, parse_ctx),
         tok!("incbin") => directives::parse_incbin(first_token, parse_ctx),
         tok!("include") => directives::context::parse_include(first_token, parse_ctx),
         tok!("load") => directives::section::parse_load(first_token, parse_ctx),
@@ -362,9 +379,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
         tok!("pushc") => directives::charmap::parse_pushc(first_token, parse_ctx),
         tok!("pusho") => directives::opt::parse_pusho(first_token, parse_ctx),
         tok!("pushs") => directives::section::parse_pushs(first_token, parse_ctx),
-        tok!("rb") => directives::parse_rb(first_token, parse_ctx),
-        tok!("rw") => directives::parse_rw(first_token, parse_ctx),
-        tok!("redef") => directives::parse_redef(first_token, parse_ctx),
+        tok!("redef") => directives::symbol::parse_def_or_redef(first_token, parse_ctx),
         tok!("rsreset") => directives::parse_rsreset(first_token, parse_ctx),
         tok!("rsset") => directives::parse_rsset(first_token, parse_ctx),
         tok!("section") => directives::section::parse_section(first_token, parse_ctx),

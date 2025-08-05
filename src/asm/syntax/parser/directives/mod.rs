@@ -54,10 +54,6 @@ pub(super) fn parse_export(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Tok
     todo!()
 }
 
-pub(super) fn parse_fatal(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
 pub(super) fn parse_incbin(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
@@ -67,18 +63,6 @@ pub(super) fn parse_nextu(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Toke
 }
 
 pub(super) fn parse_purge(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_rb(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_rw(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_redef(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
@@ -104,3 +88,4 @@ pub mod context;
 pub mod opt;
 pub mod output;
 pub mod section;
+pub mod symbol;
