@@ -20,7 +20,7 @@ use compact_str::CompactString;
 use unicase::UniCase;
 
 use crate::{
-    cond::{self, Condition},
+    cond::Condition,
     diagnostics::{self, warning, ReportBuilder},
     format::FormatSpec,
     macro_args::{MacroArgs, UniqueId},
@@ -2171,6 +2171,8 @@ impl Lexer {
                             Self::get_char_escape(ch, ofs, ctx, text, &mut chars, &params)
                         {
                             string.push(value);
+                        } else {
+                            todo!();
                         }
                     }
 

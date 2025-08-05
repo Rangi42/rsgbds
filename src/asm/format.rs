@@ -38,7 +38,7 @@ impl Default for FormatSpec {
     fn default() -> Self {
         Self {
             force_sign: None,
-            be_exact: true,
+            be_exact: false,
             align_left: false,
             pad_with_zeros: false,
             width: 0,
@@ -232,7 +232,7 @@ impl FormatSpec {
                 let fmt = NumberFormatter {
                     number,
                     force_sign: self.force_sign,
-                    be_exact: self.be_exact,
+                    be_exact: self.be_exact || matches!(self.kind, FormatKind::Default),
                     precision: self.precision,
                     frac: self.frac.unwrap_or(5), // 5 digits is enough for the default Q16.16
                     width: self.width,
