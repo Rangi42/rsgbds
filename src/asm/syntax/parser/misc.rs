@@ -36,7 +36,7 @@ pub(super) fn parse_comma_list<
 }
 
 pub enum StrOrNum {
-    Num(i32),
+    Num(Result<i32, crate::expr::Error>),
     String(CompactString),
 }
 pub(super) fn parse_str_or_const_expr(
@@ -51,11 +51,12 @@ pub(super) fn parse_str_or_const_expr(
 
     let (maybe_expr, lookahead) = expr::parse_numeric_expr(lookahead, parse_ctx);
     if let Some(expr) = maybe_expr {
-        if let Ok((value, _span)) = parse_ctx.try_const_eval(&expr) {
-            (Some(StrOrNum::Num(value)), lookahead)
-        } else {
-            (None, lookahead)
-        }
+        (
+            Some(StrOrNum::Num(
+                parse_ctx.try_const_eval(&expr).map(|(value, _span)| value),
+            )),
+            lookahead,
+        )
     } else {
         parse_ctx.error(&lookahead.span, |error| {
             error.set_message(format!("syntax error: unexpected {}", lookahead.payload));

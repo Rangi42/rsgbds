@@ -6,7 +6,8 @@ fn parse_print_elem(first_token: Token, parse_ctx: &mut parse_ctx!()) -> (Option
     let (expr, lookahead) = misc::parse_str_or_const_expr(first_token, parse_ctx);
     match expr {
         None => return (None, lookahead),
-        Some(misc::StrOrNum::Num(value)) => print!("${value:X}"),
+        Some(misc::StrOrNum::Num(Ok(value))) => print!("${value:X}"),
+        Some(misc::StrOrNum::Num(Err(error))) => parse_ctx.report_expr_error(error),
         Some(misc::StrOrNum::String(string)) => print!("{string}"),
     };
     (Some(()), lookahead)

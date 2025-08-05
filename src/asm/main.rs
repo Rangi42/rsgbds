@@ -100,11 +100,9 @@ fn main() -> ExitCode {
     // TODO: unclosed PUSHC
     sections.warn_if_stack_not_empty(&nb_errors_left, &options);
 
-    if nb_errors_left.get() != options.max_errors {
-        eprintln!(
-            "{} errors generated.",
-            options.max_errors - nb_errors_left.get(),
-        );
+    let nb_errors = options.max_errors - nb_errors_left.get();
+    if nb_errors != 0 {
+        eprintln!("{nb_errors} error{} generated.", common::S::from(nb_errors));
         return ExitCode::DataErr;
     }
 
