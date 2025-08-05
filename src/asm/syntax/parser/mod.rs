@@ -47,7 +47,7 @@ macro_rules! expect_one_of {
             ..
         } => $then, )+
         $unexpected => {
-            expect_one_of!(@expected [$($( $kind )+),+] $($expected)?); // Internal call.
+            expect_one_of!(@expected [$($( $kind, )+)+] $($expected)?); // Internal call.
             $handle_default
         }
     }};
@@ -354,7 +354,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
         tok!("assert") => directives::output::parse_assert(first_token, parse_ctx),
         tok!("break") => directives::parse_break(first_token, parse_ctx),
         tok!("charmap") => directives::charmap::parse_charmap(first_token, parse_ctx),
-        tok!("def") => directives::symbol::parse_def_or_redef(first_token, parse_ctx),
+        tok!("def") => directives::symbol::parse_def_or_redef(first_token, parse_ctx, None),
         tok!("db") => directives::parse_db(first_token, parse_ctx),
         tok!("dl") => directives::parse_dl(first_token, parse_ctx),
         tok!("ds") => directives::parse_ds(first_token, parse_ctx),
@@ -362,7 +362,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
         tok!("endsection") => directives::section::parse_endsection(first_token, parse_ctx),
         tok!("endl") => directives::section::parse_endl(first_token, parse_ctx),
         tok!("endu") => directives::parse_endu(first_token, parse_ctx),
-        tok!("export") => directives::parse_export(first_token, parse_ctx),
+        tok!("export") => directives::symbol::parse_export(first_token, parse_ctx),
         tok!("fail") => directives::output::parse_fail(first_token, parse_ctx)?,
         tok!("incbin") => directives::parse_incbin(first_token, parse_ctx),
         tok!("include") => directives::context::parse_include(first_token, parse_ctx),
@@ -375,13 +375,13 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
         tok!("pops") => directives::section::parse_pops(first_token, parse_ctx),
         tok!("println") => directives::output::parse_println(first_token, parse_ctx),
         tok!("print") => directives::output::parse_print(first_token, parse_ctx),
-        tok!("purge") => directives::parse_purge(first_token, parse_ctx),
+        tok!("purge") => directives::symbol::parse_purge(first_token, parse_ctx),
         tok!("pushc") => directives::charmap::parse_pushc(first_token, parse_ctx),
         tok!("pusho") => directives::opt::parse_pusho(first_token, parse_ctx),
         tok!("pushs") => directives::section::parse_pushs(first_token, parse_ctx),
-        tok!("redef") => directives::symbol::parse_def_or_redef(first_token, parse_ctx),
-        tok!("rsreset") => directives::parse_rsreset(first_token, parse_ctx),
-        tok!("rsset") => directives::parse_rsset(first_token, parse_ctx),
+        tok!("redef") => directives::symbol::parse_def_or_redef(first_token, parse_ctx, None),
+        tok!("rsreset") => directives::symbol::parse_rsreset(first_token, parse_ctx),
+        tok!("rsset") => directives::symbol::parse_rsset(first_token, parse_ctx),
         tok!("section") => directives::section::parse_section(first_token, parse_ctx),
         tok!("setcharmap") => directives::charmap::parse_setcharmap(first_token, parse_ctx),
         tok!("shift") => directives::parse_shift(first_token, parse_ctx),
@@ -430,6 +430,9 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
             parse_ctx.report_syntax_error(&unexpected, |error, span| {
                 error.add_label(diagnostics::error_label(span).with_message("expected nothing else on this line"))
             });
+
+            let _token = discard_rest_of_line(parse_ctx.next_token(), parse_ctx);
+            debug_assert!(matches_tok!(_token, "end of line" | "end of input"));
         }
     });
 

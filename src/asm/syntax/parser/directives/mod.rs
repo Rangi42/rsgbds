@@ -50,27 +50,11 @@ pub(super) fn parse_endu(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token
     todo!()
 }
 
-pub(super) fn parse_export(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
 pub(super) fn parse_incbin(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
 pub(super) fn parse_nextu(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_purge(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_rsreset(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_rsset(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }
 
