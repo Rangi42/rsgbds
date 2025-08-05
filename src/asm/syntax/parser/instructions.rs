@@ -60,19 +60,109 @@ pub(super) fn parse_ld(
             Some(Instruction::ld_r8_imm(dest, src, span))
         }
 
+        // ld <reg16>, <imm>
+        [Operand {
+            kind: OperandKind::Reg16(reg),
+            indirect: false,
+            ..
+        }, Operand {
+            kind: OperandKind::Expr(_),
+            indirect: false,
+            span,
+        }] => {
+            let dest = *reg;
+            let span = instr_token.span.merged_with(span);
+            let Some(Operand {
+                kind: OperandKind::Expr(src),
+                ..
+            }) = operands.drain(..).nth(1)
+            else {
+                unreachable!()
+            };
+
+            let instr = Instruction::ld_r16_imm(dest, src, span);
+            if let Err(span) = &instr {
+                parse_ctx.error(span, |error| {
+                    error.set_message("invalid left-hand side operand to `ld`");
+                    error.add_label(
+                        diagnostics::error_label(span)
+                            .with_message("expected `bc`, `de`, `hl`, or `sp`"),
+                    );
+                });
+            }
+            instr.ok()
+        }
+
         // `ld a, [<reg16>]`
         [operand!(Reg8::A), Operand {
             kind: OperandKind::Reg16(r16),
             indirect: true,
             span,
-        }] => Instruction::ld_a_r16_ind(false, *r16, instr_token.span.merged_with(span)),
+        }] => {
+            let instr = Instruction::ld_a_r16_ind(false, *r16, instr_token.span.merged_with(span));
+            if let Err(span) = &instr {
+                parse_ctx.error(span, |error| {
+                    error.set_message("invalid right-hand side operand to `ld`");
+                    error.add_label(
+                        diagnostics::error_label(span)
+                            .with_message("expected `bc`, `de`, `hld`, or `hli`"),
+                    );
+                });
+            }
+            instr.ok()
+        }
         // `ld [<reg16>], a`
         [Operand {
             kind: OperandKind::Reg16(r16),
             indirect: true,
             span,
         }, operand!(Reg8::A)] => {
-            Instruction::ld_a_r16_ind(true, *r16, instr_token.span.merged_with(span))
+            let instr = Instruction::ld_a_r16_ind(true, *r16, instr_token.span.merged_with(span));
+            if let Err(span) = &instr {
+                parse_ctx.error(span, |error| {
+                    error.set_message("invalid left-hand side operand to `ld`");
+                    error.add_label(
+                        diagnostics::error_label(span)
+                            .with_message("expected `bc`, `de`, `hld`, or `hli`"),
+                    );
+                });
+            }
+            instr.ok()
+        }
+
+        // ld a, [<imm>]
+        [operand!(Reg8::A), Operand {
+            kind: OperandKind::Expr(_),
+            indirect: true,
+            span,
+        }] => {
+            let span = instr_token.span.merged_with(span);
+            let Some(Operand {
+                kind: OperandKind::Expr(addr),
+                ..
+            }) = operands.drain(..).nth(1)
+            else {
+                unreachable!()
+            };
+
+            Some(Instruction::ld_a_addr(false, addr, span))
+        }
+        // ld [<imm>], a
+        [Operand {
+            kind: OperandKind::Expr(_),
+            indirect: true,
+            span,
+        }, operand!(Reg8::A)] => {
+            let span = instr_token.span.merged_with(span);
+            let Some(Operand {
+                kind: OperandKind::Expr(addr),
+                ..
+            }) = operands.drain(..).next()
+            else {
+                unreachable!()
+            };
+
+            Some(Instruction::ld_a_addr(true, addr, span))
         }
 
         // `ld sp, hl`
@@ -95,6 +185,24 @@ pub(super) fn parse_ld(
                 unreachable!()
             };
             Some(Instruction::ld_hl_sp_ofs(offset, span))
+        }
+
+        // ld [<imm>], sp
+        [Operand {
+            kind: OperandKind::Expr(_),
+            indirect: true,
+            span,
+        }, operand!(Reg16::Sp)] => {
+            let span = instr_token.span.merged_with(span);
+            let Some(Operand {
+                kind: OperandKind::Expr(addr),
+                ..
+            }) = operands.drain(..).next()
+            else {
+                unreachable!()
+            };
+
+            Some(Instruction::ld_addr_sp(addr, span))
         }
 
         // TODO: the other variants of `ld`.
@@ -230,13 +338,13 @@ pub(super) fn parse_add(
                 },
                 Some(Operand { span, kind: OperandKind::Reg16(reg), indirect: false }) => {
                     let instr = Instruction::add_r16(reg, instr_token.span.merged_with(&span));
-                    if instr.is_none() {
-                        parse_ctx.error(&span, |error| {
+                    if let Err(span) = &instr {
+                        parse_ctx.error(span, |error| {
                             error.set_message("invalid right-hand side operand to `add hl`");
-                            error.add_label(diagnostics::error_label(&span).with_message("expected one of `bc`, `de`, `hl`, or `sp`"));
+                            error.add_label(diagnostics::error_label(span).with_message("expected one of `bc`, `de`, `hl`, or `sp`"));
                         });
                     }
-                    instr
+                    instr.ok()
                 },
                 Some(operand) => {
                     if is_valid(std::array::from_ref(&operand)) {
@@ -444,8 +552,8 @@ pub(super) fn parse_dec(
             indirect: false,
         }) => {
             let instruction = Instruction::dec_r16(reg, span);
-            if instruction.is_none() {
-                parse_ctx.error(&instr_token.span, |error| {
+            if let Err(span) = &instruction {
+                parse_ctx.error(span, |error| {
                     error.set_message("invalid operand to `dec`");
                     error.add_label(
                         diagnostics::error_label(&instr_token.span)
@@ -453,7 +561,7 @@ pub(super) fn parse_dec(
                     );
                 });
             }
-            instruction
+            instruction.ok()
         }
         Some(operand) => {
             if is_valid(std::array::from_ref(&operand)) {
@@ -499,8 +607,8 @@ pub(super) fn parse_inc(
             indirect: false,
         }) => {
             let instruction = Instruction::inc_r16(reg, span);
-            if instruction.is_none() {
-                parse_ctx.error(&instr_token.span, |error| {
+            if let Err(span) = &instruction {
+                parse_ctx.error(span, |error| {
                     error.set_message("invalid operand to `inc`");
                     error.add_label(
                         diagnostics::error_label(&instr_token.span)
@@ -508,7 +616,7 @@ pub(super) fn parse_inc(
                     );
                 });
             }
-            instruction
+            instruction.ok()
         }
         Some(operand) => {
             if is_valid(std::array::from_ref(&operand)) {
@@ -951,7 +1059,7 @@ pub(super) fn parse_pop(
             indirect: false,
         }] => {
             let instr = Instruction::pop(*reg, instr_token.span.merged_with(span));
-            if instr.is_none() {
+            if let Err(span) = &instr {
                 parse_ctx.error(span, |error| {
                     error.set_message("invalid operand to `pop`");
                     error.add_label(
@@ -960,7 +1068,7 @@ pub(super) fn parse_pop(
                     );
                 });
             }
-            instr
+            instr.ok()
         }
         _ => {
             let span = match operands.last() {
@@ -995,7 +1103,7 @@ pub(super) fn parse_push(
             indirect: false,
         }] => {
             let instr = Instruction::push(*reg, instr_token.span.merged_with(span));
-            if instr.is_none() {
+            if let Err(span) = &instr {
                 parse_ctx.error(span, |error| {
                     error.set_message("invalid operand to `push`");
                     error.add_label(
@@ -1004,7 +1112,7 @@ pub(super) fn parse_push(
                     );
                 });
             }
-            instr
+            instr.ok()
         }
         _ => {
             let span = match operands.last() {

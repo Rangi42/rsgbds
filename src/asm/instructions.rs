@@ -79,21 +79,58 @@ impl Instruction {
             }),
         }
     }
-    pub fn ld_a_r16_ind(is_write: bool, reg: Reg16, span: Span) -> Option<Self> {
+    pub fn ld_r16_imm(reg: Reg16, value: Expr, span: Span) -> Result<Self, Span> {
         match reg {
-            Reg16::Bc => Some(0),
-            Reg16::De => Some(1),
-            Reg16::Hli => Some(2),
-            Reg16::Hld => Some(3),
-            Reg16::Hl | Reg16::Af | Reg16::Sp => None,
+            Reg16::Bc => Ok((0, span)),
+            Reg16::De => Ok((1, span)),
+            Reg16::Hl => Ok((2, span)),
+            Reg16::Sp => Ok((3, span)),
+            Reg16::Af | Reg16::Hli | Reg16::Hld => Err(span),
         }
-        .map(|encoded| Self {
+        .map(|(encoded, span)| Self {
+            span,
+            bytes: [0x01 | encoded << 4, Default::default(), Default::default()]
+                .into_iter()
+                .collect(),
+            patch: Some(Patch {
+                kind: PatchKind::Word,
+                offset: 1,
+                expr: value,
+            }),
+        })
+    }
+    pub fn ld_a_r16_ind(is_write: bool, reg: Reg16, span: Span) -> Result<Self, Span> {
+        match reg {
+            Reg16::Bc => Ok((0, span)),
+            Reg16::De => Ok((1, span)),
+            Reg16::Hli => Ok((2, span)),
+            Reg16::Hld => Ok((3, span)),
+            Reg16::Hl | Reg16::Af | Reg16::Sp => Err(span),
+        }
+        .map(|(encoded, span)| Self {
             span,
             bytes: [if is_write { 0x02 } else { 0x0A } | encoded << 4]
                 .into_iter()
                 .collect(),
             patch: None,
         })
+    }
+    pub fn ld_a_addr(is_write: bool, address: Expr, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [
+                if is_write { 0xEA } else { 0xFA },
+                Default::default(),
+                Default::default(),
+            ]
+            .into_iter()
+            .collect(),
+            patch: Some(Patch {
+                kind: PatchKind::Word,
+                offset: 1,
+                expr: address,
+            }),
+        }
     }
     pub fn ld_sp_hl(span: Span) -> Self {
         Self {
@@ -110,6 +147,19 @@ impl Instruction {
                 kind: PatchKind::Byte,
                 offset: 1,
                 expr: offset,
+            }),
+        }
+    }
+    pub fn ld_addr_sp(address: Expr, span: Span) -> Self {
+        Self {
+            span,
+            bytes: [0x08, Default::default(), Default::default()]
+                .into_iter()
+                .collect(),
+            patch: Some(Patch {
+                kind: PatchKind::Word,
+                offset: 1,
+                expr: address,
             }),
         }
     }
@@ -135,15 +185,15 @@ impl Instruction {
         }
     }
 
-    pub fn add_r16(rhs: Reg16, span: Span) -> Option<Self> {
+    pub fn add_r16(rhs: Reg16, span: Span) -> Result<Self, Span> {
         match rhs {
-            Reg16::Bc => Some(0x09),
-            Reg16::De => Some(0x19),
-            Reg16::Hl => Some(0x29),
-            Reg16::Sp => Some(0x39),
-            Reg16::Af | Reg16::Hli | Reg16::Hld => None,
+            Reg16::Bc => Ok((0x09, span)),
+            Reg16::De => Ok((0x19, span)),
+            Reg16::Hl => Ok((0x29, span)),
+            Reg16::Sp => Ok((0x39, span)),
+            Reg16::Af | Reg16::Hli | Reg16::Hld => Err(span),
         }
-        .map(|byte| Self {
+        .map(|(byte, span)| Self {
             span,
             bytes: [byte].into_iter().collect(),
             patch: None,
@@ -326,29 +376,29 @@ impl Instruction {
             patch: None,
         }
     }
-    pub fn dec_r16(rhs: Reg16, span: Span) -> Option<Self> {
+    pub fn dec_r16(rhs: Reg16, span: Span) -> Result<Self, Span> {
         match rhs {
-            Reg16::Bc => Some(0x0B),
-            Reg16::De => Some(0x1B),
-            Reg16::Hl => Some(0x2B),
-            Reg16::Sp => Some(0x3B),
-            _ => None,
+            Reg16::Bc => Ok((0x0B, span)),
+            Reg16::De => Ok((0x1B, span)),
+            Reg16::Hl => Ok((0x2B, span)),
+            Reg16::Sp => Ok((0x3B, span)),
+            _ => Err(span),
         }
-        .map(|byte| Self {
+        .map(|(byte, span)| Self {
             span,
             bytes: [byte].into_iter().collect(),
             patch: None,
         })
     }
-    pub fn inc_r16(rhs: Reg16, span: Span) -> Option<Self> {
+    pub fn inc_r16(rhs: Reg16, span: Span) -> Result<Self, Span> {
         match rhs {
-            Reg16::Bc => Some(0x0B),
-            Reg16::De => Some(0x1B),
-            Reg16::Hl => Some(0x2B),
-            Reg16::Sp => Some(0x3B),
-            _ => None,
+            Reg16::Bc => Ok((0x0B, span)),
+            Reg16::De => Ok((0x1B, span)),
+            Reg16::Hl => Ok((0x2B, span)),
+            Reg16::Sp => Ok((0x3B, span)),
+            _ => Err(span),
         }
-        .map(|byte| Self {
+        .map(|(byte, span)| Self {
             span,
             bytes: [byte].into_iter().collect(),
             patch: None,
@@ -450,29 +500,29 @@ impl Instruction {
         }
     }
 
-    pub fn pop(reg: Reg16, span: Span) -> Option<Self> {
+    pub fn pop(reg: Reg16, span: Span) -> Result<Self, Span> {
         match reg {
-            Reg16::Bc => Some(0),
-            Reg16::De => Some(1),
-            Reg16::Hl => Some(2),
-            Reg16::Af => Some(3),
-            _ => None,
+            Reg16::Bc => Ok((0, span)),
+            Reg16::De => Ok((1, span)),
+            Reg16::Hl => Ok((2, span)),
+            Reg16::Af => Ok((3, span)),
+            _ => Err(span),
         }
-        .map(|reg| Self {
+        .map(|(reg, span)| Self {
             span,
             bytes: [0xC1 | reg << 4].into_iter().collect(),
             patch: None,
         })
     }
-    pub fn push(reg: Reg16, span: Span) -> Option<Self> {
+    pub fn push(reg: Reg16, span: Span) -> Result<Self, Span> {
         match reg {
-            Reg16::Bc => Some(0),
-            Reg16::De => Some(1),
-            Reg16::Hl => Some(2),
-            Reg16::Af => Some(3),
-            _ => None,
+            Reg16::Bc => Ok((0, span)),
+            Reg16::De => Ok((1, span)),
+            Reg16::Hl => Ok((2, span)),
+            Reg16::Af => Ok((3, span)),
+            _ => Err(span),
         }
-        .map(|reg| Self {
+        .map(|(reg, span)| Self {
             span,
             bytes: [0xC5 | reg << 4].into_iter().collect(),
             patch: None,
