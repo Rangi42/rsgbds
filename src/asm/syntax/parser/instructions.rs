@@ -53,7 +53,7 @@ pub(super) fn parse_ld(
             let Some(Operand {
                 kind: OperandKind::Expr(src),
                 ..
-            }) = operands.drain(..).nth(1)
+            }) = operands.into_iter().nth(1)
             else {
                 unreachable!()
             };
@@ -75,7 +75,7 @@ pub(super) fn parse_ld(
             let Some(Operand {
                 kind: OperandKind::Expr(src),
                 ..
-            }) = operands.drain(..).nth(1)
+            }) = operands.into_iter().nth(1)
             else {
                 unreachable!()
             };
@@ -140,7 +140,7 @@ pub(super) fn parse_ld(
             let Some(Operand {
                 kind: OperandKind::Expr(addr),
                 ..
-            }) = operands.drain(..).nth(1)
+            }) = operands.into_iter().nth(1)
             else {
                 unreachable!()
             };
@@ -157,7 +157,7 @@ pub(super) fn parse_ld(
             let Some(Operand {
                 kind: OperandKind::Expr(addr),
                 ..
-            }) = operands.drain(..).next()
+            }) = operands.into_iter().next()
             else {
                 unreachable!()
             };
@@ -180,7 +180,7 @@ pub(super) fn parse_ld(
             let Some(Operand {
                 kind: OperandKind::SpRel(offset),
                 ..
-            }) = operands.drain(..).nth(1)
+            }) = operands.into_iter().nth(1)
             else {
                 unreachable!()
             };
@@ -197,7 +197,7 @@ pub(super) fn parse_ld(
             let Some(Operand {
                 kind: OperandKind::Expr(addr),
                 ..
-            }) = operands.drain(..).next()
+            }) = operands.into_iter().next()
             else {
                 unreachable!()
             };
@@ -253,7 +253,7 @@ pub(super) fn parse_ldh(
             let Some(Operand {
                 kind: OperandKind::Expr(addr),
                 ..
-            }) = operands.drain(..).nth(1)
+            }) = operands.into_iter().nth(1)
             else {
                 unreachable!()
             };
@@ -268,7 +268,7 @@ pub(super) fn parse_ldh(
             let Some(Operand {
                 kind: OperandKind::Expr(addr),
                 ..
-            }) = operands.drain(..).next()
+            }) = operands.into_iter().next()
             else {
                 unreachable!()
             };
@@ -667,7 +667,7 @@ pub(super) fn parse_bit(
             let Some(Operand {
                 kind: OperandKind::Expr(bit),
                 ..
-            }) = operands.drain(..).next()
+            }) = operands.into_iter().next()
             else {
                 unreachable!()
             };
@@ -713,7 +713,7 @@ pub(super) fn parse_res(
             let Some(Operand {
                 kind: OperandKind::Expr(bit),
                 ..
-            }) = operands.drain(..).next()
+            }) = operands.into_iter().next()
             else {
                 unreachable!()
             };
@@ -759,7 +759,7 @@ pub(super) fn parse_set(
             let Some(Operand {
                 kind: OperandKind::Expr(bit),
                 ..
-            }) = operands.drain(..).next()
+            }) = operands.into_iter().next()
             else {
                 unreachable!()
             };

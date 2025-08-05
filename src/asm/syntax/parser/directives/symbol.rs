@@ -2,7 +2,9 @@ use crate::{
     diagnostics,
     sources::Span,
     syntax::parser::{
-        expect_one_of, expr, matches_tok, parse_ctx, require, string, Expected, Token,
+        expect_one_of,
+        expr::{self, expect_numeric_expr},
+        matches_tok, misc, parse_ctx, require, string, Expected, Token,
     },
 };
 
@@ -57,6 +59,8 @@ pub(in super::super) fn parse_def_or_redef(
             lookahead
         },
 
+        // TODO: `+=` etc, `rb` etc
+
         else |unexpected, expected| => {
             parse_ctx.report_syntax_error(&unexpected, |error,span| {
                 error.add_label(diagnostics::error_label(span).with_message(Expected(expected)));
@@ -72,13 +76,46 @@ pub(in super::super) fn parse_export(_keyword: Token, parse_ctx: &mut parse_ctx!
 }
 
 pub(in super::super) fn parse_purge(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+    // Note that it's important to parse the full list first instead of deleting symbols piecemeal,
+    // as the rest of the line may reference symbols purged by an earlier part.
+    // Example: `purge STR, {STR}`.
+    let (names, lookahead) = misc::parse_comma_list(
+        |token, parse_ctx| {
+            expect_one_of! { token => {
+                Token { span } @ |"identifier"(ident, _has_colon)| => (Some((ident, span)), parse_ctx.next_token()),
+                else |unexpected| => (None, unexpected)
+            }}
+        },
+        parse_ctx.next_token(),
+        parse_ctx,
+    );
+
+    for (ident, span) in names {
+        parse_ctx.symbols.delete(
+            ident,
+            span,
+            parse_ctx.identifiers,
+            parse_ctx.nb_errors_remaining,
+            parse_ctx.options,
+        );
+    }
+
+    lookahead
 }
 
 pub(in super::super) fn parse_rsreset(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+    *parse_ctx.symbols.rs() = 0;
+
+    parse_ctx.next_token()
 }
 
 pub(in super::super) fn parse_rsset(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+    let (expr, lookahead) = expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
+
+    match parse_ctx.try_const_eval(&expr) {
+        Ok((value, _span)) => *parse_ctx.symbols.rs() = value,
+        Err(error) => parse_ctx.report_expr_error(error),
+    }
+
+    lookahead
 }

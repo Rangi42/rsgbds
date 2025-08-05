@@ -1,11 +1,12 @@
-use std::cell::Cell;
+use std::{cell::Cell, collections::hash_map::Entry};
 
 use chrono::prelude::*;
 use compact_str::CompactString;
 use rustc_hash::{FxBuildHasher, FxHashMap};
+use string_interner::Symbol;
 
 use crate::{
-    diagnostics,
+    diagnostics::{self, warning},
     format::{FormatError, FormatSpec},
     macro_args::MacroArgs,
     section::Sections,
@@ -67,13 +68,15 @@ impl Symbols {
             let name_sym = identifiers.get_or_intern_static(name);
             let res = this.symbols.insert(name_sym, kind);
             debug_assert!(res.is_none());
+            name_sym
         };
         let numeric = |value, mutable| SymbolData::Builtin(SymbolKind::Numeric { value, mutable });
         let string = |string| SymbolData::Builtin(SymbolKind::String(string));
 
         def_builtin("@", SymbolData::Pc);
+        let rs_sym = def_builtin("_RS", numeric(0, true));
+        debug_assert_eq!(rs_sym, Self::rs_ident()); // Be careful, this identifier is special.
         def_builtin("_NARG", SymbolData::Narg);
-        def_builtin("_RS", numeric(0, true));
         def_builtin(".", SymbolData::Dot);
         def_builtin("..", SymbolData::DotDot);
 
@@ -165,6 +168,10 @@ impl Symbols {
         }
 
         this
+    }
+
+    fn rs_ident() -> Identifier {
+        Identifier::try_from_usize(1).unwrap()
     }
 
     pub fn find(&self, name: &Identifier) -> Option<&SymbolData> {
@@ -396,6 +403,144 @@ impl Symbols {
             nb_errors_left,
             options,
         )
+    }
+
+    pub fn rs(&mut self) -> &mut i32 {
+        let Some(SymbolData::Builtin(SymbolKind::Numeric {
+            value,
+            mutable: true,
+        })) = self.symbols.get_mut(&Self::rs_ident())
+        else {
+            unreachable!()
+        };
+        value
+    }
+
+    pub fn delete(
+        &mut self,
+        name: Identifier,
+        deletion_span: Span,
+        identifiers: &Identifiers,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        match self.symbols.entry(name) {
+            Entry::Vacant(_) => diagnostics::error(
+                &deletion_span,
+                |error| {
+                    error.set_message("cannot delete a symbol that doesn't exist");
+                    error.add_label(diagnostics::error_label(&deletion_span).with_message(
+                        format!(
+                            "no symbol named `{}` exists at this point",
+                            identifiers.resolve(name).unwrap(),
+                        ),
+                    ));
+                },
+                nb_errors_left,
+                options,
+            ),
+
+            Entry::Occupied(mut entry) => {
+                let sym = entry.get_mut();
+                match sym {
+                    SymbolData::User {
+                        definition,
+                        kind: SymbolKind::Ref,
+                        ..
+                    } => diagnostics::error(
+                        &deletion_span,
+                        |error| {
+                            error.set_message("cannot delete a symbol that doesn't exist");
+                            error.add_labels([
+                                diagnostics::error_label(&deletion_span).with_message(format!(
+                                    "no symbol named `{}` exists at this point",
+                                    identifiers.resolve(name).unwrap(),
+                                )),
+                                diagnostics::error_label(definition)
+                                    .with_message("the name was previously referenced here"),
+                            ]);
+                        },
+                        nb_errors_left,
+                        options,
+                    ),
+
+                    SymbolData::User { exported, kind, .. } => {
+                        if *exported {
+                            diagnostics::warn(
+                                warning!("purge=1"),
+                                &deletion_span,
+                                |warning| {
+                                    warning.set_message("deleting an exported symbol");
+                                    warning.add_label(
+                                        diagnostics::warning_label(&deletion_span).with_message(
+                                            format!(
+                                                "deleting `{}` here",
+                                                identifiers.resolve(name).unwrap(),
+                                            ),
+                                        ),
+                                    );
+                                },
+                                nb_errors_left,
+                                options,
+                            );
+                        } else if matches!(kind, SymbolKind::Label { .. }) {
+                            diagnostics::warn(
+                                warning!("purge=2"),
+                                &deletion_span,
+                                |warning| {
+                                    warning.set_message("deleting a label");
+                                    warning.add_label(
+                                        diagnostics::warning_label(&deletion_span).with_message(
+                                            format!(
+                                                "deleting `{}` here",
+                                                identifiers.resolve(name).unwrap(),
+                                            ),
+                                        ),
+                                    );
+                                },
+                                nb_errors_left,
+                                options,
+                            );
+                        }
+                        *sym = SymbolData::Deleted(deletion_span)
+                    }
+
+                    SymbolData::Deleted(span) => diagnostics::error(
+                        &deletion_span,
+                        |error| {
+                            error.set_message(format!(
+                                "`{}` was already deleted",
+                                identifiers.resolve(name).unwrap()
+                            ));
+                            error.add_labels([
+                                diagnostics::error_label(&deletion_span)
+                                    .with_message("cannot perform this deletion..."),
+                                diagnostics::error_label(span)
+                                    .with_message("...because of this one"),
+                            ])
+                        },
+                        nb_errors_left,
+                        options,
+                    ),
+
+                    _ => diagnostics::error(
+                        &deletion_span,
+                        |error| {
+                            error.set_message(format!(
+                                "cannot delete built-in symbol `{}`",
+                                identifiers.resolve(name).unwrap(),
+                            ));
+                            error.add_label(
+                                diagnostics::error_label(&deletion_span)
+                                    .with_message("cannot perform this deletion"),
+                            )
+                        },
+                        nb_errors_left,
+                        options,
+                    ),
+                }
+            }
+        }
     }
 }
 
