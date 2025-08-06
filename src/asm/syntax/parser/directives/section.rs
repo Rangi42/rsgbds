@@ -2,7 +2,7 @@ use compact_str::CompactString;
 
 use crate::{
     common::section::MemRegion,
-    diagnostics,
+    diagnostics::{self, warning},
     section::{AddrConstraint, SectionAttrs, SectionKind},
     sources::Span,
     syntax::{parser::Expected, tokens::Token},
@@ -391,6 +391,94 @@ pub(in super::super) fn parse_pops(keyword: Token, parse_ctx: &mut parse_ctx!())
     parse_ctx.next_token()
 }
 
-pub(in super::super) fn parse_align(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
+pub(in super::super) fn parse_align(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+    let (expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
+
+    let (offset, lookahead) = expect_one_of! { lookahead => {
+        |","| => {
+            let (ofs_expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
+
+            let ofs = match parse_ctx.try_const_eval(&ofs_expr){
+                Ok((value, _span)) => value,
+                Err(error) => {
+                    parse_ctx.report_expr_error(error);
+                    0
+                }
+            };
+            (ofs, lookahead)
+        },
+        else |unexpected| => (0, unexpected)
+    }};
+
+    match parse_ctx.try_const_eval(&expr) {
+        Ok((value, span)) => {
+            let alignment = match value {
+                0..=16 => value as u8,
+                17.. => {
+                    parse_ctx.error(&span, |error| {
+                        error.set_message("alignment cannot be larger than 16");
+                        error.add_label(
+                            diagnostics::error_label(&span)
+                                .with_message(format!("an alignment of {value} is invalid")),
+                        );
+                    });
+                    16
+                }
+                ..=-1 => {
+                    parse_ctx.error(&span, |error| {
+                        error.set_message("alignment cannot be negative");
+                        error.add_label(
+                            diagnostics::error_label(&span)
+                                .with_message(format!("an alignment of {value} is invalid")),
+                        );
+                    });
+                    0
+                }
+            };
+
+            let align_size = 1 << alignment;
+            let offset = if offset >= align_size || offset <= -align_size {
+                parse_ctx.warn(warning!("align-ofs"), &keyword.span, |warning| {
+                warning.set_message("alignment offset is larger than alignment size");
+                warning.add_label(diagnostics::warning_label(&keyword.span).with_message(format!("requested an alignment to ${align_size:02X} bytes and an offset of ${offset:02X} bytes")));
+            });
+                (offset % align_size) as u16
+            } else {
+                offset as u16
+            };
+
+            if let Some((_data_section, symbol_section)) =
+                parse_ctx.sections.active_section.as_mut()
+            {
+                let constraint = if alignment == 16 {
+                    AddrConstraint::Addr(offset)
+                } else {
+                    AddrConstraint::Align(alignment, offset)
+                };
+                if let Err(err) = parse_ctx.sections.sections[symbol_section.id]
+                    .attrs
+                    .address
+                    .merge(constraint, symbol_section.offset)
+                {
+                    parse_ctx.error(&keyword.span, |error| {
+                        let (msg, label) = err.details();
+                        error.set_message(msg);
+                        error
+                            .add_label(diagnostics::error_label(&keyword.span).with_message(label));
+                    });
+                }
+            } else {
+                parse_ctx.error(&keyword.span, |error| {
+                    error.set_message("`align` used outside of a section");
+                    error.add_label(
+                        diagnostics::error_label(&keyword.span)
+                            .with_message("this directive is invalid"),
+                    );
+                });
+            }
+        }
+        Err(error) => parse_ctx.report_expr_error(error),
+    }
+
+    lookahead
 }

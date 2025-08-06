@@ -27,7 +27,7 @@ type SectionId = usize; // Index into the `IndexMap`.
 pub struct Section {
     // Really, the span of the *first* definition.
     def_span: Span,
-    attrs: SectionAttrs,
+    pub attrs: SectionAttrs,
     patches: Vec<Patch>,
     bytes: Contents,
 }
