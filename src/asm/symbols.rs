@@ -225,8 +225,6 @@ impl Symbols {
         kind: SymbolKind,
         exported: bool,
     ) -> Result<(), (&mut SymbolData, Span)> {
-        use std::collections::hash_map::Entry;
-
         match symbols.entry(name) {
             Entry::Vacant(entry) => {
                 entry.insert(SymbolData::User {
@@ -394,12 +392,14 @@ impl Symbols {
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
+        // TODO: update the scope
+
         self.define_symbol(
             name,
             identifiers,
             definition,
             SymbolKind::Label { section_id, offset },
-            exported,
+            exported || options.export_all,
             nb_errors_left,
             options,
         )

@@ -10,7 +10,8 @@ use crate::{
     expr::Expr,
     instructions::Instruction,
     sources::Span,
-    Options,
+    symbols::Symbols,
+    Identifier, Identifiers, Options,
 };
 
 #[derive(Debug)]
@@ -42,10 +43,13 @@ pub struct SectionAttrs {
     pub address: AddrConstraint,
     pub bank: Option<u32>,
 }
-#[derive(Debug)]
+#[derive(Debug, displaydoc::Display)]
 pub enum SectionKind {
+    /// normal
     Normal,
+    /// union
     Union,
+    /// fragment
     Fragment,
 }
 #[derive(Debug, PartialEq, Eq)]
@@ -92,6 +96,8 @@ impl Sections {
         name: CompactString,
         attrs: SectionAttrs,
         def_span: Span,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
     ) -> ActiveSection {
         match self.sections.entry(name) {
             Entry::Vacant(entry) => {
@@ -110,7 +116,74 @@ impl Sections {
                     .index();
                 ActiveSection { id, offset: 0 }
             }
-            Entry::Occupied(entry) => todo!(),
+
+            Entry::Occupied(mut entry) => {
+                let sect = entry.get();
+                let offset = match (&attrs.kind, &sect.attrs.kind) {
+                    (SectionKind::Normal, SectionKind::Normal) => {
+                        diagnostics::error(
+                            &def_span,
+                            |error| {
+                                error.set_message(format!(
+                                    "normal-type section \"{}\" redefined",
+                                    entry.key(),
+                                ));
+                                error.add_labels([
+                                    diagnostics::error_label(&def_span)
+                                        .with_message("redefined here..."),
+                                    diagnostics::error_label(&sect.def_span)
+                                        .with_message("...original definition here"),
+                                ]);
+                                error.set_help("declare the section as `union` to overlay the pieces, or as `fragment` to concatenate them");
+                            },
+                            nb_errors_left,
+                            options,
+                        );
+                        sect.bytes.len()
+                    }
+                    (SectionKind::Union, SectionKind::Union) => 0, // Restart from the beginning.
+                    (SectionKind::Fragment, SectionKind::Fragment) => sect.bytes.len(),
+
+                    (new, old) => {
+                        diagnostics::error(
+                            &def_span,
+                            |error| {
+                                error.set_message(format!(
+                                    "incorrect type used for section \"{}\"",
+                                    entry.key(),
+                                ));
+                                error.add_labels([
+                                    diagnostics::error_label(&def_span)
+                                        .with_message(format!("defined again as {new} here...")),
+                                    diagnostics::error_label(&sect.def_span).with_message(format!(
+                                        "...but originally defined as {old} here"
+                                    )),
+                                ])
+                            },
+                            nb_errors_left,
+                            options,
+                        );
+                        sect.bytes.len()
+                    }
+                };
+                if let Err(err) = entry.get_mut().attrs.address.merge(attrs.address, offset) {
+                    diagnostics::error(
+                        &def_span,
+                        |error| {
+                            let (msg, details) = err.details();
+                            error.set_message(msg);
+                            error.add_label(
+                                diagnostics::error_label(&def_span).with_message(details),
+                            );
+                        },
+                        nb_errors_left,
+                        options,
+                    );
+                }
+
+                let id = entry.index();
+                ActiveSection { id, offset }
+            }
         }
     }
 
@@ -314,35 +387,35 @@ impl MergeError {
     pub fn details(&self) -> (String, String) {
         match self {
             Self::AddrMismatch(addr, other_addr) => (
-                format!("Cannot place the section at address ${other_addr:04x}"),
-                format!("The section is already fixed at address ${addr:04x}"),
+                format!("cannot place the section at address ${other_addr:04x}"),
+                format!("the section is already fixed at address ${addr:04x}"),
             ),
             Self::FixedBadAlign(addr, align, align_ofs) => (
                 format!(
-                    "Cannot align the section's lower {align} bit{} to {align_ofs}",
+                    "cannot align the section's lower {align} bit{} to {align_ofs}",
                     S::from(*align),
                 ),
                 format!(
-                    "The fixed address would have the bit{} equal to {} at this point",
+                    "the fixed address would have the bit{} equal to {} at this point",
                     S::from(*align),
                     addr % (1 << align),
                 ),
             ),
             Self::BadAlignFixed(align, align_ofs, addr) => (
-                format!("Cannot place the section at address ${addr:04x}"),
+                format!("cannot place the section at address ${addr:04x}"),
                 format!(
-                    "The lower {align} bit{} of the address are equal to ${} here",
+                    "the lower {align} bit{} of the address are equal to ${} here",
                     S::from(*align),
                     addr % (1 << align),
                 ),
             ),
             Self::ConflictingAlign(align, align_ofs, other_align, other_align_ofs) => (
                 format!(
-                    "Cannot align the section's lower {align} bit{} to {align_ofs}",
+                    "cannot align the section's lower {align} bit{} to {align_ofs}",
                     S::from(*align),
                 ),
                 format!(
-                    "The bits would be equal to {} at this point",
+                    "the bits would be equal to {} at this point",
                     align_ofs % (1 << other_align),
                 ),
             ),
@@ -353,9 +426,9 @@ impl MergeError {
 impl ActiveSection {
     pub fn define_label(
         &self,
-        name: crate::Identifier,
-        symbols: &mut crate::symbols::Symbols,
-        identifiers: &crate::Identifiers,
+        name: Identifier,
+        symbols: &mut Symbols,
+        identifiers: &Identifiers,
         definition: Span,
         exported: bool,
         nb_errors_left: &Cell<usize>,
@@ -381,6 +454,15 @@ impl Section {
         match self.attrs.address {
             AddrConstraint::None | AddrConstraint::Align(_, _) => None,
             AddrConstraint::Addr(addr) => Some(addr),
+        }
+    }
+}
+
+impl Contents {
+    fn len(&self) -> usize {
+        match self {
+            Self::Data(data) => data.len(),
+            Self::NoData(len) => *len,
         }
     }
 }

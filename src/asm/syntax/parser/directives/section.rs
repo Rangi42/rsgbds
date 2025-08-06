@@ -277,9 +277,13 @@ fn parse_section_attrs(
 pub(in super::super) fn parse_section(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     let (def_span, attrs, name, lookahead) = parse_section_attrs(parse_ctx.next_token(), parse_ctx);
 
-    let active_section = parse_ctx
-        .sections
-        .create_if_not_exists(name, attrs, def_span);
+    let active_section = parse_ctx.sections.create_if_not_exists(
+        name,
+        attrs,
+        def_span,
+        parse_ctx.nb_errors_remaining,
+        parse_ctx.options,
+    );
     parse_ctx.sections.active_section = Some((active_section.clone(), active_section));
 
     lookahead
@@ -294,9 +298,13 @@ pub(in super::super) fn parse_endsection(_keyword: Token, parse_ctx: &mut parse_
 pub(in super::super) fn parse_load(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     let (def_span, attrs, name, lookahead) = parse_section_attrs(parse_ctx.next_token(), parse_ctx);
 
-    let new_active_section = parse_ctx
-        .sections
-        .create_if_not_exists(name, attrs, def_span);
+    let new_active_section = parse_ctx.sections.create_if_not_exists(
+        name,
+        attrs,
+        def_span,
+        parse_ctx.nb_errors_remaining,
+        parse_ctx.options,
+    );
     let Some((data_section, symbol_section)) = parse_ctx.sections.active_section.as_mut() else {
         parse_ctx.error(&keyword.span, |error| {
             error.set_message("`LOAD` used outside of a section");
@@ -320,25 +328,25 @@ pub(in super::super) fn parse_load(keyword: Token, parse_ctx: &mut parse_ctx!())
     lookahead
 }
 
-pub(in super::super) fn parse_endl(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+pub(in super::super) fn parse_endl(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     if let Some((data_section, symbol_section)) = parse_ctx.sections.active_section.as_mut() {
         if !data_section.points_to_same_as(symbol_section) {
             // End the `LOAD` block.
             *symbol_section = data_section.clone();
         } else {
-            parse_ctx.error(&_keyword.span, |error| {
-                error.set_message("`ENDL` used outside of a `LOAD` block");
+            parse_ctx.error(&keyword.span, |error| {
+                error.set_message("`endl` used outside of a `load` block");
                 error.add_label(
-                    diagnostics::error_label(&_keyword.span)
+                    diagnostics::error_label(&keyword.span)
                         .with_message("this directive is invalid"),
                 );
             });
         }
     } else {
-        parse_ctx.error(&_keyword.span, |error| {
-            error.set_message("`ENDL` used outside of a section");
+        parse_ctx.error(&keyword.span, |error| {
+            error.set_message("`endl` used outside of a section");
             error.add_label(
-                diagnostics::error_label(&_keyword.span).with_message("this directive is invalid"),
+                diagnostics::error_label(&keyword.span).with_message("this directive is invalid"),
             );
         });
     }
@@ -357,9 +365,13 @@ pub(in super::super) fn parse_pushs(keyword: Token, parse_ctx: &mut parse_ctx!()
 
     let (def_span, attrs, name, lookahead) = parse_section_attrs(lookahead, parse_ctx);
 
-    let active_section = parse_ctx
-        .sections
-        .create_if_not_exists(name, attrs, def_span);
+    let active_section = parse_ctx.sections.create_if_not_exists(
+        name,
+        attrs,
+        def_span,
+        parse_ctx.nb_errors_remaining,
+        parse_ctx.options,
+    );
     parse_ctx.sections.active_section = Some((active_section.clone(), active_section));
 
     lookahead
