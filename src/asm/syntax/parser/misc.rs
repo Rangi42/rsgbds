@@ -4,11 +4,7 @@ use crate::{diagnostics, sources::Span, syntax::tokens::Token, Identifier};
 
 use super::{expect_one_of, expr, matches_tok, parse_ctx, string};
 
-pub(super) fn parse_comma_list<
-    'ctx_stack,
-    T,
-    F: FnMut(Token, &mut parse_ctx!()) -> (Option<T>, Token),
->(
+pub(super) fn parse_comma_list<T, F: FnMut(Token, &mut parse_ctx!()) -> (Option<T>, Token)>(
     mut parse_element: F,
     mut lookahead: Token,
     parse_ctx: &mut parse_ctx!(),

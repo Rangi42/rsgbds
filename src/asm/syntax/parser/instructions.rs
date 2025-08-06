@@ -31,7 +31,7 @@ pub(super) fn parse_ld(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    let (mut operands, lookahead) =
+    let (operands, lookahead) =
         misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
 
     let res = match operands.as_slice() {
@@ -229,7 +229,7 @@ pub(super) fn parse_ldh(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    let (mut operands, lookahead) =
+    let (operands, lookahead) =
         misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
 
     let res = match operands.as_slice() {
@@ -651,7 +651,7 @@ pub(super) fn parse_bit(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    let (mut operands, lookahead) =
+    let (operands, lookahead) =
         misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
 
     let res = match operands.as_slice() {
@@ -697,7 +697,7 @@ pub(super) fn parse_res(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    let (mut operands, lookahead) =
+    let (operands, lookahead) =
         misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
 
     let res = match operands.as_slice() {
@@ -743,7 +743,7 @@ pub(super) fn parse_set(
     instr_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<Instruction>, Token) {
-    let (mut operands, lookahead) =
+    let (operands, lookahead) =
         misc::parse_comma_list(parse_operand, parse_ctx.next_token(), parse_ctx);
 
     let res = match operands.as_slice() {

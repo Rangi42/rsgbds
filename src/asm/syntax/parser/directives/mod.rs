@@ -2,26 +2,6 @@ use crate::{diagnostics, syntax::tokens::Token};
 
 use super::{expr, parse_ctx};
 
-pub(super) fn parse_align(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_db(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_dl(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_ds(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_dw(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
 pub(super) fn parse_endm(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     parse_ctx.report_syntax_error(&keyword, |error, span| {
         error.add_label(
@@ -40,18 +20,6 @@ pub(super) fn parse_endr(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token 
     });
 
     parse_ctx.next_token()
-}
-
-pub(super) fn parse_endu(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_incbin(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
-pub(super) fn parse_nextu(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
 }
 
 pub(super) fn parse_shift(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
@@ -94,13 +62,10 @@ pub(super) fn parse_shift(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token
     lookahead
 }
 
-pub(super) fn parse_union(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
 pub mod charmap;
 pub mod cond;
 pub mod context;
+pub mod data;
 pub mod opt;
 pub mod output;
 pub mod section;

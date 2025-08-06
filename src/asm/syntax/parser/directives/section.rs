@@ -375,3 +375,7 @@ pub(in super::super) fn parse_pops(keyword: Token, parse_ctx: &mut parse_ctx!())
 
     parse_ctx.next_token()
 }
+
+pub(in super::super) fn parse_align(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+    todo!()
+}
