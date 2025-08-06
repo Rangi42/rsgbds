@@ -1,8 +1,12 @@
-use std::rc::Rc;
+use std::{cell::Cell, cmp::Ordering, rc::Rc};
 
 use compact_str::{format_compact, CompactString};
 
-use crate::sources::Source;
+use crate::{
+    diagnostics::{self, warning},
+    sources::{Source, Span},
+    Options,
+};
 
 /// This should be created using the [`FromIterator`] trait.
 #[derive(Debug)]
@@ -51,8 +55,61 @@ impl MacroArgs {
         self.args.len().saturating_sub(self.shift)
     }
 
-    pub fn shift_by(&mut self, offset: isize) {
-        self.shift = self.shift.saturating_add_signed(offset);
+    pub fn shift_by(
+        &mut self,
+        mut offset: isize,
+        span: &Span,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        match offset.cmp(&0) {
+            Ordering::Equal => return, // Nothing will happen, we don't even need to invalidate the cache.
+
+            Ordering::Greater if offset as usize > self.max_valid() => {
+                diagnostics::warn(
+                    warning!("macro-shift"),
+                    span,
+                    |warning| {
+                        warning.set_message(format!(
+                            "attempting to shift by more than the {} available macro arguments",
+                            self.max_valid()
+                        ));
+                        warning.add_label(
+                            diagnostics::warning_label(span)
+                                .with_message(format!("attempting to shift by {offset} here")),
+                        );
+                    },
+                    nb_errors_left,
+                    options,
+                );
+
+                self.shift = self.max_valid();
+            }
+
+            Ordering::Less if -offset as usize > self.shift => {
+                diagnostics::warn(
+                    warning!("macro-shift"),
+                    span,
+                    |warning| {
+                        warning.set_message(format!(
+                            "attempting to unshift by more than the {} shifted arguments",
+                            self.shift
+                        ));
+                        warning.add_label(
+                            diagnostics::warning_label(span)
+                                .with_message(format!("attempting to shift by {offset} here")),
+                        );
+                    },
+                    nb_errors_left,
+                    options,
+                );
+
+                self.shift = 0;
+            }
+
+            _ => self.shift = self.shift.wrapping_add_signed(offset),
+        }
+
         self.combined_args = None; // Invalidate the cache.
     }
 
