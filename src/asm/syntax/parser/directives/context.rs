@@ -260,6 +260,23 @@ pub(in super::super) fn parse_for(keyword: Token, parse_ctx: &mut parse_ctx!()) 
     lookahead
 }
 
+pub(in super::super) fn parse_break(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+    // Parse up to EOL right now, since we're about to switch contexts.
+    let lookahead = expect_eol(parse_ctx.next_token(), parse_ctx);
+
+    if let Err(loop_context_somewhere) = parse_ctx.lexer.break_loop() {
+        parse_ctx.error(&keyword.span, |error| {
+            error.set_message("`break` used outside of a loop");
+            error.add_label(diagnostics::error_label(&keyword.span).with_message("not currently inside of a loop"));
+            if loop_context_somewhere {
+                error.set_help("one of the parent contexts is a loop, but `break` must be used directly from the loop");
+            }
+        });
+    }
+
+    lookahead
+}
+
 impl parse_ctx!() {
     pub fn push_file(&mut self, file: Rc<Source>, parent: Option<Rc<NormalSpan>>) {
         self.lexer

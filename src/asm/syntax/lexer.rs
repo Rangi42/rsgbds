@@ -110,6 +110,36 @@ impl Lexer {
         contents.kind = SpanKind::Loop(0);
         self.push_context(contents, loop_info, nb_errors_left, options);
     }
+
+    pub fn break_loop(&mut self) -> Result<(), bool> {
+        let (i, context) = self
+            .contexts
+            .iter_mut()
+            .enumerate()
+            .rev()
+            .find(|(_i, ctx)| !ctx.span.kind.ends_implicitly())
+            .unwrap();
+
+        if matches!(
+            context,
+            Context {
+                span: NormalSpan {
+                    kind: SpanKind::Loop(..),
+                    ..
+                },
+                ..
+            }
+        ) {
+            self.contexts.truncate(i);
+            Ok(())
+        } else {
+            Err(self
+                .contexts
+                .iter()
+                .find(|ctx| matches!(ctx.span.kind, SpanKind::Loop(..)))
+                .is_some())
+        }
+    }
 }
 
 struct LexerParams<'idents, 'sym, 'mac_args, 'uniq_id, 'sections, 'nb_err, 'opts> {

@@ -6,10 +6,6 @@ pub(super) fn parse_align(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Toke
     todo!()
 }
 
-pub(super) fn parse_break(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    todo!()
-}
-
 pub(super) fn parse_db(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     todo!()
 }

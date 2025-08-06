@@ -352,7 +352,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
 
         tok!("align") => directives::parse_align(first_token, parse_ctx),
         tok!("assert") => directives::output::parse_assert(first_token, parse_ctx),
-        tok!("break") => directives::parse_break(first_token, parse_ctx),
+        tok!("break") => directives::context::parse_break(first_token, parse_ctx),
         tok!("charmap") => directives::charmap::parse_charmap(first_token, parse_ctx),
         tok!("def") => directives::symbol::parse_def_or_redef(first_token, parse_ctx, None),
         tok!("db") => directives::parse_db(first_token, parse_ctx),
