@@ -5,7 +5,7 @@ use crate::{
     diagnostics,
     section::{AddrConstraint, SectionAttrs, SectionKind},
     sources::Span,
-    syntax::tokens::Token,
+    syntax::{parser::Expected, tokens::Token},
 };
 
 use super::super::{expect_one_of, expr, matches_tok, parse_ctx, require, string};
@@ -77,7 +77,7 @@ fn parse_section_attrs(
         },
         else |other, expected| => {
             parse_ctx.report_syntax_error(&other, |error,span| {
-                error.add_label(diagnostics::error_label(span).with_message("expected TODO here"))
+                error.add_label(diagnostics::error_label(span).with_message(Expected(expected)))
             });
 
             // Process the next token if it is expected later in the directive.
@@ -99,9 +99,12 @@ fn parse_section_attrs(
 
         debug_assert_eq!(attrs.address, AddrConstraint::None);
         match parse_ctx.try_const_eval(&expr) {
-            Ok((addr, _)) => match addr.try_into() {
+            Ok((addr, span)) => match addr.try_into() {
                 Ok(addr) => attrs.address = AddrConstraint::Addr(addr),
-                Err(err) => todo!(),
+                Err(err) => parse_ctx.error(&span, |error| {
+                    error.set_message("section address out of range");
+                    error.add_label(diagnostics::error_label(&span).with_message(err));
+                }),
             },
             Err(err) => parse_ctx.report_expr_error(err),
         };
