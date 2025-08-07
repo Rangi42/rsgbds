@@ -9,6 +9,7 @@ use crate::{
     diagnostics::{self, warning},
     expr::Expr,
     instructions::Instruction,
+    macro_args::MacroArgs,
     sources::Span,
     symbols::Symbols,
     Identifier, Identifiers, Options,
@@ -217,12 +218,397 @@ impl Sections {
         }
     }
 
-    pub fn emit_instruction(
+    pub fn allocate_space(
         &mut self,
-        instruction: Instruction,
+        length: usize,
+        keyword_span: &Span,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
+        let Some((data_section, symbol_section)) = self.active_section.as_mut() else {
+            diagnostics::error(
+                keyword_span,
+                |error| {
+                    error.set_message("padding emitted outside of a section");
+                    error.add_label(
+                        diagnostics::error_label(keyword_span)
+                            .with_message("no section is active at this point"),
+                    );
+                    if self
+                        .section_stack
+                        .iter()
+                        .any(|(_span, entry)| entry.is_some())
+                    {
+                        error.set_help("consider popping a section with `pops` before this");
+                    } else {
+                        error.set_help("consider opening a section with `section` before this");
+                    }
+                },
+                nb_errors_left,
+                options,
+            );
+            return;
+        };
+
+        let data_sect = &mut self.sections[data_section.id];
+        match &mut data_sect.bytes {
+            Contents::Data(data) => {
+                debug_assert_eq!(data.len(), data_section.offset);
+                data.extend(std::iter::repeat(options.runtime_opts.pad_byte).take(length));
+            }
+            Contents::NoData(len) => {
+                if !matches!(data_sect.attrs.kind, SectionKind::Union) {
+                    debug_assert_eq!(*len, data_section.offset);
+                    *len += length;
+                } else {
+                    *len = std::cmp::max(data_section.offset + length, *len);
+                }
+            }
+        }
+
+        data_section.offset += length;
+        symbol_section.offset += length;
+    }
+
+    pub fn emit_padding(
+        &mut self,
+        bytes: &[Expr],
+        keyword_span: &Span,
+        identifiers: &Identifiers,
+        symbols: &mut Symbols,
+        macro_args: Option<&MacroArgs>,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        let eval_res: Vec<_> = bytes
+            .iter()
+            .map(|expr| expr.prep_for_patch(symbols, macro_args, self))
+            .collect();
+
+        let Some((data_section, symbol_section)) = self.active_section.as_mut() else {
+            diagnostics::error(
+                keyword_span,
+                |error| {
+                    error.set_message("padding emitted outside of a section");
+                    error.add_label(
+                        diagnostics::error_label(keyword_span)
+                            .with_message("no section is active at this point"),
+                    );
+                    if self
+                        .section_stack
+                        .iter()
+                        .any(|(_span, entry)| entry.is_some())
+                    {
+                        error.set_help("consider popping a section with `pops` before this");
+                    } else {
+                        error.set_help("consider opening a section with `section` before this");
+                    }
+                },
+                nb_errors_left,
+                options,
+            );
+            return;
+        };
+
+        let data_sect = &mut self.sections[data_section.id];
+        match &mut data_sect.bytes {
+            Contents::Data(data) => {
+                debug_assert_eq!(data.len(), data_section.offset);
+
+                let offset = data_section.offset;
+                for (i, res) in eval_res.iter().enumerate() {
+                    // It is important that PC's value remains identical throughout the loop's iterations.
+                    Self::push_byte(
+                        res,
+                        offset + i,
+                        &mut data_sect.patches,
+                        data,
+                        symbol_section,
+                        identifiers,
+                        nb_errors_left,
+                        options,
+                    );
+                }
+            }
+            Contents::NoData(len) => {
+                debug_assert_eq!(*len, data_section.offset);
+
+                diagnostics::error(
+                    keyword_span,
+                    |error| {
+                        error.set_message("padding emitted outside of ROM");
+                        error.add_label(diagnostics::error_label(keyword_span).with_message(
+                            format!(
+                                "a {} section is active here",
+                                data_sect.attrs.mem_region.name(),
+                            ),
+                        ));
+                        error.set_help("you can store the data in ROM while leaving labels pointing to RAM, using `load`");
+                    },
+                    nb_errors_left,
+                    options,
+                );
+                *len += bytes.len();
+            }
+        }
+
+        data_section.offset += bytes.len();
+        symbol_section.offset += bytes.len();
+    }
+
+    pub fn emit_byte(
+        &mut self,
+        byte: &Expr,
+        keyword_span: &Span,
+        identifiers: &Identifiers,
+        symbols: &mut Symbols,
+        macro_args: Option<&MacroArgs>,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        let eval_res = byte.prep_for_patch(symbols, macro_args, self);
+
+        let Some((data_section, symbol_section)) = self.active_section.as_mut() else {
+            diagnostics::error(
+                keyword_span,
+                |error| {
+                    error.set_message("byte emitted outside of a section");
+                    error.add_label(
+                        diagnostics::error_label(keyword_span)
+                            .with_message("no section is active at this point"),
+                    );
+                    if self
+                        .section_stack
+                        .iter()
+                        .any(|(_span, entry)| entry.is_some())
+                    {
+                        error.set_help("consider popping a section with `pops` before this");
+                    } else {
+                        error.set_help("consider opening a section with `section` before this");
+                    }
+                },
+                nb_errors_left,
+                options,
+            );
+            return;
+        };
+
+        let data_sect = &mut self.sections[data_section.id];
+        match &mut data_sect.bytes {
+            Contents::Data(data) => {
+                debug_assert_eq!(data.len(), data_section.offset);
+
+                let offset = data_section.offset;
+                Self::push_byte(
+                    &eval_res,
+                    offset,
+                    &mut data_sect.patches,
+                    data,
+                    symbol_section,
+                    identifiers,
+                    nb_errors_left,
+                    options,
+                );
+            }
+            Contents::NoData(len) => {
+                debug_assert_eq!(*len, data_section.offset);
+
+                diagnostics::error(
+                    keyword_span,
+                    |error| {
+                        error.set_message("byte emitted outside of ROM");
+                        error.add_label(diagnostics::error_label(keyword_span).with_message(
+                            format!(
+                                "a {} section is active here",
+                                data_sect.attrs.mem_region.name(),
+                            ),
+                        ));
+                        error.set_help("you can store the data in ROM while leaving labels pointing to RAM, using `load`");
+                    },
+                    nb_errors_left,
+                    options,
+                );
+                *len += 1;
+            }
+        }
+
+        data_section.offset += 1;
+        symbol_section.offset += 1;
+    }
+
+    pub fn emit_word(
+        &mut self,
+        word: &Expr,
+        keyword_span: &Span,
+        identifiers: &Identifiers,
+        symbols: &mut Symbols,
+        macro_args: Option<&MacroArgs>,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        let eval_res = word.prep_for_patch(symbols, macro_args, self);
+
+        let Some((data_section, symbol_section)) = self.active_section.as_mut() else {
+            diagnostics::error(
+                keyword_span,
+                |error| {
+                    error.set_message("word emitted outside of a section");
+                    error.add_label(
+                        diagnostics::error_label(keyword_span)
+                            .with_message("no section is active at this point"),
+                    );
+                    if self
+                        .section_stack
+                        .iter()
+                        .any(|(_span, entry)| entry.is_some())
+                    {
+                        error.set_help("consider popping a section with `pops` before this");
+                    } else {
+                        error.set_help("consider opening a section with `section` before this");
+                    }
+                },
+                nb_errors_left,
+                options,
+            );
+            return;
+        };
+
+        let data_sect = &mut self.sections[data_section.id];
+        match &mut data_sect.bytes {
+            Contents::Data(data) => {
+                debug_assert_eq!(data.len(), data_section.offset);
+
+                let offset = data_section.offset;
+                Self::push_byte(
+                    &eval_res,
+                    offset,
+                    &mut data_sect.patches,
+                    data,
+                    symbol_section,
+                    identifiers,
+                    nb_errors_left,
+                    options,
+                );
+            }
+            Contents::NoData(len) => {
+                debug_assert_eq!(*len, data_section.offset);
+
+                diagnostics::error(
+                    keyword_span,
+                    |error| {
+                        error.set_message("word emitted outside of ROM");
+                        error.add_label(diagnostics::error_label(keyword_span).with_message(
+                            format!(
+                                "a {} section is active here",
+                                data_sect.attrs.mem_region.name(),
+                            ),
+                        ));
+                        error.set_help("you can store the data in ROM while leaving labels pointing to RAM, using `load`");
+                    },
+                    nb_errors_left,
+                    options,
+                );
+                *len += 1;
+            }
+        }
+
+        data_section.offset += 1;
+        symbol_section.offset += 1;
+    }
+
+    pub fn emit_long(
+        &mut self,
+        long: &Expr,
+        keyword_span: &Span,
+        identifiers: &Identifiers,
+        symbols: &mut Symbols,
+        macro_args: Option<&MacroArgs>,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        let eval_res = long.prep_for_patch(symbols, macro_args, self);
+
+        let Some((data_section, symbol_section)) = self.active_section.as_mut() else {
+            diagnostics::error(
+                keyword_span,
+                |error| {
+                    error.set_message("long emitted outside of a section");
+                    error.add_label(
+                        diagnostics::error_label(keyword_span)
+                            .with_message("no section is active at this point"),
+                    );
+                    if self
+                        .section_stack
+                        .iter()
+                        .any(|(_span, entry)| entry.is_some())
+                    {
+                        error.set_help("consider popping a section with `pops` before this");
+                    } else {
+                        error.set_help("consider opening a section with `section` before this");
+                    }
+                },
+                nb_errors_left,
+                options,
+            );
+            return;
+        };
+
+        let data_sect = &mut self.sections[data_section.id];
+        match &mut data_sect.bytes {
+            Contents::Data(data) => {
+                debug_assert_eq!(data.len(), data_section.offset);
+
+                let offset = data_section.offset;
+                Self::push_byte(
+                    &eval_res,
+                    offset,
+                    &mut data_sect.patches,
+                    data,
+                    symbol_section,
+                    identifiers,
+                    nb_errors_left,
+                    options,
+                );
+            }
+            Contents::NoData(len) => {
+                debug_assert_eq!(*len, data_section.offset);
+
+                diagnostics::error(
+                    keyword_span,
+                    |error| {
+                        error.set_message("long emitted outside of ROM");
+                        error.add_label(diagnostics::error_label(keyword_span).with_message(
+                            format!(
+                                "a {} section is active here",
+                                data_sect.attrs.mem_region.name(),
+                            ),
+                        ));
+                        error.set_help("you can store the data in ROM while leaving labels pointing to RAM, using `load`");
+                    },
+                    nb_errors_left,
+                    options,
+                );
+                *len += 1;
+            }
+        }
+
+        data_section.offset += 1;
+        symbol_section.offset += 1;
+    }
+
+    pub fn emit_instruction(
+        &mut self,
+        instruction: Instruction,
+        identifiers: &Identifiers,
+        symbols: &mut Symbols,
+        macro_args: Option<&MacroArgs>,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        let patch_res = instruction
+            .patch
+            .map(|patch| (patch.expr.prep_for_patch(symbols, macro_args, self), patch));
+
         let Some((data_section, symbol_section)) = self.active_section.as_mut() else {
             diagnostics::error(
                 &instruction.span,
@@ -249,39 +635,255 @@ impl Sections {
         };
 
         let data_sect = &mut self.sections[data_section.id];
-        if let Contents::Data(data) = &mut data_sect.bytes {
-            debug_assert_eq!(data.len(), data_section.offset);
-            data.extend_from_slice(&instruction.bytes);
+        match &mut data_sect.bytes {
+            Contents::Data(data) => {
+                debug_assert_eq!(data.len(), data_section.offset);
+                data.extend_from_slice(&instruction.bytes);
 
-            if let Some(patch) = instruction.patch {
-                data_sect.patches.push(Patch {
-                    span: instruction.span,
-                    expr: patch.expr,
-                    kind: patch.kind,
-                    offset: data_section.offset + usize::from(patch.offset),
-                    pc: (symbol_section.id, symbol_section.offset),
-                });
+                if let Some((eval_res, patch)) = patch_res {
+                    let offset = data_section.offset + usize::from(patch.offset);
+                    match eval_res {
+                        Ok((value, span)) => match patch.kind {
+                            PatchKind::Byte => Self::push_byte(
+                                &Ok((value, span)),
+                                offset,
+                                &mut data_sect.patches,
+                                data,
+                                symbol_section,
+                                identifiers,
+                                nb_errors_left,
+                                options,
+                            ),
+                            PatchKind::Word => Self::push_word(
+                                &Ok((value, span)),
+                                offset,
+                                &mut data_sect.patches,
+                                data,
+                                symbol_section,
+                                identifiers,
+                                nb_errors_left,
+                                options,
+                            ),
+                            PatchKind::Long => Self::push_long(
+                                &Ok((value, span)),
+                                offset,
+                                &mut data_sect.patches,
+                                data,
+                                symbol_section,
+                                identifiers,
+                                nb_errors_left,
+                                options,
+                            ),
+                            PatchKind::Jr => todo!(),
+                        },
+
+                        Err(Ok(expr)) => data_sect.patches.push(Patch {
+                            span: instruction.span,
+                            expr,
+                            kind: patch.kind,
+                            offset,
+                            pc: (symbol_section.id, symbol_section.offset),
+                        }),
+
+                        Err(Err(error)) => error.report(identifiers, nb_errors_left, options),
+                    }
+                }
             }
-        } else {
-            diagnostics::error(
-                &instruction.span,
-                |error| {
-                    error.set_message("instruction emitted outside of ROM");
-                    error.add_label(diagnostics::error_label(&instruction.span).with_message(
-                        format!(
-                            "a {} section is active here",
-                            data_sect.attrs.mem_region.name()
-                        ),
-                    ));
-                    error.set_help("you can store the data in ROM while leaving labels pointing to RAM, using `load`");
-                },
-                nb_errors_left,
-                options,
-            );
+            Contents::NoData(len) => {
+                debug_assert_eq!(*len, data_section.offset);
+
+                diagnostics::error(
+                    &instruction.span,
+                    |error| {
+                        error.set_message("instruction emitted outside of ROM");
+                        error.add_label(diagnostics::error_label(&instruction.span).with_message(
+                            format!(
+                                "a {} section is active here",
+                                data_sect.attrs.mem_region.name(),
+                            ),
+                        ));
+                        error.set_help("you can store the data in ROM while leaving labels pointing to RAM, using `load`");
+                    },
+                    nb_errors_left,
+                    options,
+                );
+                *len += instruction.bytes.len();
+            }
         }
 
         data_section.offset += instruction.bytes.len();
         symbol_section.offset += instruction.bytes.len();
+    }
+
+    fn push_byte(
+        res: &Result<(i32, Span), Result<Expr, crate::expr::Error>>,
+        offset: usize,
+        data_sect_patches: &mut Vec<Patch>,
+        data_sect_data: &mut Vec<u8>,
+        symbol_section: &ActiveSection,
+        identifiers: &Identifiers,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        match res {
+            Ok((value, span)) => {
+                if *value < -255 || *value > 255 {
+                    diagnostics::warn(
+                        warning!("truncation=1"),
+                        span,
+                        |warning| {
+                            warning.set_message("this expression's value is not 8-bit");
+                            warning.add_label(diagnostics::warning_label(span).with_message(format!("this expression evaluates to {value}, which is not between -255 and 255")));
+                            warning.set_help(
+                                "you can use the `low()` function to truncate an expression",
+                            );
+                        },
+                        nb_errors_left,
+                        options,
+                    );
+                } else if *value < -128 {
+                    diagnostics::warn(
+                        warning!("truncation=2"),
+                        span,
+                        |warning| {
+                            warning.set_message("this expression's value doesn't seem to be 8-bit");
+                            warning.add_label(diagnostics::warning_label(span).with_message(format!("this expression evaluates to {value}, which is not between -128 and 255")));
+                            warning.set_help(
+                                "you can use the `low()` function to truncate an expression",
+                            );
+                        },
+                        nb_errors_left,
+                        options,
+                    );
+                }
+
+                data_sect_data.push(*value as u8);
+            }
+
+            Err(Ok(expr)) => {
+                data_sect_patches.push(Patch {
+                    span: expr.overall_span(),
+                    expr: expr.clone(),
+                    kind: PatchKind::Byte,
+                    offset,
+                    pc: (symbol_section.id, symbol_section.offset),
+                });
+
+                data_sect_data.push(Default::default());
+            }
+
+            Err(Err(error)) => {
+                error.report(identifiers, nb_errors_left, options);
+
+                data_sect_data.push(Default::default());
+            }
+        }
+    }
+
+    fn push_word(
+        res: &Result<(i32, Span), Result<Expr, crate::expr::Error>>,
+        offset: usize,
+        data_sect_patches: &mut Vec<Patch>,
+        data_sect_data: &mut Vec<u8>,
+        symbol_section: &ActiveSection,
+        identifiers: &Identifiers,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        match res {
+            Ok((value, span)) => {
+                if *value < -65535 || *value > 65535 {
+                    diagnostics::warn(
+                        warning!("truncation=1"),
+                        span,
+                        |warning| {
+                            warning.set_message("this expression's value is not 16-bit");
+                            warning.add_label(diagnostics::warning_label(span).with_message(format!("this expression evaluates to {value}, which is not between -65535 and 65535")));
+                        },
+                        nb_errors_left,
+                        options,
+                    );
+                } else if *value < -32767 {
+                    diagnostics::warn(
+                        warning!("truncation=2"),
+                        span,
+                        |warning| {
+                            warning
+                                .set_message("this expression's value doesn't seem to be 16-bit");
+                            warning.add_label(diagnostics::warning_label(span).with_message(format!("this expression evaluates to {value}, which is not between -32767 and 65535")));
+                        },
+                        nb_errors_left,
+                        options,
+                    );
+                }
+
+                data_sect_data.extend_from_slice(&(*value as i16).to_le_bytes());
+            }
+
+            Err(Ok(expr)) => {
+                data_sect_patches.push(Patch {
+                    span: expr.overall_span(),
+                    expr: expr.clone(),
+                    kind: PatchKind::Word,
+                    offset,
+                    pc: (symbol_section.id, symbol_section.offset),
+                });
+
+                data_sect_data.extend_from_slice(&[Default::default(), Default::default()]);
+            }
+
+            Err(Err(error)) => {
+                error.report(identifiers, nb_errors_left, options);
+
+                data_sect_data.extend_from_slice(&[Default::default(), Default::default()]);
+            }
+        }
+    }
+
+    fn push_long(
+        res: &Result<(i32, Span), Result<Expr, crate::expr::Error>>,
+        offset: usize,
+        data_sect_patches: &mut Vec<Patch>,
+        data_sect_data: &mut Vec<u8>,
+        symbol_section: &ActiveSection,
+        identifiers: &Identifiers,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        match res {
+            Ok((value, _span)) => {
+                // No truncation checks here, since we are working with 32-bit values already.
+                data_sect_data.extend_from_slice(&value.to_le_bytes());
+            }
+
+            Err(Ok(expr)) => {
+                data_sect_patches.push(Patch {
+                    span: expr.overall_span(),
+                    expr: expr.clone(),
+                    kind: PatchKind::Long,
+                    offset,
+                    pc: (symbol_section.id, symbol_section.offset),
+                });
+
+                data_sect_data.extend_from_slice(&[
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                ]);
+            }
+
+            Err(Err(error)) => {
+                error.report(identifiers, nb_errors_left, options);
+
+                data_sect_data.extend_from_slice(&[
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                ]);
+            }
+        }
     }
 
     // The linker will perform a similar check, but this helps catching such errors early, and not generating huge object files.

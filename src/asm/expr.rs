@@ -5,7 +5,7 @@ use crate::{
     macro_args::MacroArgs,
     section::Sections,
     sources::Span,
-    symbols::{SymbolData, SymbolKind, Symbols},
+    symbols::{SymbolData, Symbols},
     syntax::tokens::{tok, TokenPayload},
     Identifier, Identifiers, Options,
 };
@@ -48,7 +48,7 @@ pub struct Error {
 #[derive(Debug)]
 enum ErrKind {
     SymNotFound(Identifier),
-    SymDeleted(Span),
+    SymDeleted(Identifier, Span),
     // The boolean indicates whether the expression contains just the symbol,
     //   or if the error has bubbled up some.
     // This is used to resolve non-constant symbols in some constant ways,
@@ -159,19 +159,20 @@ impl Expr {
         macro_args: Option<&MacroArgs>,
         sections: &Sections,
     ) -> Result<(i32, Span), Error> {
-        debug_assert!(!self.payload.is_empty());
+        debug_assert_ne!(self.payload.len(), 0);
+
         let mut eval_stack = vec![];
         for op in &self.payload {
-            match op.kind {
-                OpKind::Number(value) => eval_stack.push(Ok((value, op.span.clone()))),
-                OpKind::Symbol(name) => eval_stack.push(match symbols.find(&name) {
+            let res = match op.kind {
+                OpKind::Number(value) => Ok((value, op.span.clone())),
+                OpKind::Symbol(name) => match symbols.find(&name) {
                     None => Err(Error {
                         span: op.span.clone(),
                         kind: ErrKind::SymNotFound(name),
                     }),
                     Some(SymbolData::Deleted(span)) => Err(Error {
                         span: op.span.clone(),
-                        kind: ErrKind::SymDeleted(span.clone()),
+                        kind: ErrKind::SymDeleted(name, span.clone()),
                     }),
                     Some(sym) => match sym.get_number(macro_args, sections) {
                         Some(value) => Ok((value, op.span.clone())),
@@ -183,33 +184,33 @@ impl Expr {
                             },
                         }),
                     },
-                }),
+                },
                 OpKind::Binary(operator) => {
                     let rhs = eval_stack.pop().unwrap();
                     let lhs = eval_stack.pop().unwrap();
-                    eval_stack.push(operator.const_eval(lhs, rhs, symbols, sections));
+                    operator.const_eval(lhs, rhs, symbols, sections)
                 }
                 OpKind::Unary(operator) => {
                     let value = eval_stack.pop().unwrap();
-                    eval_stack.push(operator.const_eval(value, &op.span));
+                    operator.const_eval(value, &op.span)
                 }
                 OpKind::Low => {
                     let value = eval_stack.pop().unwrap();
-                    eval_stack.push(match value {
+                    match value {
                         Ok((number, _span)) => Ok((number & 0xFF, op.span.clone())),
                         Err(err) => Err(err.bubble_up()),
-                    });
+                    }
                 }
                 OpKind::High => {
                     let value = eval_stack.pop().unwrap();
-                    eval_stack.push(match value {
+                    match value {
                         Ok((number, _span)) => Ok(((number >> 8) & 0xFF, op.span.clone())),
                         Err(err) => Err(err.bubble_up()),
-                    });
+                    }
                 }
                 OpKind::Rst => {
                     let value = eval_stack.pop().unwrap();
-                    eval_stack.push(match value {
+                    match value {
                         Ok((number, span)) => {
                             if number & !0x38 == 0 {
                                 Ok((number | 0xC7, span))
@@ -221,40 +222,94 @@ impl Expr {
                             }
                         }
                         Err(err) => Err(err.bubble_up()),
-                    });
+                    }
                 }
                 OpKind::Ldh => {
                     let value = eval_stack.pop().unwrap();
-                    eval_stack.push(match value {
+                    match value {
                         Ok((number @ 0xFF00..=0xFFFF, span)) => Ok((number & 0xFF, span)),
                         Ok((number, span)) => Err(Error {
                             span,
                             kind: ErrKind::LdhRange(number),
                         }),
                         Err(err) => Err(err.bubble_up()),
-                    });
+                    }
                 }
                 OpKind::BitCheck(or_mask) => {
                     let value = eval_stack.pop().unwrap();
-                    eval_stack.push(match value {
+                    match value {
                         Ok((number @ 0..=7, span)) => Ok((number | i32::from(or_mask), span)),
                         Ok((number, span)) => Err(Error {
                             span,
                             kind: ErrKind::BitRange(number),
                         }),
                         Err(err) => Err(err.bubble_up()),
-                    });
+                    }
                 }
-                OpKind::Nothing => {
-                    eval_stack.push(Err(Error {
-                        span: op.span.clone(),
-                        kind: ErrKind::NoExpr,
-                    }));
-                }
-            }
+                OpKind::Nothing => Err(Error {
+                    span: op.span.clone(),
+                    kind: ErrKind::NoExpr,
+                }),
+            };
+            eval_stack.push(res);
         }
+
         debug_assert_eq!(eval_stack.len(), 1);
         eval_stack.pop().unwrap()
+    }
+
+    /// This function takes an expression, and reduces it to its non-constant components, so that it's ready to be serialised.
+    /// This step is important, because it evaluates symbols that are constant at this point;
+    /// if the expression was evaluated during object file generation, the following code would misbehave:
+    ///
+    /// ```rgbasm
+    /// FOR I, 2
+    ///     dw Label + I
+    /// ENDR
+    /// ```
+    ///
+    /// ...because this would emit the `Label + I` expression identically twice,
+    /// yet the intent is that each capture the same value for `Label`, but different values for `I`.
+    pub fn prep_for_patch(
+        &self,
+        symbols: &mut Symbols,
+        macro_args: Option<&MacroArgs>,
+        sections: &Sections,
+    ) -> Result<(i32, Span), Result<Self, Error>> {
+        debug_assert_ne!(self.payload.len(), 0);
+
+        match self.try_const_eval(symbols, macro_args, sections) {
+            Ok((value, span)) => Ok((value, span)),
+            Err(Error {
+                kind:
+                    ErrKind::SymNotFound(..) | ErrKind::SymDeleted(..) | ErrKind::SymNotConst { .. },
+                ..
+            }) => {
+                Err(Ok(Self {
+                    payload: self
+                        .payload
+                        .iter()
+                        .map(|op| Op {
+                            span: op.span.clone(),
+                            kind: match op.kind {
+                                // Eagerly evaluate symbols that can be.
+                                OpKind::Symbol(name) => match symbols
+                                    .find(&name)
+                                    .and_then(|sym| sym.get_number(macro_args, sections))
+                                {
+                                    Some(value) => OpKind::Number(value),
+                                    // TODO: we might want to create a `Ref` here;
+                                    // but we'd need to also ensure it doesn't get deleted, even after it gets replaced...
+                                    None => OpKind::Symbol(name),
+                                },
+                                kind => kind,
+                            },
+                        })
+                        .collect(),
+                }))
+            }
+            Err(err) => Err(Err(err)),
+        }
     }
 
     pub fn first_span(&self) -> &Span {
@@ -499,7 +554,14 @@ impl ErrKind {
                 ),
                 "no symbol by this name exists at this point".into(),
             ),
-            Self::SymDeleted(span) => todo!(),
+            // TODO: add a label that highlights `span`
+            Self::SymDeleted(ident, span) => (
+                format!(
+                    "the symbol `{}` was deleted",
+                    identifiers.resolve(*ident).unwrap(),
+                ),
+                "no symbol by this name exists at this point".into(),
+            ),
             // TODO: suggest that difference between symbols and/or alignment can be constant?
             Self::SymNotConst { name, .. } => (
                 format!("`{}` is not constant", identifiers.resolve(*name).unwrap()),

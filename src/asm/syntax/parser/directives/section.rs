@@ -301,6 +301,18 @@ pub(in super::super) fn parse_endsection(_keyword: Token, parse_ctx: &mut parse_
 pub(in super::super) fn parse_load(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     let (def_span, attrs, name, lookahead) = parse_section_attrs(parse_ctx.next_token(), parse_ctx);
 
+    if attrs.mem_region.has_data() {
+        parse_ctx.error(&keyword.span, |error| {
+            error.set_message("`load` cannot be used with a ROM section");
+            error.add_label(
+                diagnostics::error_label(&keyword.span)
+                    .with_message("this has an invalid memory region"),
+            );
+        });
+
+        return lookahead;
+    }
+
     let new_active_section = parse_ctx.sections.create_if_not_exists(
         name,
         attrs,
@@ -310,17 +322,22 @@ pub(in super::super) fn parse_load(keyword: Token, parse_ctx: &mut parse_ctx!())
     );
     let Some((data_section, symbol_section)) = parse_ctx.sections.active_section.as_mut() else {
         parse_ctx.error(&keyword.span, |error| {
-            error.set_message("`LOAD` used outside of a section");
+            error.set_message("`load` used outside of a section");
+            error.add_label(
+                diagnostics::error_label(&keyword.span).with_message("this directive is invalid"),
+            );
         });
 
         return lookahead;
     };
     if new_active_section.points_to_same_as(data_section) {
         parse_ctx.error(&keyword.span, |error| {
-            error.set_message("`LOAD` cannot designate the active section");
+            error.set_message("`load` cannot designate the active section");
             error.add_label(
-                diagnostics::error_label(&keyword.span)
-                    .with_message("section \"{}\" is active here"),
+                diagnostics::error_label(&keyword.span).with_message(format!(
+                    "section \"{}\" is active here",
+                    parse_ctx.sections.sections.keys()[new_active_section.id],
+                )),
             );
         });
 

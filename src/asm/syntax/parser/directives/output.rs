@@ -3,11 +3,13 @@ use crate::{diagnostics, syntax::tokens::Token};
 use super::super::{expect_one_of, matches_tok, misc, parse_ctx, string};
 
 fn parse_print_elem(first_token: Token, parse_ctx: &mut parse_ctx!()) -> (Option<()>, Token) {
-    let (expr, lookahead) = misc::parse_str_or_const_expr(first_token, parse_ctx);
+    let (expr, lookahead) = misc::parse_str_or_expr(first_token, parse_ctx);
     match expr {
         None => return (None, lookahead),
-        Some(misc::StrOrNum::Num(Ok(value))) => print!("${value:X}"),
-        Some(misc::StrOrNum::Num(Err(error))) => parse_ctx.report_expr_error(error),
+        Some(misc::StrOrNum::Num(expr)) => match parse_ctx.try_const_eval(&expr) {
+            Ok((value, _span)) => print!("${value:X}"),
+            Err(error) => parse_ctx.report_expr_error(error),
+        },
         Some(misc::StrOrNum::String(string)) => print!("{string}"),
     };
     (Some(()), lookahead)

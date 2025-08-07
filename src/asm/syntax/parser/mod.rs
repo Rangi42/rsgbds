@@ -409,6 +409,9 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
         if let Some(instr) = instruction {
             parse_ctx.sections.emit_instruction(
                 instr,
+                parse_ctx.identifiers,
+                parse_ctx.symbols,
+                parse_ctx.macro_args.last(),
                 parse_ctx.nb_errors_remaining,
                 parse_ctx.options,
             );

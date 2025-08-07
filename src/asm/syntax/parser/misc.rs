@@ -1,6 +1,6 @@
 use compact_str::CompactString;
 
-use crate::{diagnostics, sources::Span, syntax::tokens::Token, Identifier};
+use crate::{diagnostics, expr::Expr, sources::Span, syntax::tokens::Token, Identifier};
 
 use super::{expect_one_of, expr, matches_tok, parse_ctx, string};
 
@@ -41,10 +41,10 @@ pub(super) fn parse_identifier(
 }
 
 pub enum StrOrNum {
-    Num(Result<i32, crate::expr::Error>),
+    Num(Expr),
     String(CompactString),
 }
-pub(super) fn parse_str_or_const_expr(
+pub(super) fn parse_str_or_expr(
     first_token: Token,
     parse_ctx: &mut parse_ctx!(),
 ) -> (Option<StrOrNum>, Token) {
@@ -56,12 +56,7 @@ pub(super) fn parse_str_or_const_expr(
 
     let (maybe_expr, lookahead) = expr::parse_numeric_expr(lookahead, parse_ctx);
     if let Some(expr) = maybe_expr {
-        (
-            Some(StrOrNum::Num(
-                parse_ctx.try_const_eval(&expr).map(|(value, _span)| value),
-            )),
-            lookahead,
-        )
+        (Some(StrOrNum::Num(expr)), lookahead)
     } else {
         parse_ctx.error(&lookahead.span, |error| {
             error.set_message(format!("syntax error: unexpected {}", lookahead.payload));

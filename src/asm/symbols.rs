@@ -247,11 +247,16 @@ impl Symbols {
                         Ok(())
                     }
                     // Numeric symbols override "references" (themselves essentially placeholders).
+                    // References also do not conflict with themselves.
                     SymbolData::User {
                         kind: SymbolKind::Ref,
                         exported: previously_exported,
                         ..
-                    } if matches!(kind, SymbolKind::Label { .. } | SymbolKind::Numeric { .. }) => {
+                    } if matches!(
+                        kind,
+                        SymbolKind::Label { .. } | SymbolKind::Numeric { .. } | SymbolKind::Ref
+                    ) =>
+                    {
                         *existing = SymbolData::User {
                             definition,
                             kind,
@@ -311,7 +316,27 @@ impl Symbols {
                         exported: true,
                     });
                 }
-                SymbolData::User { exported, .. } => *exported = true,
+                SymbolData::User {
+                    exported,
+                    kind: SymbolKind::Label { .. } | SymbolKind::Numeric { .. } | SymbolKind::Ref,
+                    ..
+                } => *exported = true,
+                ref sym @ SymbolData::User { ref definition, .. } => diagnostics::error(
+                    &span,
+                    |error| {
+                        error.set_message("cannot export non-numeric symbol");
+                        error.add_labels([
+                            diagnostics::error_label(&span).with_message(format!(
+                                "cannot export `{}`",
+                                identifiers.resolve(name).unwrap()
+                            )),
+                            diagnostics::error_label(definition)
+                                .with_message(format!("defined here as {}", sym.kind_name())),
+                        ]);
+                    },
+                    nb_errors_left,
+                    options,
+                ),
                 _ => diagnostics::error(
                     &span,
                     |error| {
@@ -441,6 +466,25 @@ impl Symbols {
             identifiers,
             definition,
             SymbolKind::Macro(body),
+            false,
+            nb_errors_left,
+            options,
+        )
+    }
+
+    pub fn create_ref(
+        &mut self,
+        name: Identifier,
+        identifiers: &Identifiers,
+        ref_span: Span,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        self.define_symbol(
+            name,
+            identifiers,
+            ref_span,
+            SymbolKind::Ref,
             false,
             nb_errors_left,
             options,
