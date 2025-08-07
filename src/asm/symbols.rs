@@ -20,7 +20,7 @@ type SymMap = FxHashMap<Identifier, SymbolData>;
 #[derive(Debug)]
 pub struct Symbols {
     symbols: SymMap,
-    scope: Option<Identifier>,
+    pub scope: Option<Identifier>,
 }
 
 #[derive(Debug)]

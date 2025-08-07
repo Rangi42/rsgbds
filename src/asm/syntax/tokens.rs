@@ -63,8 +63,8 @@ define_tokens! {
         #[name = "string"]
         String(CompactString),
         #[name = "identifier"]
-        /// The boolean indicates whether the identifier is immediately followed by a colon.
-        /// This is used to disambiguate labels and macro calls.
+        /// The boolean indicates whether the identifier is immediately followed by a colon, or is a local.
+        /// This is used to disambiguate labels and macro calls at the beginning of a line.
         Identifier(Identifier, bool),
         #[name = "anonymous label reference"]
         AnonLabelRef(i32),

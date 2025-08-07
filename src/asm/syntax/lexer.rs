@@ -1563,7 +1563,7 @@ impl Lexer {
                     } else {
                         self.consume(&mut span);
                         match self.peek(&mut params) {
-                            Some(first_char @ chars!(ident_start)) => {
+                            Some(first_char @ (chars!(ident_start) | '.')) => {
                                 self.consume(&mut span);
                                 self.read_identifier(first_char, &mut span, false, &mut params)
                             }
@@ -1586,7 +1586,7 @@ impl Lexer {
                 }
 
                 // Identifier.
-                Some(ch @ chars!(ident_start)) => {
+                Some(ch @ (chars!(ident_start) | '.')) => {
                     self.consume(&mut span);
 
                     let payload = self.read_identifier(ch, &mut span, true, &mut params);
@@ -1784,6 +1784,20 @@ impl Lexer {
         debug_assert!(matches!(first_char, chars!(ident_start)));
 
         let mut name = CompactString::default();
+        let local_without_scope = if first_char == '.' {
+            if let Some(scope) = params.symbols.scope {
+                let scope_name = params.identifiers.resolve(scope).unwrap();
+                debug_assert!(!scope_name.contains('.'), "scope = {scope_name:?}");
+                name.push_str(scope_name);
+                false
+            } else {
+                true
+            }
+        } else {
+            false
+        };
+        let mut is_local = first_char == '.';
+
         name.push(first_char);
         let followed_by_colon = loop {
             match self.peek(params) {
@@ -1791,18 +1805,33 @@ impl Lexer {
                     self.consume(span);
                     name.push(ch);
                 }
+                Some('.') => {
+                    self.consume(span);
+                    name.push('.');
+                    is_local = true;
+                }
                 Some(':') => break true,
                 _ => break false,
             }
         };
 
-        if can_be_keyword {
+        if local_without_scope {
+            let span = Span::Normal(span.clone());
+            params.error(&span, |error| {
+                error.set_message("local symbol in main scope");
+                error.add_label(
+                    diagnostics::error_label(&span).with_message("no global label before this"),
+                );
+            })
+        }
+
+        if can_be_keyword && !is_local {
             if let Some(keyword) = KEYWORDS.get(&UniCase::ascii(name.as_str())) {
                 return keyword.clone();
             }
         }
         let identifier = params.identifiers.get_or_intern(&name);
-        tok!("identifier"(identifier, followed_by_colon))
+        tok!("identifier"(identifier, followed_by_colon || is_local))
     }
 
     fn read_string_maybe(
