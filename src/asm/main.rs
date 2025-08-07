@@ -59,7 +59,7 @@ pub struct RuntimeOptions {
 }
 
 fn main() -> ExitCode {
-    let Ok((mut options, main_path, defines, warnings)) =
+    let Ok((mut options, main_path, defines)) =
         crate::common::cli::setup_and_parse_args().and_then(Cli::finish)
     else {
         return ExitCode::Usage;

@@ -86,7 +86,7 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn finish(self) -> Result<(Options, PathBuf, Vec<String>, Vec<String>), ()> {
+    pub fn finish(self) -> Result<(Options, PathBuf, Vec<String>), ()> {
         crate::common::cli::apply_color_choice(self.color);
         let mut fail = false;
 
@@ -152,7 +152,6 @@ impl Cli {
                 },
                 self.input,
                 self.defines,
-                self.warning,
             ))
         }
     }
