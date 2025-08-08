@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use anyhow::Context;
 use datatest_stable::Utf8Path;
 use snapbox::{cmd::Command, data::DataFormat, Assert, Data};
@@ -77,19 +75,64 @@ fn run_test(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
             .try_eq(None, Data::binary(generated.as_slice()), reference.clone())
             .is_err()
         {
-            return Err(BinDiff(reference.to_bytes().unwrap(), generated).into());
+            return Err(BinDiff {
+                expected: reference.to_bytes().unwrap(),
+                actual: generated,
+                path: bin_file_path,
+            }
+            .into());
         }
     }
 
     Ok(())
 }
 
-#[derive(Debug)]
-struct BinDiff(Vec<u8>, Vec<u8>);
-
-impl Display for BinDiff {
+struct BinDiff<D> {
+    expected: Vec<u8>,
+    actual: Vec<u8>,
+    path: D,
+}
+impl<D: std::fmt::Display> std::fmt::Debug for BinDiff<D> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let palette = snapbox::report::Palette::color();
+
+        const NB_BYTES_PER_LINE: usize = 8;
+
+        writeln!(
+            f,
+            "{}                  | {} ({})",
+            palette.actual("actual"),
+            palette.expected("expected"),
+            self.path,
+        )?;
+
+        let mut expected = self.expected.iter();
+        let mut actual = self.actual.iter();
+        while !expected.as_slice().is_empty() && !actual.as_slice().is_empty() {
+            for _ in 0..NB_BYTES_PER_LINE {
+                match actual.next() {
+                    Some(&byte) => write!(f, "{byte:02x} ")?,
+                    None => write!(f, "   ")?,
+                }
+            }
+            write!(f, "|")?;
+            for &byte in expected.by_ref().take(NB_BYTES_PER_LINE) {
+                write!(f, " {byte:02x}")?;
+            }
+            writeln!(f)?;
+        }
+
+        writeln!(
+            f,
+            "\n{}",
+            palette.hint(format_args!("Update with {ACTION_ENV_VAR_NAME}=overwrite")),
+        )
+    }
+}
+
+impl<D: std::fmt::Display> std::fmt::Display for BinDiff<D> {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
-impl std::error::Error for BinDiff {}
+impl<D: std::fmt::Display> std::error::Error for BinDiff<D> {}
