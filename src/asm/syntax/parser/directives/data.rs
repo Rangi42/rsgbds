@@ -46,6 +46,7 @@ pub(in super::super) fn parse_ds(keyword: Token, parse_ctx: &mut parse_ctx!()) -
         |","| => {
             let (bytes, lookahead) = misc::parse_comma_list(expr::parse_numeric_expr, parse_ctx.next_token(), parse_ctx);
             parse_ctx.sections.emit_padding(
+                length,
                 &bytes,
                 &keyword.span,
                 parse_ctx.identifiers,

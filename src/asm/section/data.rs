@@ -70,6 +70,7 @@ impl Sections {
 
     pub fn emit_padding(
         &mut self,
+        length: usize,
         bytes: &[Expr],
         keyword_span: &Span,
         identifiers: &Identifiers,
@@ -85,15 +86,15 @@ impl Sections {
 
         self.emit_data(
             "padding",
-            bytes.len(),
+            length,
             keyword_span,
             identifiers,
             nb_errors_left,
             options,
             |offset, mut ctx| {
-                for (i, res) in eval_res.iter().enumerate() {
+                for i in 0..length {
                     // It is important that PC's value remains identical throughout the loop's iterations.
-                    Self::push_byte(res, offset + i, &mut ctx);
+                    Self::push_byte(&eval_res[i % eval_res.len()], offset + i, &mut ctx);
                 }
             },
         );
