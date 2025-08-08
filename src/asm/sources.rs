@@ -14,20 +14,26 @@ pub struct Source {
 pub enum Span {
     CommandLine,
     Builtin,
+    TopLevel,
     Normal(NormalSpan),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NormalSpan {
+    pub node: FileNode,
+    pub bytes: Range<usize>,
+}
+/// A [`NormalSpan`], but without the byte range.
+#[derive(Debug, Clone)]
+pub struct FileNode {
     // TODO(perf): consider the `rclite` crate, since we don't need weak refs
     pub src: Rc<Source>,
-    pub bytes: Range<usize>,
     pub kind: SpanKind,
     /// For example, for a [`File`][SpanKind::File], this is the span of its triggering `INCLUDE` directive.
     pub parent: Option<Rc<NormalSpan>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash)]
 pub enum SpanKind {
     File, // has the name of the underlying `src`.
     Macro(Identifier),
@@ -65,10 +71,8 @@ impl NormalSpan {
     pub fn new(src: Rc<Source>, kind: SpanKind, parent: Option<Rc<NormalSpan>>) -> Self {
         let bytes = 0..src.contents.text().len();
         Self {
-            src,
+            node: FileNode { src, kind, parent },
             bytes,
-            kind,
-            parent,
         }
     }
 
@@ -77,10 +81,8 @@ impl NormalSpan {
         debug_assert!(self.is_offset_valid(sub_range.start));
         debug_assert!(self.is_offset_valid(sub_range.end));
         Self {
-            src: Rc::clone(&self.src),
+            node: self.node.clone(),
             bytes: sub_range,
-            kind: self.kind,
-            parent: self.parent.clone(),
         }
     }
 
@@ -92,16 +94,26 @@ impl NormalSpan {
 
 // Required by `ariadne`.
 // Instead of comparing sources by contents, we check if both spans point to the same source.
-impl PartialEq for NormalSpan {
+
+impl PartialEq for FileNode {
     fn eq(&self, other: &Self) -> bool {
-        let Self {
-            src,
-            bytes,
-            kind,
-            parent,
-        } = self; // Using this to make sure not to forget any fields if they're added.
-        Rc::ptr_eq(src, &other.src)
-            && (bytes, kind, parent) == (&other.bytes, &other.kind, &other.parent)
+        Rc::ptr_eq(&self.src, &other.src)
+            && self.kind == other.kind
+            && match (self.parent.as_ref(), other.parent.as_ref()) {
+                (None, None) => true,
+                (Some(this_parent), Some(other_parent)) => Rc::ptr_eq(this_parent, other_parent),
+                _ => false,
+            }
+    }
+}
+impl Eq for FileNode {}
+impl std::hash::Hash for FileNode {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        state.write_usize(Rc::as_ptr(&self.src) as usize);
+        self.kind.hash(state);
+        if let Some(parent) = self.parent.as_ref() {
+            state.write_usize(Rc::as_ptr(parent) as usize);
+        }
     }
 }
 
@@ -113,17 +125,17 @@ impl Span {
 
         fn parent_of(span: &NormalSpan) -> &NormalSpan {
             debug_assert!(
-                span.kind.ends_implicitly(),
+                span.node.kind.ends_implicitly(),
                 "Spans can only be merged if they are inside of the same “strong” context"
             );
-            span.parent.as_ref().unwrap()
+            span.node.parent.as_ref().unwrap()
         }
         struct ParentIter<'span>(Option<&'span NormalSpan>);
         impl<'span> Iterator for ParentIter<'span> {
             type Item = &'span NormalSpan;
             fn next(&mut self) -> Option<Self::Item> {
                 let span = self.0?;
-                self.0 = span.parent.as_deref();
+                self.0 = span.node.parent.as_deref();
                 self.0
             }
         }
@@ -152,18 +164,16 @@ impl Span {
                 }
             }
         }
-        while !Rc::ptr_eq(&left.src, &right.src) {
+        while !Rc::ptr_eq(&left.node.src, &right.node.src) {
             left = parent_of(left);
             right = parent_of(right);
         }
 
-        debug_assert_eq!(left.kind, right.kind);
+        debug_assert_eq!(left.node.kind, right.node.kind);
         debug_assert!(left.bytes.end <= right.bytes.start);
         Self::Normal(NormalSpan {
-            src: Rc::clone(&left.src),
+            node: left.node.clone(),
             bytes: left.bytes.start..right.bytes.end,
-            kind: left.kind,
-            parent: left.parent.clone(),
         })
     }
 }

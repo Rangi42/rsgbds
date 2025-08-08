@@ -19,13 +19,13 @@ pub struct Expr {
 }
 
 #[derive(Debug, Clone)]
-struct Op {
+pub struct Op {
     span: Span,
-    kind: OpKind,
+    pub kind: OpKind,
 }
 
 #[derive(Debug, Clone, Copy)]
-enum OpKind {
+pub enum OpKind {
     Number(i32),
     Symbol(Identifier),
     Binary(BinOp),
@@ -323,6 +323,27 @@ impl Expr {
             // Attempting to merge a span with itself would fail.
             [op] => op.span.clone(),
             ops => ops[0].span.merged_with(&ops.last().unwrap().span),
+        }
+    }
+
+    pub fn ops(&self) -> impl Iterator<Item = &Op> {
+        self.payload.iter()
+    }
+}
+
+impl Op {
+    pub fn get_symbol(&self) -> Option<Identifier> {
+        match self.kind {
+            OpKind::Symbol(ident) => Some(ident),
+            OpKind::Number(_)
+            | OpKind::Binary(_)
+            | OpKind::Unary(_)
+            | OpKind::Low
+            | OpKind::High
+            | OpKind::Rst
+            | OpKind::Ldh
+            | OpKind::BitCheck(_)
+            | OpKind::Nothing => None,
         }
     }
 }

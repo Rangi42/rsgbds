@@ -19,7 +19,7 @@ type SymMap = FxHashMap<Identifier, SymbolData>;
 // TODO: consider using a `Vec<Option<SymbolData>>` instead of a hash map?
 #[derive(Debug)]
 pub struct Symbols {
-    symbols: SymMap,
+    pub symbols: SymMap,
     pub scope: Option<Identifier>,
 }
 
@@ -73,9 +73,10 @@ impl Symbols {
         let numeric = |value, mutable| SymbolData::Builtin(SymbolKind::Numeric { value, mutable });
         let string = |string| SymbolData::Builtin(SymbolKind::String(string));
 
-        def_builtin("@", SymbolData::Pc);
+        let pc_sym = def_builtin("@", SymbolData::Pc);
+        debug_assert_eq!(pc_sym, Self::pc_ident()); // Be careful, this identifier is special.
         let rs_sym = def_builtin("_RS", numeric(0, true));
-        debug_assert_eq!(rs_sym, Self::rs_ident()); // Be careful, this identifier is special.
+        debug_assert_eq!(rs_sym, Self::rs_ident()); // And so is this one.
         def_builtin("_NARG", SymbolData::Narg);
         def_builtin(".", SymbolData::Dot);
         def_builtin("..", SymbolData::DotDot);
@@ -168,6 +169,10 @@ impl Symbols {
         }
 
         this
+    }
+
+    pub fn pc_ident() -> Identifier {
+        Identifier::try_from_usize(0).unwrap()
     }
 
     fn rs_ident() -> Identifier {

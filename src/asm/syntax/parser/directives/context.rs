@@ -315,7 +315,7 @@ impl parse_ctx!() {
 
     pub fn pop_context(&mut self) -> bool {
         let ctx = self.lexer.top_context();
-        match &mut ctx.span.kind {
+        match &mut ctx.span.node.kind {
             SpanKind::File => self
                 .lexer
                 .pop_context(self.nb_errors_remaining, self.options),
@@ -348,6 +348,7 @@ impl parse_ctx!() {
 
                         let span = ctx
                             .span
+                            .node
                             .parent
                             .as_deref()
                             .expect("Loop context should have a parent")

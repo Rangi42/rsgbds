@@ -1,0 +1,505 @@
+use std::{
+    cell::Cell,
+    fs::File,
+    io::{BufWriter, Write},
+    path::Path,
+    rc::Rc,
+};
+
+use rustc_hash::FxBuildHasher;
+use sysexits::ExitCode;
+
+use crate::{
+    common::section::MemRegion,
+    diagnostics,
+    expr::{BinOp, Expr, OpKind, UnOp},
+    section::{AddrConstraint, Contents, PatchKind, SectionKind, Sections},
+    sources::{FileNode, NormalSpan, Span, SpanKind},
+    symbols::{SymbolData, SymbolKind, Symbols},
+    Identifier, Identifiers, Options,
+};
+
+type IndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
+type IndexSet<V> = indexmap::IndexSet<V, FxBuildHasher>;
+
+type FileNodeRegistry<'nodes> = IndexSet<&'nodes FileNode>;
+type SymRegistry<'sym> = IndexMap<Identifier, (&'sym NormalSpan, &'sym SymbolKind, bool)>;
+
+const VERSION_STRING: &[u8] = b"RGB9";
+const REVISION: u32 = 12;
+
+pub fn emit(
+    path: &Path,
+    identifiers: &Identifiers,
+    sections: &Sections,
+    symbols: &Symbols,
+    nb_errors_left: &Cell<usize>,
+    options: &Options,
+) -> Result<(), ExitCode> {
+    // TODO: `dash_stdio`
+    let file = File::create(path).map_err(|err| {
+        diagnostics::error(
+            &Span::TopLevel,
+            |error| {
+                error.set_message("unable to write object file");
+                error.add_label(diagnostics::error_label(&Span::TopLevel).with_message(err));
+            },
+            nb_errors_left,
+            options,
+        );
+        ExitCode::CantCreat
+    })?;
+    let registered_symbols = register_symbols(symbols, sections);
+    let registered_file_nodes = register_file_nodes(sections, &registered_symbols);
+    let mut ctx = WriteContext {
+        identifiers,
+        sections,
+        symbols,
+        nb_errors_left,
+        options,
+
+        file: BufWriter::new(file),
+        registered_symbols: &registered_symbols,
+        registered_file_nodes,
+    };
+
+    let io_err = |res: std::io::Result<()>| {
+        res.map_err(|err| {
+            diagnostics::error(
+                &Span::TopLevel,
+                |error| {
+                    error.set_message("error writing object file");
+                    error.add_label(diagnostics::error_label(&Span::TopLevel).with_message(err));
+                },
+                nb_errors_left,
+                options,
+            );
+            ExitCode::IoErr
+        })
+    };
+    let usize_to_u32 = |value: usize, what: &str| {
+        u32::try_from(value).map_err(|err| {
+            diagnostics::error(
+                &Span::TopLevel,
+                |error| {
+                    error.set_message(format!("too many {what}"));
+                    error.add_label(diagnostics::error_label(&Span::TopLevel).with_message(err));
+                },
+                nb_errors_left,
+                options,
+            );
+            ExitCode::DataErr
+        })
+    };
+
+    for (_name, section) in &sections.sections {
+        // TODO: report the section for which there are too many patches
+        let _ = usize_to_u32(section.patches.len(), "patches")?;
+    }
+
+    io_err(ctx.write_header(
+        usize_to_u32(ctx.registered_symbols.len(), "symbols")?,
+        usize_to_u32(ctx.sections.sections.len(), "sections")?,
+        usize_to_u32(ctx.registered_file_nodes.len(), "file nodes")?,
+    ))?;
+    io_err(ctx.write_file_nodes())?;
+    io_err(ctx.write_symbols())?;
+    io_err(ctx.write_sections())?;
+    io_err(ctx.write_long(0))?; // TODO: assertions
+
+    io_err(ctx.file.flush())?;
+    Ok(())
+}
+
+fn register_file_nodes<'nodes>(
+    sections: &'nodes Sections,
+    registered_symbols: &'nodes SymRegistry,
+) -> FileNodeRegistry<'nodes> {
+    let mut registry = IndexSet::default();
+
+    // Registers a span's node, as well as all of its parents, recursively.
+    let mut register_span = |span: &'nodes NormalSpan| {
+        let mut span = hard_span_of(span);
+        // If the node is newly inserted, we need to register its parents as well.
+        // If the node is already present in the registry, then we can assume its parent are as well.
+        while registry.insert(&span.node) {
+            let Some(parent) = span.node.parent.as_deref() else {
+                break;
+            };
+            span = parent;
+        }
+    };
+
+    for (_name, &(span, _kind, _exported)) in registered_symbols {
+        register_span(span);
+    }
+    for (_name, sect) in &sections.sections {
+        let Span::Normal(span) = &sect.def_span else {
+            unreachable!()
+        };
+        register_span(span);
+    }
+
+    registry
+}
+
+fn register_symbols<'sym>(symbols: &'sym Symbols, sections: &Sections) -> SymRegistry<'sym> {
+    let mut registry = IndexMap::default();
+
+    // Emit all exported symbols.
+    registry.extend(symbols.symbols.iter().filter_map(|(name, sym)| {
+        if let SymbolData::User {
+            definition: Span::Normal(span),
+            kind,
+            exported: true,
+        } = sym
+        {
+            Some((*name, (span, kind, true)))
+        } else {
+            None
+        }
+    }));
+    // Emit all symbols referenced by patches.
+    registry.extend(
+        sections
+            .sections
+            .iter()
+            .flat_map(|(_name, sect)| &sect.patches)
+            .flat_map(|patch| patch.expr.ops().filter_map(|op| op.get_symbol()))
+            .flat_map(|ident| {
+                let SymbolData::User {
+                    definition: Span::Normal(span),
+                    kind,
+                    exported,
+                } = &symbols.symbols[&ident]
+                else {
+                    return None;
+                };
+                Some((ident, (span, kind, *exported)))
+            }),
+    );
+
+    registry
+}
+
+struct WriteContext<'nodes, 'ident, 'sect: 'nodes, 'sym: 'nodes, 'nerr, 'opt> {
+    identifiers: &'ident Identifiers,
+    sections: &'sect Sections,
+    symbols: &'sym Symbols,
+    nb_errors_left: &'nerr Cell<usize>,
+    options: &'opt Options,
+
+    file: BufWriter<File>,
+    registered_symbols: &'nodes SymRegistry<'sym>,
+    registered_file_nodes: FileNodeRegistry<'nodes>,
+}
+impl WriteContext<'_, '_, '_, '_, '_, '_> {
+    fn resolve_span(&self, span: &NormalSpan) -> (u32, u32) {
+        let span = hard_span_of(span);
+
+        let node_num = self
+            .registered_file_nodes
+            .get_index_of(&span.node)
+            .expect("Unregistered file node!?");
+        let line_no = span
+            .node
+            .src
+            .contents
+            .get_byte_line(span.bytes.start)
+            .expect("Span start out of range!?")
+            .line_idx
+            + 1;
+        // We know there are less than `u32::MAX` nodes, from the earlier size check.
+        // The line number is unlikely to ever be more than u32::MAX, but even if it is, this'll just lead to incorrect error reporting.
+        (node_num as u32, line_no as u32)
+    }
+}
+fn hard_span_of(mut span: &NormalSpan) -> &NormalSpan {
+    while span.node.kind.ends_implicitly() {
+        span = span
+            .node
+            .parent
+            .as_ref()
+            .expect("Implicitly-ending context without a parent!?");
+    }
+    span
+}
+
+fn write_byte(mut output: impl Write, byte: u8) -> std::io::Result<()> {
+    output.write_all(std::array::from_ref(&byte))
+}
+fn write_long(mut output: impl Write, long: u32) -> std::io::Result<()> {
+    output.write_all(&long.to_le_bytes())
+}
+fn write_string(mut output: impl Write, string: &str) -> std::io::Result<()> {
+    assert!(!string.as_bytes().contains(&0)); // TODO: be more graceful(?)
+    output.write_all(string.as_bytes())?;
+    output.write_all(&[0])
+}
+impl WriteContext<'_, '_, '_, '_, '_, '_> {
+    fn write_byte(&mut self, byte: u8) -> std::io::Result<()> {
+        write_byte(&mut self.file, byte)
+    }
+    fn write_long(&mut self, long: u32) -> std::io::Result<()> {
+        write_long(&mut self.file, long)
+    }
+    fn write_string(&mut self, string: &str) -> std::io::Result<()> {
+        write_string(&mut self.file, string)
+    }
+
+    fn write_header(
+        &mut self,
+        nb_symbols: u32,
+        nb_sections: u32,
+        nb_file_nodes: u32,
+    ) -> std::io::Result<()> {
+        self.file.write_all(VERSION_STRING)?;
+        self.write_long(REVISION)?;
+        self.write_long(nb_symbols)?;
+        self.write_long(nb_sections)?;
+        self.write_long(nb_file_nodes)?;
+
+        Ok(())
+    }
+
+    fn write_file_nodes(&mut self) -> std::io::Result<()> {
+        for node in self.registered_file_nodes.iter().rev() {
+            let (parent_id, parent_line_no) = match node.parent.as_deref() {
+                Some(parent) => self.resolve_span(parent),
+                None => (u32::MAX, 0),
+            };
+            write_long(&mut self.file, parent_id)?;
+            write_long(&mut self.file, parent_line_no)?;
+
+            match node.kind {
+                SpanKind::File => {
+                    write_byte(&mut self.file, 1)?;
+                    write_string(&mut self.file, &node.src.name)?;
+                }
+                SpanKind::Macro(_) => todo!(),
+                SpanKind::Loop(_) => todo!(),
+                _ => {
+                    debug_assert!(node.kind.ends_implicitly());
+                    unreachable!("Registered non-hard node!?")
+                }
+            };
+        }
+        Ok(())
+    }
+
+    fn write_symbols(&mut self) -> std::io::Result<()> {
+        for (&ident, &(definition, kind, exported)) in self.registered_symbols.as_slice() {
+            self.write_string(self.identifiers.resolve(ident).unwrap())?;
+
+            match kind {
+                SymbolKind::String(_) | SymbolKind::Macro(_) => unreachable!(),
+                SymbolKind::Numeric { value, .. } => {
+                    write_numeric_sym(definition, *value as u32, u32::MAX, exported, self)?
+                }
+                SymbolKind::Label { section_id, offset } => {
+                    // The offset must be in u32 range, as section sizes are lower than u16 range.
+                    // Section IDs are also checked for validity by the earlier check of the number of sections.
+                    write_numeric_sym(
+                        definition,
+                        *offset as u32,
+                        *section_id as u32,
+                        exported,
+                        self,
+                    )?
+                }
+                SymbolKind::Ref => {
+                    debug_assert!(!exported);
+                    self.write_byte(1)?;
+                }
+            }
+            fn write_numeric_sym(
+                definition: &NormalSpan,
+                value: u32,
+                section_id: u32,
+                exported: bool,
+                ctx: &mut WriteContext,
+            ) -> std::io::Result<()> {
+                ctx.write_byte(if exported { 2 } else { 0 })?;
+
+                let (node_id, line_no) = ctx.resolve_span(definition);
+                ctx.write_long(node_id)?;
+                ctx.write_long(line_no)?;
+
+                ctx.write_long(section_id)?;
+
+                ctx.write_long(value)?;
+
+                Ok(())
+            }
+        }
+        Ok(())
+    }
+
+    fn write_sections(&mut self) -> std::io::Result<()> {
+        for (name, section) in self.sections.sections.as_slice() {
+            self.write_string(name)?;
+
+            let Span::Normal(span) = &section.def_span else {
+                unreachable!("section not defined normally!?")
+            };
+            let (node_id, line_no) = self.resolve_span(span);
+            self.write_long(node_id)?;
+            self.write_long(line_no)?;
+
+            // Section sizes have been checked, and are known to be below u16::MAX.
+            match &section.bytes {
+                Contents::Data(data) => self.write_long(data.len() as u32)?,
+                Contents::NoData(len) => self.write_long(*len as u32)?,
+            }
+
+            let flags = match section.attrs.kind {
+                SectionKind::Normal => 0x00,
+                SectionKind::Union => 0x80,
+                SectionKind::Fragment => 0x40,
+            };
+            let mem_region = match section.attrs.mem_region {
+                MemRegion::Wram0 => 0,
+                MemRegion::Vram => 1,
+                MemRegion::Romx => 2,
+                MemRegion::Rom0 => 3,
+                MemRegion::Hram => 4,
+                MemRegion::Wramx => 5,
+                MemRegion::Sram => 6,
+                MemRegion::Oam => 7,
+            };
+            self.write_byte(flags | mem_region)?;
+
+            self.write_long(section.address().map_or(u32::MAX, Into::into))?;
+            self.write_long(section.attrs.bank.unwrap_or(u32::MAX))?;
+
+            match section.attrs.address {
+                AddrConstraint::Align(alignment, ofs) => {
+                    self.write_byte(alignment)?;
+                    self.write_long(ofs.into())?;
+                }
+                AddrConstraint::None | AddrConstraint::Addr(_) => {
+                    self.write_byte(0)?;
+                    self.write_long(0)?;
+                }
+            }
+
+            match &section.bytes {
+                Contents::NoData(_) => {
+                    debug_assert_eq!(section.patches.len(), 0, "data-less section has patches!?")
+                }
+                Contents::Data(data) => {
+                    self.file.write_all(data)?;
+
+                    // Section patch counts have been checked earlier.
+                    self.write_long(section.patches.len() as u32)?;
+                    for patch in &section.patches {
+                        let Span::Normal(span) = &patch.span else {
+                            unreachable!("patch not defined normally!?")
+                        };
+                        let (node_id, line_no) = self.resolve_span(span);
+                        self.write_long(node_id)?;
+                        self.write_long(line_no)?;
+
+                        self.write_long(patch.offset as u32)?;
+
+                        self.write_long(patch.pc.0 as u32)?; // Section ID.
+                        self.write_long(patch.pc.1 as u32)?; // Offset.
+
+                        self.write_byte(match patch.kind {
+                            PatchKind::Byte => 0,
+                            PatchKind::Word => 1,
+                            PatchKind::Long => 2,
+                            PatchKind::Jr => 3,
+                        })?;
+
+                        self.write_expr(&patch.expr)?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn write_expr(&mut self, expr: &Expr) -> std::io::Result<()> {
+        let len = expr.ops().fold(0, |len, op| {
+            len + match op.kind {
+                OpKind::Number(_) => 5,
+                OpKind::Symbol(_) => 5,
+                OpKind::Binary(_) => 1,
+                OpKind::Unary(operator) => {
+                    if matches!(operator, UnOp::Identity) {
+                        0
+                    } else {
+                        1
+                    }
+                }
+                OpKind::Low => 1,
+                OpKind::High => 1,
+                OpKind::Rst => 1,
+                OpKind::Ldh => 1,
+                OpKind::BitCheck(_) => 2,
+                OpKind::Nothing => unreachable!("empty op at emission time!?"),
+            }
+        });
+        self.write_long(len)?;
+
+        for op in expr.ops() {
+            match op.kind {
+                OpKind::Number(number) => {
+                    self.write_byte(0x80)?;
+                    self.write_long(number as u32)?;
+                }
+                OpKind::Symbol(ident) => {
+                    self.write_byte(0x81)?;
+                    self.write_long(if ident == Symbols::pc_ident() {
+                        u32::MAX
+                    } else {
+                        self.registered_symbols
+                            .get_index_of(&ident)
+                            .expect("non-registered symbol in expr!?")
+                            as u32
+                    })?;
+                }
+                OpKind::Binary(operator) => self.write_byte(match operator {
+                    BinOp::LogicalOr => 0x22,
+                    BinOp::LogicalAnd => 0x21,
+                    BinOp::NotEqual => 0x31,
+                    BinOp::Equal => 0x30,
+                    BinOp::LessEq => 0x35,
+                    BinOp::Less => 0x33,
+                    BinOp::GreaterEq => 0x34,
+                    BinOp::Greater => 0x32,
+                    BinOp::Add => 0x00,
+                    BinOp::Subtract => 0x01,
+                    BinOp::And => 0x11,
+                    BinOp::Or => 0x10,
+                    BinOp::Xor => 0x12,
+                    BinOp::LeftShift => 0x40,
+                    BinOp::RightShift => 0x41,
+                    BinOp::UnsignedRightShift => 0x42,
+                    BinOp::Multiply => 0x02,
+                    BinOp::Divide => 0x03,
+                    BinOp::Modulo => 0x04,
+                    BinOp::Exponent => 0x06,
+                })?,
+                OpKind::Unary(operator) => match operator {
+                    UnOp::Complement => self.write_byte(0x13)?,
+                    UnOp::Identity => {}
+                    UnOp::Negation => self.write_byte(0x05)?,
+                    UnOp::Not => self.write_byte(0x23)?,
+                },
+                OpKind::Low => self.write_byte(0x71)?,
+                OpKind::High => self.write_byte(0x70)?,
+                OpKind::Rst => self.write_byte(0x61)?,
+                OpKind::Ldh => self.write_byte(0x60)?,
+                OpKind::BitCheck(mask) => {
+                    self.write_byte(0x62)?;
+                    self.write_byte(mask)?;
+                }
+                OpKind::Nothing => unreachable!("empty op when encoding RPN!?"),
+            }
+        }
+
+        Ok(())
+    }
+}

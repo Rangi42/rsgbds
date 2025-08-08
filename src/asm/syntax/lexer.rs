@@ -25,7 +25,7 @@ use crate::{
     format::FormatSpec,
     macro_args::{MacroArgs, UniqueId},
     section::Sections,
-    sources::{NormalSpan, Source, Span, SpanKind},
+    sources::{FileNode, NormalSpan, Source, Span, SpanKind},
     symbols::Symbols,
     Identifier, Identifiers, Options,
 };
@@ -93,8 +93,8 @@ impl Lexer {
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
-        contents.parent = Some(parent);
-        contents.kind = SpanKind::Macro(macro_name);
+        contents.node.parent = Some(parent);
+        contents.node.kind = SpanKind::Macro(macro_name);
         self.push_context(contents, Default::default(), nb_errors_left, options);
     }
 
@@ -106,8 +106,8 @@ impl Lexer {
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
-        contents.parent = Some(parent);
-        contents.kind = SpanKind::Loop(0);
+        contents.node.parent = Some(parent);
+        contents.node.kind = SpanKind::Loop(0);
         self.push_context(contents, loop_info, nb_errors_left, options);
     }
 
@@ -117,14 +117,17 @@ impl Lexer {
             .iter_mut()
             .enumerate()
             .rev()
-            .find(|(_i, ctx)| !ctx.span.kind.ends_implicitly())
+            .find(|(_i, ctx)| !ctx.span.node.kind.ends_implicitly())
             .unwrap();
 
         if matches!(
             context,
             Context {
                 span: NormalSpan {
-                    kind: SpanKind::Loop(..),
+                    node: FileNode {
+                        kind: SpanKind::Loop(..),
+                        ..
+                    },
                     ..
                 },
                 ..
@@ -136,7 +139,7 @@ impl Lexer {
             Err(self
                 .contexts
                 .iter()
-                .find(|ctx| matches!(ctx.span.kind, SpanKind::Loop(..)))
+                .find(|ctx| matches!(ctx.span.node.kind, SpanKind::Loop(..)))
                 .is_some())
         }
     }
@@ -183,7 +186,7 @@ impl Context {
     }
 
     fn remaining_text(&self) -> &str {
-        &self.span.src.contents.text()[self.cur_byte..self.span.bytes.end]
+        &self.span.node.src.contents.text()[self.cur_byte..self.span.bytes.end]
     }
 
     fn new_span(&self) -> NormalSpan {
@@ -200,7 +203,7 @@ impl Lexer {
         self.contexts
             .iter_mut()
             .rev()
-            .find(|ctx| !ctx.is_empty() || !ctx.span.kind.ends_implicitly())
+            .find(|ctx| !ctx.is_empty() || !ctx.span.node.kind.ends_implicitly())
     }
 
     fn push_context(
@@ -213,7 +216,7 @@ impl Lexer {
         debug_assert!(self.contexts.len() <= options.runtime_opts.recursion_depth);
 
         if self.contexts.len() == options.runtime_opts.recursion_depth {
-            let span = match span.parent {
+            let span = match span.node.parent {
                 Some(trigger_span) => Span::Normal(trigger_span.as_ref().clone()),
                 None => Span::CommandLine,
             };
@@ -222,7 +225,7 @@ impl Lexer {
             self.contexts.push(Context {
                 cur_byte: span.bytes.start,
                 // Expansions that end implicitly cannot contain other expansions.
-                ofs_scanned_for_expansion: if span.kind.ends_implicitly() {
+                ofs_scanned_for_expansion: if span.node.kind.ends_implicitly() {
                     span.bytes.end
                 } else {
                     span.bytes.start
@@ -261,7 +264,7 @@ impl Lexer {
 
     pub fn top_context(&mut self) -> &mut Context {
         let ctx = self.active_context().expect("No active lexer context");
-        debug_assert!(!ctx.span.kind.ends_implicitly());
+        debug_assert!(!ctx.span.node.kind.ends_implicitly());
         ctx
     }
 
@@ -273,7 +276,7 @@ impl Lexer {
                 .expect("Attempting to reset a lexer context when there are no more!?");
             // Pop any remaining implicitly-ending contexts.
             // (e.g. if the current top-level “hard“ context ends with an expansion).
-            if !ctx.span.kind.ends_implicitly() {
+            if !ctx.span.node.kind.ends_implicitly() {
                 break ctx;
             }
             debug_assert_eq!(
@@ -283,7 +286,7 @@ impl Lexer {
             self.contexts.pop();
         };
 
-        debug_assert!(matches!(ctx.span.kind, SpanKind::Loop(..)));
+        debug_assert!(matches!(ctx.span.node.kind, SpanKind::Loop(..)));
 
         Lexer::report_unterminated_conditionals(&mut self.cond_stack, ctx, nb_errors_left, options);
 
@@ -301,7 +304,7 @@ impl Lexer {
                 .expect("Attempting to pop a lexer context when there are no more!?");
             // Pop any remaining implicitly-ending contexts.
             // (e.g. if the current top-level “hard“ context ends with an expansion).
-            if !ctx.span.kind.ends_implicitly() {
+            if !ctx.span.node.kind.ends_implicitly() {
                 break ctx;
             }
             debug_assert_eq!(
@@ -505,17 +508,17 @@ impl Lexer {
             if !ctx.is_empty() {
                 break ctx;
             }
-            debug_assert!(ctx.span.kind.ends_implicitly());
+            debug_assert!(ctx.span.node.kind.ends_implicitly());
 
             let ctx = self.contexts.pop().unwrap();
 
             // Only repoint the span if it is currently pointing to the context we are exiting.
-            if Rc::ptr_eq(&span.src, &ctx.span.src) {
+            if Rc::ptr_eq(&span.node.src, &ctx.span.node.src) {
                 let span_is_empty = span.bytes.is_empty();
                 // Since we're popping a context, this means that the span is straddling two buffers.
                 // Thus, we will mark the span as spanning the entirety of the buffer's “expansion”.
                 // (Plus the character that's about to be consumed.)
-                *span = ctx.span.parent.unwrap().deref().clone();
+                *span = ctx.span.node.parent.unwrap().deref().clone();
                 // Exception: if the span is empty, we'll keep it empty (pointing at the end of the trigger),
                 //            but we still need to point it to the new active buffer.
                 if span_is_empty {
@@ -523,11 +526,11 @@ impl Lexer {
                 }
             } else {
                 debug_assert!(
-                    Rc::ptr_eq(&span.src, &ctx.span.parent.as_ref().unwrap().src),
+                    Rc::ptr_eq(&span.node.src, &ctx.span.node.parent.as_ref().unwrap().node.src),
                     "Span is pointing neither at current buffer ({}) nor its parent ({}), but at {}",
-                    &ctx.span.src.name,
-                    &ctx.span.parent.as_ref().unwrap().src.name,
-                    &span.src.name,
+                    &ctx.span.node.src.name,
+                    &ctx.span.node.parent.as_ref().unwrap().node.src.name,
+                    &span.node.src.name,
                 );
             }
         };
@@ -539,7 +542,7 @@ impl Lexer {
             .next()
             .expect("Lexer attempting to consume a char at EOF!?");
 
-        if Rc::ptr_eq(&span.src, &ctx.span.src) {
+        if Rc::ptr_eq(&span.node.src, &ctx.span.node.src) {
             // The span is pointing at the active buffer.
 
             // This check works in most cases, but breaks down in the presence of expansions.
@@ -548,22 +551,22 @@ impl Lexer {
             span.bytes.end = ctx.cur_byte + c.len_utf8(); // Advance the span by as much, so it encompasses the character we just shifted.
         } else {
             debug_assert!(
-                ctx.span.kind.ends_implicitly(),
+                ctx.span.node.kind.ends_implicitly(),
                 "Tokens can only straddle implicitly-ending contexts"
             );
             // The span is not pointing at the active buffer, so it should be pointing at its parent instead.
-            let Some(parent) = ctx.span.parent.as_ref() else {
+            let Some(parent) = ctx.span.node.parent.as_ref() else {
                 panic!(
                     "Span not pointing at the current top-level buffer ({}), but at {} instead",
-                    &ctx.span.src.name, &span.src.name,
+                    &ctx.span.node.src.name, &span.node.src.name,
                 );
             };
             debug_assert!(
-                Rc::ptr_eq(&span.src, &parent.src),
+                Rc::ptr_eq(&span.node.src, &parent.node.src),
                 "Span is pointing neither at {} nor its parent {}, but at {}",
-                &ctx.span.src.name,
-                &parent.src.name,
-                &span.src.name,
+                &ctx.span.node.src.name,
+                &parent.node.src.name,
+                &span.node.src.name,
             );
             // This modification is idempotent, so only do it at the beginning of the expansion, as a performance optimisation.
             if ctx.cur_byte == ctx.span.bytes.start {
@@ -2284,7 +2287,7 @@ impl Lexer {
         self.with_active_context_raw(&mut span, |ctx, text| {
             debug_assert!(
                 matches!(
-                    ctx.span.src.contents.text()[ctx.cur_byte - 1..ctx.cur_byte]
+                    ctx.span.node.src.contents.text()[ctx.cur_byte - 1..ctx.cur_byte]
                         .chars()
                         .next(),
                     Some(chars!(newline))
@@ -2366,7 +2369,7 @@ impl Lexer {
         self.with_active_context_raw(&mut span, |ctx, text| {
             debug_assert!(
                 matches!(
-                    ctx.span.src.contents.text()[ctx.cur_byte - 1..ctx.cur_byte]
+                    ctx.span.node.src.contents.text()[ctx.cur_byte - 1..ctx.cur_byte]
                         .chars()
                         .next(),
                     Some(chars!(newline))

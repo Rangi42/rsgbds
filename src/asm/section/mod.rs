@@ -28,13 +28,13 @@ type SectionId = usize; // Index into the `IndexMap`.
 #[derive(Debug)]
 pub struct Section {
     // Really, the span of the *first* definition.
-    def_span: Span,
+    pub def_span: Span,
     pub attrs: SectionAttrs,
-    patches: Vec<Patch>,
-    bytes: Contents,
+    pub patches: Vec<Patch>,
+    pub bytes: Contents,
 }
 #[derive(Debug)]
-enum Contents {
+pub enum Contents {
     Data(Vec<u8>),
     NoData(usize),
 }
@@ -68,12 +68,12 @@ pub struct ActiveSection {
 }
 
 #[derive(Debug)]
-struct Patch {
-    span: Span,
-    expr: Expr,
-    kind: PatchKind,
-    offset: usize,
-    pc: (SectionId, usize),
+pub struct Patch {
+    pub span: Span,
+    pub expr: Expr,
+    pub kind: PatchKind,
+    pub offset: usize,
+    pub pc: (SectionId, usize),
 }
 #[derive(Debug)]
 pub enum PatchKind {

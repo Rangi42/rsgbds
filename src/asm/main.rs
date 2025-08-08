@@ -16,6 +16,7 @@ mod expr;
 mod format;
 mod instructions;
 mod macro_args;
+mod obj_file;
 mod section;
 use section::Sections;
 mod sources;
@@ -42,7 +43,7 @@ pub struct Options {
     backtrace_depth: usize,
     max_errors: usize,
     runtime_opts: RuntimeOptions,
-    // TODO: maybe a `smallvec` instead? This never has more than one entry in practice.
+    // TODO(perf): maybe a `smallvec` instead? This never has more than one entry in practice.
     runtime_opt_stack: Vec<RuntimeOptions>,
 }
 #[derive(Debug, Clone)]
@@ -52,7 +53,7 @@ pub struct RuntimeOptions {
     pad_byte: u8,
     q_precision: usize,
     recursion_depth: usize,
-    // TODO: use some bitfield(s) instead?
+    // TODO(perf): use some bitfield(s) instead?
     warnings: [WarningState; NB_WARNINGS],
     meta_warnings: [WarningState; NB_META_WARNINGS + 1],
     warnings_are_errors: bool,
@@ -106,7 +107,21 @@ fn main() -> ExitCode {
         return ExitCode::DataErr;
     }
 
-    // TODO: emit object file
+    if let Some(obj_path) = &options.output {
+        if let Err(code) = obj_file::emit(
+            obj_path,
+            &identifiers,
+            &sections,
+            &symbols,
+            &nb_errors_left,
+            &options,
+        ) {
+            let nb_errors = options.max_errors - nb_errors_left.get();
+            debug_assert_ne!(nb_errors, 0);
+            eprintln!("{nb_errors} error{} generated.", common::S::from(nb_errors));
+            return ExitCode::DataErr;
+        }
+    }
 
     ExitCode::Ok
 }

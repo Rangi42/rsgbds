@@ -179,11 +179,11 @@ fn add_backtrace_labels_and_print(diag: ReportBuilder<'_>, span: &Span, options:
     fn add_level(diag: ReportBuilder<'_>, mut span: &NormalSpan, allowed_depth: usize) {
         let mut diag = diag; // Required for rustc to figure out a new lifetime for that binding of `diag`.
 
-        if let Some(parent) = &span.parent {
+        if let Some(parent) = &span.node.parent {
             match allowed_depth.checked_sub(1) {
                 Some(depth) => {
                     let diag_span = Span::Normal((**parent).clone());
-                    diag.add_label(note_label(&diag_span).with_message(match span.kind {
+                    diag.add_label(note_label(&diag_span).with_message(match span.node.kind {
                         SpanKind::File => "file included from here",
                         SpanKind::Macro(_) => "macro called here",
                         SpanKind::Loop(_) => "loop beginning here",
@@ -197,7 +197,7 @@ fn add_backtrace_labels_and_print(diag: ReportBuilder<'_>, span: &Span, options:
                 }
                 None => {
                     let mut remaining_depth = 1usize;
-                    while let Some(parent) = &span.parent {
+                    while let Some(parent) = &span.node.parent {
                         remaining_depth += 1;
                         span = &**parent;
                     }
@@ -236,13 +236,13 @@ impl<'span> ariadne::Span for &'span Span {
 
     fn start(&self) -> usize {
         match self {
-            Span::CommandLine | Span::Builtin => 0,
+            Span::CommandLine | Span::Builtin | Span::TopLevel => 0,
             Span::Normal(span) => span.bytes.start,
         }
     }
     fn end(&self) -> usize {
         match self {
-            Span::CommandLine | Span::Builtin => 0,
+            Span::CommandLine | Span::Builtin | Span::TopLevel => 0,
             Span::Normal(span) => span.bytes.end,
         }
     }
@@ -257,10 +257,10 @@ impl ariadne::Cache<Span> for () {
     ) -> Result<&'ret ariadne::Source<Self::Storage>, Box<dyn std::fmt::Debug + 'cache>> {
         static EMPTY_SOURCE: OnceLock<ariadne::Source<CompactString>> = OnceLock::new();
         match id {
-            Span::CommandLine | Span::Builtin => {
+            Span::CommandLine | Span::Builtin | Span::TopLevel => {
                 Ok(EMPTY_SOURCE.get_or_init(|| CompactString::default().into()))
             }
-            Span::Normal(span) => Ok(&span.src.contents),
+            Span::Normal(span) => Ok(&span.node.src.contents),
         }
     }
 
@@ -268,7 +268,8 @@ impl ariadne::Cache<Span> for () {
         match id {
             Span::CommandLine => Some(Box::new("<command line>")),
             Span::Builtin => Some(Box::new("<built-in>")),
-            Span::Normal(span) => Some(Box::new(&span.src.name)),
+            Span::TopLevel => Some(Box::new("<at top level>")),
+            Span::Normal(span) => Some(Box::new(&span.node.src.name)),
         }
     }
 }
