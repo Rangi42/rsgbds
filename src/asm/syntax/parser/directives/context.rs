@@ -279,7 +279,9 @@ pub(in super::super) fn parse_break(keyword: Token, parse_ctx: &mut parse_ctx!()
 
 impl parse_ctx!() {
     pub fn push_file(&mut self, file: Rc<Source>, parent: Option<Rc<NormalSpan>>) {
-        self.lexer
+        // We don't do anything if this fails to push.
+        let _ = self
+            .lexer
             .push_file(file, parent, self.nb_errors_remaining, self.options);
         // Preserve the active macro args.
     }
@@ -291,26 +293,36 @@ impl parse_ctx!() {
         parent: Rc<NormalSpan>,
         args: MacroArgs,
     ) {
-        self.lexer.push_macro(
-            macro_name,
-            contents,
-            parent,
-            self.nb_errors_remaining,
-            self.options,
-        );
-        self.macro_args.push(args);
-        self.unique_id.enter_unique_ctx();
+        if self
+            .lexer
+            .push_macro(
+                macro_name,
+                contents,
+                parent,
+                self.nb_errors_remaining,
+                self.options,
+            )
+            .is_ok()
+        {
+            self.macro_args.push(args);
+            self.unique_id.enter_unique_ctx();
+        }
     }
 
     pub fn push_loop(&mut self, contents: NormalSpan, parent: Rc<NormalSpan>, loop_info: LoopInfo) {
-        self.lexer.push_loop(
-            loop_info,
-            contents,
-            parent,
-            self.nb_errors_remaining,
-            self.options,
-        );
-        self.unique_id.enter_unique_ctx();
+        if self
+            .lexer
+            .push_loop(
+                loop_info,
+                contents,
+                parent,
+                self.nb_errors_remaining,
+                self.options,
+            )
+            .is_ok()
+        {
+            self.unique_id.enter_unique_ctx();
+        }
     }
 
     pub fn pop_context(&mut self) -> bool {

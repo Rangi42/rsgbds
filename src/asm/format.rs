@@ -91,10 +91,7 @@ impl FormatSpec {
                 parse_decimal(&mut chars, first_digit as usize)
             });
         let frac = chars.next_if_eq(&'.').map(|_| todo!());
-        let precision = chars
-            .next_if_eq(&'q')
-            .map(|_| todo!())
-            .unwrap_or(default_precision);
+        let precision = chars.next_if_eq(&'q').map(|_| todo!());
         let kind = match chars.next() {
             Some('d') => Ok(FormatKind::Signed),
             Some('u') => Ok(FormatKind::Unsigned),
@@ -120,7 +117,7 @@ impl FormatSpec {
                         flag_name: "fractional width",
                         sym_kind: "string",
                     })
-                } else if precision != 0 {
+                } else if precision.is_some() {
                     Err(FormatError::IncompatibleFlag {
                         flag_name: "precision",
                         sym_kind: "string",
@@ -162,14 +159,14 @@ impl FormatSpec {
                     flag_name: "fractional width",
                 });
             }
-            if precision != 0 {
+            if precision.is_some() {
                 return Err(FormatError::FractionalFlag {
                     flag_name: "fractional precision",
                 });
             }
         }
 
-        if precision > 31 {
+        if precision.is_some_and(|prec| prec > 31) {
             return Err(FormatError::FixPointPrecOver31);
         }
         if let Some(256..) = frac {
@@ -189,7 +186,7 @@ impl FormatSpec {
             pad_with_zeros,
             width,
             frac,
-            precision,
+            precision: precision.unwrap_or(default_precision),
             kind,
         })
     }

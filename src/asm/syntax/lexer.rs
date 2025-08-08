@@ -74,7 +74,7 @@ impl Lexer {
         parent: Option<Rc<NormalSpan>>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
-    ) {
+    ) -> Result<(), ()> {
         debug_assert_eq!(parent.is_none(), self.contexts.is_empty());
 
         self.push_context(
@@ -82,7 +82,7 @@ impl Lexer {
             Default::default(),
             nb_errors_left,
             options,
-        );
+        )
     }
 
     pub fn push_macro(
@@ -92,10 +92,10 @@ impl Lexer {
         parent: Rc<NormalSpan>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
-    ) {
+    ) -> Result<(), ()> {
         contents.node.parent = Some(parent);
         contents.node.kind = SpanKind::Macro(macro_name);
-        self.push_context(contents, Default::default(), nb_errors_left, options);
+        self.push_context(contents, Default::default(), nb_errors_left, options)
     }
 
     pub fn push_loop(
@@ -105,10 +105,10 @@ impl Lexer {
         parent: Rc<NormalSpan>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
-    ) {
+    ) -> Result<(), ()> {
         contents.node.parent = Some(parent);
         contents.node.kind = SpanKind::Loop(0);
-        self.push_context(contents, loop_info, nb_errors_left, options);
+        self.push_context(contents, loop_info, nb_errors_left, options)
     }
 
     pub fn break_loop(&mut self) -> Result<(), bool> {
@@ -212,15 +212,16 @@ impl Lexer {
         loop_info: LoopInfo,
         nb_errors_left: &Cell<usize>,
         options: &Options,
-    ) {
+    ) -> Result<(), ()> {
         debug_assert!(self.contexts.len() <= options.runtime_opts.recursion_depth);
 
         if self.contexts.len() == options.runtime_opts.recursion_depth {
-            let span = match span.node.parent {
+            let err_span = match span.node.parent {
                 Some(trigger_span) => Span::Normal(trigger_span.as_ref().clone()),
                 None => Span::CommandLine,
             };
-            Self::report_depth_overflow(self.contexts.len(), &span, nb_errors_left, options);
+            Self::report_depth_overflow(self.contexts.len(), &err_span, nb_errors_left, options);
+            Err(())
         } else {
             self.contexts.push(Context {
                 cur_byte: span.bytes.start,
@@ -233,7 +234,8 @@ impl Lexer {
                 span,
                 loop_state: loop_info,
                 cond_stack_depth: self.cond_stack.len(),
-            })
+            });
+            Ok(())
         }
     }
 
@@ -386,7 +388,8 @@ impl Lexer {
                                 // Consume all the characters implicated in the macro arg.
                                 ctx.cur_byte += macro_arg_len;
 
-                                self.push_context(
+                                // If this fails to push, we'll just read more characters.
+                                let _ = self.push_context(
                                     NormalSpan::new(
                                         Rc::clone(source),
                                         span_kind,
@@ -467,7 +470,8 @@ impl Lexer {
                         ),
                         Err(()) => (SpanKind::Invalid, "<invalid>"),
                     };
-                    self.push_context(
+                    // If this fails to push, we'll just read more characters.
+                    let _ = self.push_context(
                         NormalSpan::new(
                             Rc::new(Source {
                                 name: name.into(),

@@ -1,2 +1,137 @@
-FATAL: opt-r-decrease.asm(11) -> opt-r-decrease.asm::m(7) -> opt-r-decrease.asm::m(7) -> opt-r-decrease.asm::m(7) -> opt-r-decrease.asm::m(7) -> opt-r-decrease.asm::m(7) -> opt-r-decrease.asm::m(7) -> opt-r-decrease.asm::m(7) -> opt-r-decrease.asm::m(7) -> opt-r-decrease.asm::m(7) -> opt-r-decrease.asm::m(4):
-    Recursion limit (9) exceeded
+error: recursion is deeper than new limit
+    ╭─[ tests/rgbasm/opt-r-decrease/test.asm:4:8 ]
+    │
+  4 │     OPT r9
+    │        ─┬─  
+    │         ╰─── depth is 11 contexts at this point
+    │
+    ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+    │
+  7 │   m
+    │   ┬  
+    │   ╰── macro called here
+    │
+    ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+    │
+  7 │   m
+    │   ┬  
+    │   ╰── macro called here
+    │
+    ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+    │
+  7 │   m
+    │   ┬  
+    │   ╰── macro called here
+    │
+    ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+    │
+  7 │   m
+    │   ┬  
+    │   ╰── macro called here
+    │
+    ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+    │
+  7 │   m
+    │   ┬  
+    │   ╰── macro called here
+    │
+    ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+    │
+  7 │   m
+    │   ┬  
+    │   ╰── macro called here
+    │
+    ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+    │
+  7 │   m
+    │   ┬  
+    │   ╰── macro called here
+    │
+    ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+    │
+  7 │   m
+    │   ┬  
+    │   ╰── macro called here
+    │
+    ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+    │
+  7 │   m
+    │   ┬  
+    │   ╰── macro called here
+    │
+    ├─[ tests/rgbasm/opt-r-decrease/test.asm:11:3 ]
+    │
+ 11 │   m
+    │   ┬  
+    │   ╰── macro called here
+────╯
+error: maximum recursion depth exceeded
+   ╭─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+   │
+ 7 │   m
+   │   ┬  
+   │   ╰── depth is 64 contexts here, cannot enter a new one
+   │
+   ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+   │
+ 7 │   m
+   │   ┬  
+   │   ╰── macro called here
+   │
+   ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+   │
+ 7 │   m
+   │   ┬  
+   │   ╰── macro called here
+   │
+   ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+   │
+ 7 │   m
+   │   ┬  
+   │   ╰── macro called here
+   │
+   ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+   │
+ 7 │   m
+   │   ┬  
+   │   ╰── macro called here
+   │
+   ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+   │
+ 7 │   m
+   │   ┬  
+   │   ╰── macro called here
+   │
+   ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+   │
+ 7 │   m
+   │   ┬  
+   │   ╰── macro called here
+   │
+   ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+   │
+ 7 │   m
+   │   ┬  
+   │   ╰── macro called here
+   │
+   ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+   │
+ 7 │   m
+   │   ┬  
+   │   ╰── macro called here
+   │
+   ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+   │
+ 7 │   m
+   │   ┬  
+   │   ╰── macro called here
+   │
+   ├─[ tests/rgbasm/opt-r-decrease/test.asm:7:3 ]
+   │
+ 7 │   m
+   │   ┬  
+   │   ╰── macro called here
+   │ 
+   │ Note: ... 54 more levels of nesting omitted
+───╯
+2 errors generated.
