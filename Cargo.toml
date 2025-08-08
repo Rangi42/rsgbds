@@ -74,9 +74,8 @@ rgbgfx = [
 ]
 
 [dependencies] # TODO: audit deps & features (`cargo machete`, `cargo bloat`)
-# TODO: use `thiserror` instead
 parse-display = { version = "0.9", default-features = false }
-thiserror = "2.0.12"
+thiserror = "2.0.12"                                          # TODO: remove this
 try-from-discrim = "1.0"
 
 # The binaries' deps.
@@ -127,8 +126,11 @@ shadow-rs = { version = "=1.0.0", optional = true, default-features = false, fea
 ] }
 
 [dev-dependencies]
-libtest-mimic = "0.8.1"
+anyhow = "1.0.98"
+datatest-stable = "0.3.2"
+libtest-mimic = "0.8.1"                                      # TODO: remove once the rgbgfx test harness is replaced with `datatest-stable`
 snapbox = { version = "0.6.21", features = ["path", "cmd"] }
+tempfile = "3.20.0"
 
 [patch.crates-io]
 ariadne = { git = "https://github.com/ISSOtm/ariadne.git", branch = "rgbds" }
@@ -142,6 +144,11 @@ required-features = ["rgbasm"]
 name = "rgbgfx"
 path = "src/gfx/main.rs"
 required-features = ["rgbgfx"]
+
+[[test]]
+name = "rgbasm"
+harness = false
+required-features = ["rgbasm"]
 
 [[test]]
 name = "rgbgfx"
