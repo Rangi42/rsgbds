@@ -28,9 +28,15 @@ fn run_test(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
         cmd = cmd.arg(format!("@{flags_file_path}"));
     }
 
-    let result = cmd
-        .assert()
-        .with_assert(Assert::new().action_env(ACTION_ENV_VAR_NAME));
+    let result = cmd.assert().with_assert(
+        Assert::new()
+            .action_env(ACTION_ENV_VAR_NAME)
+            // On its face, path normalisation is desirable;
+            // however, it causes `snapbox` to replace ALL backslashes with slashes...
+            // including in source code listings (e.g. macro args).
+            // `datatest-stable` passes relative path with forward slashes always, anyway.
+            .normalize_paths(false),
+    );
 
     let err_file_path = asm_path.with_file_name("stderr.log");
     let result = if err_file_path.exists() {
