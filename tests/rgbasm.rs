@@ -4,7 +4,7 @@ use snapbox::{cmd::Command, data::DataFormat, Assert, Data};
 use tempfile::NamedTempFile;
 
 datatest_stable::harness! {
-    { test = run_test, root = "tests/rgbasm", pattern = r"\.asm$" },
+    { test = run_test, root = "tests/rgbasm", pattern = r"test\.asm$" },
     // TODO: `version.asm`, `notexist.asn`, other special tests in `test.sh`
 }
 
@@ -23,7 +23,7 @@ fn run_test(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
         .arg(obj_file.path())
         .arg("-Weverything");
 
-    let flags_file_path = asm_path.with_file_name("test.flags");
+    let flags_file_path = asm_path.with_file_name("flags.txt");
     if flags_file_path.exists() {
         cmd = cmd.arg(format!("@{flags_file_path}"));
     }
