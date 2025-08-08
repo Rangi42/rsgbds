@@ -2313,19 +2313,28 @@ impl Lexer {
                 debug_assert!(capture_len as isize >= 0); // `line` comes after `text`.
 
                 let trimmed = line.trim_start_matches(is_whitespace);
+                let starts_with_keyword = |keyword: &str| {
+                    // The line begins with a word the size of the keyword...
+                    trimmed.get(..keyword.len()).is_some_and(|first_word| {
+                        // ...which matches the keyword...
+                        unicase::eq_ascii(first_word, keyword)
+                            // ...and the keyword doesn't happen to just be a prefix.
+                            && !matches!(
+                                trimmed[keyword.len()..].chars().next(),
+                                Some(chars!(ident))
+                            )
+                    })
+                };
                 let nb_trimmed = line.len() - trimmed.len();
-                if let Some(first_word) = trimmed.get(..end_keyword.len()) {
-                    if unicase::eq_ascii(first_word, end_keyword) {
-                        // Found the ending keyword!
-                        match nesting_depth.checked_sub(1) {
-                            Some(new_depth) => nesting_depth = new_depth,
-                            None => break capture_len + nb_trimmed + end_keyword.len(),
-                        }
+                if starts_with_keyword(end_keyword) {
+                    // Found the ending keyword!
+                    match nesting_depth.checked_sub(1) {
+                        Some(new_depth) => nesting_depth = new_depth,
+                        None => break capture_len + nb_trimmed + end_keyword.len(),
                     }
-                }
-                for keyword in nesting_keywords {
-                    if let Some(first_word) = trimmed.get(..keyword.len()) {
-                        if unicase::eq_ascii(first_word, keyword) {
+                } else {
+                    for keyword in nesting_keywords {
+                        if starts_with_keyword(keyword) {
                             nesting_depth += 1;
                             break; // As an optimisation.
                         }
@@ -2394,23 +2403,30 @@ impl Lexer {
                 // SAFETY: `trimmed` is derived from `text`.
                 let block_len = unsafe { trimmed.as_ptr().offset_from(text.as_ptr()) } as usize;
 
-                if let Some(first_word) = trimmed.get(..END_KEYWORD.len()) {
-                    if unicase::eq_ascii(first_word, END_KEYWORD) {
-                        // Found the ending keyword!
-                        match nesting_depth.checked_sub(1) {
-                            Some(new_depth) => nesting_depth = new_depth,
-                            None => break block_len,
-                        }
-                    } else if nesting_depth == 0
-                        && (unicase::eq_ascii(first_word, "elif")
-                            || unicase::eq_ascii(first_word, "else"))
-                    {
-                        break block_len;
+                let starts_with_keyword = |keyword: &str| {
+                    // The line begins with a word the size of the keyword...
+                    trimmed.get(..keyword.len()).is_some_and(|first_word| {
+                        // ...which matches the keyword...
+                        unicase::eq_ascii(first_word, keyword)
+                            // ...and the keyword doesn't happen to just be a prefix.
+                            && !matches!(
+                                trimmed[keyword.len()..].chars().next(),
+                                Some(chars!(ident))
+                            )
+                    })
+                };
+                if starts_with_keyword(END_KEYWORD) {
+                    // Found the ending keyword!
+                    match nesting_depth.checked_sub(1) {
+                        Some(new_depth) => nesting_depth = new_depth,
+                        None => break block_len,
                     }
-                } else if let Some(first_word) = trimmed.get(..NESTING_KEYWORD.len()) {
-                    if unicase::eq_ascii(first_word, NESTING_KEYWORD) {
-                        nesting_depth += 1;
-                    }
+                } else if nesting_depth == 0
+                    && (starts_with_keyword("elif") || starts_with_keyword("else"))
+                {
+                    break block_len;
+                } else if starts_with_keyword(NESTING_KEYWORD) {
+                    nesting_depth += 1;
                 }
 
                 // Try again with the next line.
