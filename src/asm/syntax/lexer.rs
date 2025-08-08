@@ -2322,13 +2322,12 @@ impl Lexer {
                             None => break capture_len + nb_trimmed + end_keyword.len(),
                         }
                     }
-                } else {
-                    for keyword in nesting_keywords {
-                        if let Some(first_word) = trimmed.get(..keyword.len()) {
-                            if unicase::eq_ascii(first_word, keyword) {
-                                nesting_depth += 1;
-                                break; // As an optimisation.
-                            }
+                }
+                for keyword in nesting_keywords {
+                    if let Some(first_word) = trimmed.get(..keyword.len()) {
+                        if unicase::eq_ascii(first_word, keyword) {
+                            nesting_depth += 1;
+                            break; // As an optimisation.
                         }
                     }
                 }
