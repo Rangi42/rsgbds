@@ -711,7 +711,7 @@ impl SymbolData {
                 .and_then(|(_data_sect, sym_sect)| {
                     sections.sections[sym_sect.id]
                         .address()
-                        .map(|addr| addr.into())
+                        .map(|addr| i32::from(addr) + sym_sect.offset as i32)
                 }),
             Self::Narg => macro_args.map(|args| args.max_valid() as i32),
             Self::Dot => None,
