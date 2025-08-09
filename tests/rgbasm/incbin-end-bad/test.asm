@@ -1,3 +1,3 @@
 SECTION "Bad", ROM0
 
-INCBIN "data.bin", 123, 1
+INCBIN "../../empty.bin", 123, 1
