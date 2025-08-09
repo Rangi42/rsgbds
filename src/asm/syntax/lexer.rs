@@ -1237,8 +1237,14 @@ impl Lexer {
                 Some('|') => {
                     self.consume(&mut span);
                     match self.peek(&mut params) {
-                        Some('=') => break token!("|="),
-                        Some('|') => break token!("||"),
+                        Some('=') => {
+                            self.consume(&mut span);
+                            break token!("|=");
+                        }
+                        Some('|') => {
+                            self.consume(&mut span);
+                            break token!("||");
+                        }
                         _ => break token!("|"),
                     }
                 }
@@ -1275,7 +1281,10 @@ impl Lexer {
                 Some('<') => {
                     self.consume(&mut span);
                     match self.peek(&mut params) {
-                        Some('=') => break token!("<="),
+                        Some('=') => {
+                            self.consume(&mut span);
+                            break token!("<=");
+                        }
                         Some('<') => {
                             self.consume(&mut span);
                             match self.peek(&mut params) {
@@ -1294,7 +1303,10 @@ impl Lexer {
                 Some('>') => {
                     self.consume(&mut span);
                     match self.peek(&mut params) {
-                        Some('=') => break token!(">="),
+                        Some('=') => {
+                            self.consume(&mut span);
+                            break token!(">=");
+                        }
                         Some('>') => {
                             self.consume(&mut span);
                             match self.peek(&mut params) {
