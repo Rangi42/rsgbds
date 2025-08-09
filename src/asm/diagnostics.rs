@@ -45,8 +45,9 @@ fn decrement_error_count(nb_errors_left: &Cell<usize>, options: &Options) {
         let span = Span::Builtin;
         Report::build(WARNING_KIND, &span)
             .with_message(format!(
-                "Reached {} errors, any subsequent will not be printed",
+                "Reached {} error{}, any subsequent will not be printed",
                 options.max_errors,
+                S::from(options.max_errors),
             ))
             .finish()
             .eprint(())
