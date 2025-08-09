@@ -139,8 +139,7 @@ impl Lexer {
             Err(self
                 .contexts
                 .iter()
-                .find(|ctx| matches!(ctx.span.node.kind, SpanKind::Loop(..)))
-                .is_some())
+                .any(|ctx| matches!(ctx.span.node.kind, SpanKind::Loop(..))))
         }
     }
 }

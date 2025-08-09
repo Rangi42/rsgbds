@@ -41,7 +41,7 @@ impl<'path> Input<'path, '_> {
         })
     }
 
-    pub fn error_in<M: ToString>(&self, err_msg: M) -> ReportBuilder<BinFileDiag> {
+    pub fn error_in<M: ToString>(&self, err_msg: M) -> ReportBuilder<'_, BinFileDiag> {
         Report::build(ERROR_KIND, BinFileDiag("".into()))
             .with_message(err_msg)
             .with_label(Label::new(BinFileDiag(match self {
@@ -50,7 +50,7 @@ impl<'path> Input<'path, '_> {
             })))
     }
 
-    pub fn error<M: ToString>(path: &Path, err_msg: M) -> ReportBuilder<BinFileDiag> {
+    pub fn error<M: ToString>(path: &Path, err_msg: M) -> ReportBuilder<'_, BinFileDiag> {
         Report::build(ERROR_KIND, BinFileDiag("".into()))
             .with_message(err_msg)
             .with_label(Label::new(BinFileDiag(if path == Path::new("-") {
@@ -70,7 +70,7 @@ impl<'path> Output<'path> {
         })
     }
 
-    pub fn error_in<M: ToString>(&self, err_msg: M) -> ReportBuilder<BinFileDiag> {
+    pub fn error_in<M: ToString>(&self, err_msg: M) -> ReportBuilder<'_, BinFileDiag> {
         Report::build(ERROR_KIND, BinFileDiag("".into()))
             .with_message(err_msg)
             .with_label(Label::new(BinFileDiag(match self {
@@ -79,7 +79,7 @@ impl<'path> Output<'path> {
             })))
     }
 
-    pub fn error<M: ToString>(path: &Path, err_msg: M) -> ReportBuilder<BinFileDiag> {
+    pub fn error<M: ToString>(path: &Path, err_msg: M) -> ReportBuilder<'_, BinFileDiag> {
         Report::build(ERROR_KIND, BinFileDiag("".into()))
             .with_message(err_msg)
             .with_label(Label::new(BinFileDiag(if path == Path::new("-") {

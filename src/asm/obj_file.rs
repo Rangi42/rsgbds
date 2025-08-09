@@ -3,7 +3,6 @@ use std::{
     fs::File,
     io::{BufWriter, Write},
     path::Path,
-    rc::Rc,
 };
 
 use rustc_hash::FxBuildHasher;

@@ -1,7 +1,7 @@
 use crate::{
     diagnostics,
     syntax::{
-        parser::{expect_one_of, expr, misc, parse_ctx, require},
+        parser::{expect_one_of, expr, misc, parse_ctx},
         tokens::Token,
     },
 };

@@ -228,7 +228,7 @@ pub fn note_label(span: &Span) -> Label<&Span> {
     Label::new(span).with_color(NOTE_COLOR)
 }
 
-impl<'span> ariadne::Span for &'span Span {
+impl ariadne::Span for &Span {
     type SourceId = Span;
 
     fn source(&self) -> &Self::SourceId {

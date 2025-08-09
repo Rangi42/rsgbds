@@ -98,7 +98,10 @@ pub(in super::super) fn parse_assert(
     ) {
         Ok((0, span)) => assert_failure(level, msg.as_ref(), &span, parse_ctx),
         Ok(_) => Some(()), // OK
-        Err(Err(error)) => Some(parse_ctx.report_expr_error(error)),
+        Err(Err(error)) => {
+            parse_ctx.report_expr_error(error);
+            Some(())
+        }
         Err(Ok(expr)) => {
             parse_ctx.sections.assertions.push(Assertion {
                 level,
@@ -141,7 +144,10 @@ pub(in super::super) fn parse_static_assert(
     match parse_ctx.try_const_eval(&expr) {
         Ok((0, span)) => assert_failure(level, msg.as_ref(), &span, parse_ctx),
         Ok(_) => Some(()), // OK
-        Err(error) => Some(parse_ctx.report_expr_error(error)),
+        Err(error) => {
+            parse_ctx.report_expr_error(error);
+            Some(())
+        }
     }
     .map(|()| lookahead)
 }
@@ -154,9 +160,9 @@ fn assert_failure(
 ) -> Option<()> {
     match level {
         AssertLevel::Warn => {
-            parse_ctx.error(&span, |error| {
+            parse_ctx.error(span, |error| {
                 error.set_message("assertion failed");
-                error.add_label(diagnostics::error_label(&span).with_message(match msg {
+                error.add_label(diagnostics::error_label(span).with_message(match msg {
                     Some((text, _span)) => text,
                     None => "this expression evaluates to 0",
                 }));
@@ -164,9 +170,9 @@ fn assert_failure(
             Some(())
         }
         AssertLevel::Error | AssertLevel::Fatal => {
-            parse_ctx.error(&span, |error| {
+            parse_ctx.error(span, |error| {
                 error.set_message("assertion failed");
-                error.add_label(diagnostics::error_label(&span).with_message(match msg {
+                error.add_label(diagnostics::error_label(span).with_message(match msg {
                     Some((text, _span)) => text,
                     None => "this expression evaluates to 0",
                 }));

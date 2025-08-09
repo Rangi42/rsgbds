@@ -3,7 +3,7 @@ error: section "overflow" is larger than maximum size
    │
  1 │ section "overflow", rom0
    │         ─────┬────  
-   │              ╰────── this section grew to 16777216 ($1000000) bytes, over the limit of 16384
+   │              ╰────── this section grew to 16777216 ($1000000) bytes, over the limit of 32768
    │ 
    │ Help: consider splitting this section into multiple ones
 ───╯

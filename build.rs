@@ -132,7 +132,7 @@ const DEFAULT_WARNINGS: [MetaWarningKind; NB_WARNINGS] = ["
         &mut file,
         "];
 
-pub(crate) const SIMPLE_WARNINGS: [(&'static str, WarningKind); NB_SIMPLE_WARNINGS] = ["
+pub(crate) const SIMPLE_WARNINGS: [(&str, WarningKind); NB_SIMPLE_WARNINGS] = ["
     )
     .unwrap();
     let mut nb_simple_warnings = 0;
@@ -153,7 +153,7 @@ pub(crate) const SIMPLE_WARNINGS: [(&'static str, WarningKind); NB_SIMPLE_WARNIN
         "];
 const NB_SIMPLE_WARNINGS: usize = {nb_simple_warnings};
 
-pub(crate) const PARAMETRIC_WARNINGS: [(&'static str, WarningKind, usize); NB_PARAMETRIC_WARNINGS] = ["
+pub(crate) const PARAMETRIC_WARNINGS: [(&str, WarningKind, usize); NB_PARAMETRIC_WARNINGS] = ["
     )
     .unwrap();
     let mut nb_parametric_warnings = 0;
@@ -177,7 +177,7 @@ pub(crate) const PARAMETRIC_WARNINGS: [(&'static str, WarningKind, usize); NB_PA
 const NB_PARAMETRIC_WARNINGS: usize = {nb_parametric_warnings};
 
 pub(crate) const NB_META_WARNINGS: usize = {};
-pub(crate) const META_WARNINGS: [&'static str; NB_META_WARNINGS] = [",
+pub(crate) const META_WARNINGS: [&str; NB_META_WARNINGS] = [",
         META_WARNINGS.len(),
     )
     .unwrap();

@@ -57,7 +57,7 @@ impl MacroArgs {
 
     pub fn shift_by(
         &mut self,
-        mut offset: isize,
+        offset: isize,
         span: &Span,
         nb_errors_left: &Cell<usize>,
         options: &Options,
