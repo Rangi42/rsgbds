@@ -1,5 +1,5 @@
 error: section "overflow" is larger than maximum size
-   ╭─[ tests/rgbasm/section-unsigned-overflow/test.asm:1:9 ]
+   ╭─[ test.asm:1:9 ]
    │
  1 │ section "overflow", rom0
    │         ─────┬────  
@@ -8,7 +8,7 @@ error: section "overflow" is larger than maximum size
    │ Help: consider splitting this section into multiple ones
 ───╯
 error: section "moar overflow" is larger than maximum size
-   ╭─[ tests/rgbasm/section-unsigned-overflow/test.asm:6:9 ]
+   ╭─[ test.asm:6:9 ]
    │
  6 │ section "moar overflow", romx
    │         ───────┬───────  

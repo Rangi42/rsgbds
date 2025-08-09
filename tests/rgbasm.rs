@@ -27,8 +27,15 @@ fn run_test(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
     let obj_file = NamedTempFile::new().context("Unable to create temp obj file")?;
 
     let mut cmd = Command::new(RGBASM_PATH)
+        .current_dir(
+            asm_path
+                .parent()
+                .unwrap()
+                .canonicalize()
+                .context("Unable to canonicalise working directory")?,
+        )
         .env("SOURCE_DATE_EPOCH", TIMESTAMP)
-        .arg(asm_path)
+        .arg(asm_path.file_name().unwrap())
         .arg("-o")
         .arg(obj_file.path())
         .arg("-Weverything");
@@ -73,6 +80,13 @@ fn run_test(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
         let bin_file = NamedTempFile::new().context("Unable to create temp bin file")?;
 
         Command::new(RGBLINK_PATH)
+            .current_dir(
+                asm_path
+                    .parent()
+                    .unwrap()
+                    .canonicalize()
+                    .context("Unable to canonicalise working directory")?,
+            )
             .env("SOURCE_DATE_EPOCH", TIMESTAMP)
             .arg(obj_file.path())
             .arg("-o")

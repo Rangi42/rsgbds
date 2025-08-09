@@ -1,4 +1,4 @@
-error: failed to open "tests/rgbasm/notexist/test.asm"
+error: failed to open "test.asm"
   │ 
   │ Note: No such file or directory (os error 2)
 ──╯

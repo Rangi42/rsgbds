@@ -5,7 +5,7 @@ error: a unique identifier is not available in this context
     │       ─┬  
     │        ╰── cannot use `\@` here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:11:2 ]
+    ├─[ test.asm:11:2 ]
     │
  11 │     {warn_unique}
     │     ──────┬──────  
@@ -18,7 +18,7 @@ error: a unique identifier is not available in this context
     │
   1 │ WARN "\@!"
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:11:2 ]
+    ├─[ test.asm:11:2 ]
     │
  11 │     {warn_unique}
     │     ──────┬──────  
@@ -29,13 +29,13 @@ error: a unique identifier is not available in this context
     │
   1 │ WARN "\@!"
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:4:2 ]
+    ├─[ test.asm:4:2 ]
     │
   4 │     {warn_unique}
     │     ──────┬──────  
     │           ╰──────── interpolated here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:12:2 ]
+    ├─[ test.asm:12:2 ]
     │
  12 │     m
     │     ┬  
@@ -46,19 +46,19 @@ error: a unique identifier is not available in this context
     │
   1 │ WARN "\@!"
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:6:3 ]
+    ├─[ test.asm:6:3 ]
     │
   6 │        {warn_unique}
     │        ──────┬──────  
     │              ╰──────── interpolated here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:5:2 ]
+    ├─[ test.asm:5:2 ]
     │
   5 │     REPT 2
     │     ──┬─  
     │       ╰─── loop beginning here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:12:2 ]
+    ├─[ test.asm:12:2 ]
     │
  12 │     m
     │     ┬  
@@ -69,19 +69,19 @@ error: a unique identifier is not available in this context
     │
   1 │ WARN "\@!"
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:6:3 ]
+    ├─[ test.asm:6:3 ]
     │
   6 │        {warn_unique}
     │        ──────┬──────  
     │              ╰──────── interpolated here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:5:2 ]
+    ├─[ test.asm:5:2 ]
     │
   5 │     REPT 2
     │     ──┬─  
     │       ╰─── loop beginning here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:12:2 ]
+    ├─[ test.asm:12:2 ]
     │
  12 │     m
     │     ┬  
@@ -92,13 +92,13 @@ error: a unique identifier is not available in this context
     │
   1 │ WARN "\@!"
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:8:2 ]
+    ├─[ test.asm:8:2 ]
     │
   8 │     {warn_unique}
     │     ──────┬──────  
     │           ╰──────── interpolated here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:12:2 ]
+    ├─[ test.asm:12:2 ]
     │
  12 │     m
     │     ┬  
@@ -111,7 +111,7 @@ error: a unique identifier is not available in this context
     │       ─┬  
     │        ╰── cannot use `\@` here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:13:2 ]
+    ├─[ test.asm:13:2 ]
     │
  13 │     {warn_unique}
     │     ──────┬──────  
@@ -124,7 +124,7 @@ error: a unique identifier is not available in this context
     │
   1 │ WARN "\@!"
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:13:2 ]
+    ├─[ test.asm:13:2 ]
     │
  13 │     {warn_unique}
     │     ──────┬──────  
@@ -135,13 +135,13 @@ error: a unique identifier is not available in this context
     │
   1 │ WARN "\@!"
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:4:2 ]
+    ├─[ test.asm:4:2 ]
     │
   4 │     {warn_unique}
     │     ──────┬──────  
     │           ╰──────── interpolated here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:14:2 ]
+    ├─[ test.asm:14:2 ]
     │
  14 │     m
     │     ┬  
@@ -152,19 +152,19 @@ error: a unique identifier is not available in this context
     │
   1 │ WARN "\@!"
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:6:3 ]
+    ├─[ test.asm:6:3 ]
     │
   6 │        {warn_unique}
     │        ──────┬──────  
     │              ╰──────── interpolated here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:5:2 ]
+    ├─[ test.asm:5:2 ]
     │
   5 │     REPT 2
     │     ──┬─  
     │       ╰─── loop beginning here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:14:2 ]
+    ├─[ test.asm:14:2 ]
     │
  14 │     m
     │     ┬  
@@ -175,19 +175,19 @@ error: a unique identifier is not available in this context
     │
   1 │ WARN "\@!"
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:6:3 ]
+    ├─[ test.asm:6:3 ]
     │
   6 │        {warn_unique}
     │        ──────┬──────  
     │              ╰──────── interpolated here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:5:2 ]
+    ├─[ test.asm:5:2 ]
     │
   5 │     REPT 2
     │     ──┬─  
     │       ╰─── loop beginning here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:14:2 ]
+    ├─[ test.asm:14:2 ]
     │
  14 │     m
     │     ┬  
@@ -198,13 +198,13 @@ error: a unique identifier is not available in this context
     │
   1 │ WARN "\@!"
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:8:2 ]
+    ├─[ test.asm:8:2 ]
     │
   8 │     {warn_unique}
     │     ──────┬──────  
     │           ╰──────── interpolated here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:14:2 ]
+    ├─[ test.asm:14:2 ]
     │
  14 │     m
     │     ┬  
@@ -217,7 +217,7 @@ error: a unique identifier is not available in this context
     │       ─┬  
     │        ╰── cannot use `\@` here
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:15:2 ]
+    ├─[ test.asm:15:2 ]
     │
  15 │     {warn_unique}
     │     ──────┬──────  
@@ -230,7 +230,7 @@ error: a unique identifier is not available in this context
     │
   1 │ WARN "\@!"
     │
-    ├─[ tests/rgbasm/unique-id/test.asm:15:2 ]
+    ├─[ test.asm:15:2 ]
     │
  15 │     {warn_unique}
     │     ──────┬──────  
