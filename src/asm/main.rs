@@ -119,7 +119,7 @@ fn main() -> ExitCode {
             let nb_errors = options.max_errors - nb_errors_left.get();
             debug_assert_ne!(nb_errors, 0);
             eprintln!("{nb_errors} error{} generated.", common::S::from(nb_errors));
-            return ExitCode::DataErr;
+            return code;
         }
     }
 
