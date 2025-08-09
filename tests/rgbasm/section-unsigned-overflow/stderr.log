@@ -1,2 +1,19 @@
-FATAL: section-unsigned-overflow.asm(2) -> section-unsigned-overflow.asm::REPT~4(3):
-    Section size would overflow internal counter
+error: section "overflow" is larger than maximum size
+   ╭─[ tests/rgbasm/section-unsigned-overflow/test.asm:1:9 ]
+   │
+ 1 │ section "overflow", rom0
+   │         ─────┬────  
+   │              ╰────── this section grew to 16777216 ($1000000) bytes, over the limit of 16384
+   │ 
+   │ Help: consider splitting this section into multiple ones
+───╯
+error: section "moar overflow" is larger than maximum size
+   ╭─[ tests/rgbasm/section-unsigned-overflow/test.asm:6:9 ]
+   │
+ 6 │ section "moar overflow", romx
+   │         ───────┬───────  
+   │                ╰───────── this section grew to 16777216 ($1000000) bytes, over the limit of 16384
+   │ 
+   │ Help: consider splitting this section into multiple ones
+───╯
+2 errors generated.

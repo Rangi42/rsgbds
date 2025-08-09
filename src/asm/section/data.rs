@@ -13,6 +13,8 @@ use crate::{
 
 use super::{ActiveSection, Contents, SectionKind, Sections};
 
+const MAX_SECTION_SIZE: usize = 0x1_000_000;
+
 /// Top-level data emission functions.
 impl Sections {
     // Since this is intended to work even in non-data sections, it cannot use `emit_data`.
@@ -51,15 +53,31 @@ impl Sections {
         let data_sect = &mut self.sections[data_section.id];
         match &mut data_sect.bytes {
             Contents::Data(data) => {
-                debug_assert_eq!(data.len(), data_section.offset);
-                data.extend(std::iter::repeat(options.runtime_opts.pad_byte).take(length));
+                if data_section
+                    .offset
+                    .checked_add(length)
+                    .is_some_and(|new_ofs| new_ofs <= MAX_SECTION_SIZE)
+                {
+                    debug_assert_eq!(data.len(), data_section.offset);
+                    data.extend(std::iter::repeat(options.runtime_opts.pad_byte).take(length));
+                } else {
+                    data.resize(MAX_SECTION_SIZE, options.runtime_opts.pad_byte);
+                }
             }
             Contents::NoData(len) => {
                 if !matches!(data_sect.attrs.kind, SectionKind::Union) {
-                    debug_assert_eq!(*len, data_section.offset);
-                    *len += length;
+                    if data_section
+                        .offset
+                        .checked_add(length)
+                        .is_some_and(|new_ofs| new_ofs <= MAX_SECTION_SIZE)
+                    {
+                        debug_assert_eq!(*len, data_section.offset);
+                        *len += length;
+                    } else {
+                        *len = MAX_SECTION_SIZE;
+                    }
                 } else {
-                    *len = std::cmp::max(data_section.offset + length, *len);
+                    *len = std::cmp::max(*len, data_section.offset + length);
                 }
             }
         }
@@ -271,40 +289,66 @@ impl Sections {
         let data_sect = &mut self.sections[data_section.id];
         match &mut data_sect.bytes {
             Contents::Data(data) => {
-                debug_assert_eq!(data.len(), data_section.offset);
+                if data_section
+                    .offset
+                    .checked_add(nb_bytes)
+                    .is_some_and(|new_ofs| new_ofs <= MAX_SECTION_SIZE)
+                {
+                    debug_assert_eq!(data.len(), data_section.offset);
 
-                emission_callback(
-                    data_section.offset,
-                    EmissionContext {
-                        patches: &mut data_sect.patches,
-                        data,
-                        symbol_section,
-                        identifiers,
-                        nb_errors_left,
-                        options,
-                    },
-                );
+                    emission_callback(
+                        data_section.offset,
+                        EmissionContext {
+                            patches: &mut data_sect.patches,
+                            data,
+                            symbol_section,
+                            identifiers,
+                            nb_errors_left,
+                            options,
+                        },
+                    );
+                } else {
+                    match &mut data_sect.bytes {
+                        Contents::Data(data) => {
+                            data.resize(MAX_SECTION_SIZE, options.runtime_opts.pad_byte)
+                        }
+                        Contents::NoData(len) => *len = MAX_SECTION_SIZE,
+                    }
+                }
             }
 
             Contents::NoData(len) => {
-                debug_assert_eq!(*len, data_section.offset);
+                if data_section
+                    .offset
+                    .checked_add(nb_bytes)
+                    .is_some_and(|new_ofs| new_ofs <= MAX_SECTION_SIZE)
+                {
+                    debug_assert_eq!(*len, data_section.offset);
 
-                diagnostics::error(
-                    keyword_span,
-                    |error| {
-                        error.set_message(format!("{name} emitted outside of ROM"));
-                        error.add_label(diagnostics::error_label(keyword_span).with_message(
-                            format!(
-                                "a {} section is active here",
-                                data_sect.attrs.mem_region.name(),
-                            ),
-                        ));
-                        error.set_help("you can store the data in ROM while leaving labels pointing to RAM, using `load`");
-                    },
-                    nb_errors_left,
-                    options,
-                );
-                *len += nb_bytes;
+                    diagnostics::error(
+                        keyword_span,
+                        |error| {
+                            error.set_message(format!("{name} emitted outside of ROM"));
+                            error.add_label(diagnostics::error_label(keyword_span).with_message(
+                                format!(
+                                    "a {} section is active here",
+                                    data_sect.attrs.mem_region.name(),
+                                ),
+                            ));
+                            error.set_help("you can store the data in ROM while leaving labels pointing to RAM, using `load`");
+                        },
+                        nb_errors_left,
+                        options,
+                    );
+                    *len += nb_bytes;
+                } else {
+                    match &mut data_sect.bytes {
+                        Contents::Data(data) => {
+                            data.resize(MAX_SECTION_SIZE, options.runtime_opts.pad_byte)
+                        }
+                        Contents::NoData(len) => *len = MAX_SECTION_SIZE,
+                    }
+                }
             }
         }
 
