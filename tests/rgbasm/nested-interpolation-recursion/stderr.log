@@ -1,2 +1,9 @@
-FATAL: nested-interpolation-recursion.asm(2):
-    Recursion limit (64) exceeded
+error: maximum recursion depth exceeded
+   ╭─[ tests/rgbasm/nested-interpolation-recursion/test.asm:2:65 ]
+   │
+ 2 │ {{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{s}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}
+   │                                                                 ┬  
+   │                                                                 ╰── depth is 64 contexts here, cannot enter a new one
+───╯
+warning: Reached 1 error, any subsequent will not be printed
+1 error generated.
