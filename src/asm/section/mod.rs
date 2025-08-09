@@ -22,6 +22,7 @@ pub struct Sections {
     /// The first is the “data” section, the second is the “symbol” section.
     pub active_section: Option<(ActiveSection, ActiveSection)>,
     section_stack: Vec<(Span, Option<(ActiveSection, ActiveSection)>)>,
+    pub assertions: Vec<Assertion>,
 }
 type SectionId = usize; // Index into the `IndexMap`.
 
@@ -69,11 +70,20 @@ pub struct ActiveSection {
 
 #[derive(Debug)]
 pub struct Patch {
+    pub kind: PatchKind,
+    pub rest: LinkTimeExpr,
+}
+#[derive(Debug)]
+pub struct Assertion {
+    pub level: AssertLevel,
+    pub rest: LinkTimeExpr,
+}
+#[derive(Debug)]
+pub struct LinkTimeExpr {
     pub span: Span,
     pub expr: Expr,
-    pub kind: PatchKind,
     pub offset: usize,
-    pub pc: (SectionId, usize),
+    pub pc: Option<(SectionId, usize)>,
 }
 #[derive(Debug)]
 pub enum PatchKind {
@@ -83,6 +93,12 @@ pub enum PatchKind {
     Jr,
     // TODO: transfer the HRAM, `rst`, `bit`, `set`, and `res` RPN opcodes to patch kinds
 }
+#[derive(Debug, Clone, Copy)]
+pub enum AssertLevel {
+    Warn,
+    Error,
+    Fatal,
+}
 
 impl Sections {
     pub fn new() -> Self {
@@ -90,6 +106,7 @@ impl Sections {
             sections: IndexMap::with_hasher(FxBuildHasher),
             active_section: None,
             section_stack: vec![],
+            assertions: vec![],
         }
     }
 

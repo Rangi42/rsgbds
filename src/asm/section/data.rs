@@ -11,7 +11,7 @@ use crate::{
     Identifiers, Options,
 };
 
-use super::{ActiveSection, Contents, SectionKind, Sections};
+use super::{ActiveSection, Contents, LinkTimeExpr, SectionKind, Sections};
 
 const MAX_SECTION_SIZE: usize = 0x1_000_000;
 
@@ -225,11 +225,13 @@ impl Sections {
                         },
 
                         Err(Ok(expr)) => ctx.patches.push(Patch {
-                            span: instruction.span.clone(),
-                            expr,
                             kind: patch.kind,
-                            offset,
-                            pc: (ctx.symbol_section.id, ctx.symbol_section.offset),
+                            rest: LinkTimeExpr {
+                                span: instruction.span.clone(),
+                                expr,
+                                offset,
+                                pc: Some((ctx.symbol_section.id, ctx.symbol_section.offset)),
+                            },
                         }),
 
                         Err(Err(error)) => error.report(identifiers, nb_errors_left, options),
@@ -401,11 +403,13 @@ impl Sections {
 
             Err(Ok(expr)) => {
                 ctx.patches.push(Patch {
-                    span: expr.overall_span(),
-                    expr: expr.clone(),
                     kind: PatchKind::Byte,
-                    offset,
-                    pc: (ctx.symbol_section.id, ctx.symbol_section.offset),
+                    rest: LinkTimeExpr {
+                        span: expr.overall_span(),
+                        expr: expr.clone(),
+                        offset,
+                        pc: Some((ctx.symbol_section.id, ctx.symbol_section.offset)),
+                    },
                 });
 
                 ctx.data.push(Default::default());
@@ -456,11 +460,13 @@ impl Sections {
 
             Err(Ok(expr)) => {
                 ctx.patches.push(Patch {
-                    span: expr.overall_span(),
-                    expr: expr.clone(),
                     kind: PatchKind::Word,
-                    offset,
-                    pc: (ctx.symbol_section.id, ctx.symbol_section.offset),
+                    rest: LinkTimeExpr {
+                        span: expr.overall_span(),
+                        expr: expr.clone(),
+                        offset,
+                        pc: Some((ctx.symbol_section.id, ctx.symbol_section.offset)),
+                    },
                 });
 
                 ctx.data
@@ -489,11 +495,13 @@ impl Sections {
 
             Err(Ok(expr)) => {
                 ctx.patches.push(Patch {
-                    span: expr.overall_span(),
-                    expr: expr.clone(),
                     kind: PatchKind::Long,
-                    offset,
-                    pc: (ctx.symbol_section.id, ctx.symbol_section.offset),
+                    rest: LinkTimeExpr {
+                        span: expr.overall_span(),
+                        expr: expr.clone(),
+                        offset,
+                        pc: Some((ctx.symbol_section.id, ctx.symbol_section.offset)),
+                    },
                 });
 
                 ctx.data.extend_from_slice(&[

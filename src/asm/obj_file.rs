@@ -13,7 +13,7 @@ use crate::{
     common::section::MemRegion,
     diagnostics,
     expr::{BinOp, Expr, OpKind, UnOp},
-    section::{AddrConstraint, Contents, PatchKind, SectionKind, Sections},
+    section::{AddrConstraint, Contents, LinkTimeExpr, PatchKind, SectionKind, Sections},
     sources::{FileNode, NormalSpan, Span, SpanKind},
     symbols::{SymbolData, SymbolKind, Symbols},
     Identifier, Identifiers, Options,
@@ -165,7 +165,7 @@ fn register_symbols<'sym>(symbols: &'sym Symbols, sections: &Sections) -> SymReg
             .sections
             .iter()
             .flat_map(|(_name, sect)| &sect.patches)
-            .flat_map(|patch| patch.expr.ops().filter_map(|op| op.get_symbol()))
+            .flat_map(|patch| patch.rest.expr.ops().filter_map(|op| op.get_symbol()))
             .flat_map(|ident| {
                 let SymbolData::User {
                     definition: Span::Normal(span),
@@ -393,31 +393,50 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                     // Section patch counts have been checked earlier.
                     self.write_long(section.patches.len() as u32)?;
                     for patch in &section.patches {
-                        let Span::Normal(span) = &patch.span else {
-                            unreachable!("patch not defined normally!?")
-                        };
-                        let (node_id, line_no) = self.resolve_span(span);
-                        self.write_long(node_id)?;
-                        self.write_long(line_no)?;
-
-                        self.write_long(patch.offset as u32)?;
-
-                        self.write_long(patch.pc.0 as u32)?; // Section ID.
-                        self.write_long(patch.pc.1 as u32)?; // Offset.
-
-                        self.write_byte(match patch.kind {
-                            PatchKind::Byte => 0,
-                            PatchKind::Word => 1,
-                            PatchKind::Long => 2,
-                            PatchKind::Jr => 3,
-                        })?;
-
-                        self.write_expr(&patch.expr)?;
+                        self.write_link_time_expr(
+                            &patch.rest,
+                            match patch.kind {
+                                PatchKind::Byte => 0,
+                                PatchKind::Word => 1,
+                                PatchKind::Long => 2,
+                                PatchKind::Jr => 3,
+                            },
+                        )?;
                     }
                 }
             }
         }
         Ok(())
+    }
+
+    fn write_link_time_expr(
+        &mut self,
+        link_time_expr: &LinkTimeExpr,
+        type_byte: u8,
+    ) -> std::io::Result<()> {
+        let Span::Normal(span) = &link_time_expr.span else {
+            unreachable!("link-time expr not defined normally!?")
+        };
+        let (node_id, line_no) = self.resolve_span(span);
+        self.write_long(node_id)?;
+        self.write_long(line_no)?;
+
+        self.write_long(link_time_expr.offset as u32)?;
+
+        match link_time_expr.pc {
+            Some((sect_id, offset)) => {
+                self.write_long(sect_id as u32)?;
+                self.write_long(offset as u32)?;
+            }
+            None => {
+                self.write_long(u32::MAX)?;
+                self.write_long(Default::default())?;
+            }
+        }
+
+        self.write_byte(type_byte)?;
+
+        self.write_expr(&link_time_expr.expr)
     }
 
     fn write_expr(&mut self, expr: &Expr) -> std::io::Result<()> {

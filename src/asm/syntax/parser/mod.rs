@@ -351,7 +351,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
         tok!("xor") => emit(instructions::parse_xor(first_token, parse_ctx), parse_ctx),
 
         tok!("align") => directives::section::parse_align(first_token, parse_ctx),
-        tok!("assert") => directives::output::parse_assert(first_token, parse_ctx),
+        tok!("assert") => directives::output::parse_assert(first_token, parse_ctx)?,
         tok!("break") => directives::context::parse_break(first_token, parse_ctx),
         tok!("charmap") => directives::charmap::parse_charmap(first_token, parse_ctx),
         tok!("def") => directives::symbol::parse_def_or_redef(first_token, parse_ctx, None),
@@ -385,7 +385,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
         tok!("section") => directives::section::parse_section(first_token, parse_ctx),
         tok!("setcharmap") => directives::charmap::parse_setcharmap(first_token, parse_ctx),
         tok!("shift") => directives::parse_shift(first_token, parse_ctx),
-        tok!("static_assert") => directives::output::parse_static_assert(first_token, parse_ctx),
+        tok!("static_assert") => directives::output::parse_static_assert(first_token, parse_ctx)?,
         tok!("union") => directives::data::parse_union(first_token, parse_ctx),
         tok!("warn") => directives::output::parse_warn(first_token, parse_ctx),
 
