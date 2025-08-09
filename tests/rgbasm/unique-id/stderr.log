@@ -1,32 +1,239 @@
-error: unique-id.asm(11):
-    '\@' cannot be used outside of a macro or REPT/FOR block
-while expanding symbol "warn_unique"
-warning: unique-id.asm(11): [-Wuser]
-    !
-warning: unique-id.asm(12) -> unique-id.asm::m(4): [-Wuser]
-    _u1!
-warning: unique-id.asm(12) -> unique-id.asm::m(5) -> unique-id.asm::m::REPT~1(6): [-Wuser]
-    _u2!
-warning: unique-id.asm(12) -> unique-id.asm::m(5) -> unique-id.asm::m::REPT~2(6): [-Wuser]
-    _u3!
-warning: unique-id.asm(12) -> unique-id.asm::m(8): [-Wuser]
-    _u1!
-error: unique-id.asm(13):
-    '\@' cannot be used outside of a macro or REPT/FOR block
-while expanding symbol "warn_unique"
-warning: unique-id.asm(13): [-Wuser]
-    !
-warning: unique-id.asm(14) -> unique-id.asm::m(4): [-Wuser]
-    _u4!
-warning: unique-id.asm(14) -> unique-id.asm::m(5) -> unique-id.asm::m::REPT~1(6): [-Wuser]
-    _u5!
-warning: unique-id.asm(14) -> unique-id.asm::m(5) -> unique-id.asm::m::REPT~2(6): [-Wuser]
-    _u6!
-warning: unique-id.asm(14) -> unique-id.asm::m(8): [-Wuser]
-    _u4!
-error: unique-id.asm(15):
-    '\@' cannot be used outside of a macro or REPT/FOR block
-while expanding symbol "warn_unique"
-warning: unique-id.asm(15): [-Wuser]
-    !
-Assembly aborted with 3 errors!
+error: a unique identifier is not available in this context
+    ╭─[ warn_unique:1:7 ]
+    │
+  1 │ WARN "\@!"
+    │       ─┬  
+    │        ╰── cannot use `\@` here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:11:2 ]
+    │
+ 11 │     {warn_unique}
+    │     ──────┬──────  
+    │           ╰──────── interpolated here
+    │ 
+    │ Help: unique identifiers are available inside of macros and loops
+────╯
+[-Wuser] warning: !
+    ╭─[ warn_unique:1:1 ]
+    │
+  1 │ WARN "\@!"
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:11:2 ]
+    │
+ 11 │     {warn_unique}
+    │     ──────┬──────  
+    │           ╰──────── interpolated here
+────╯
+[-Wuser] warning: _u0!
+    ╭─[ warn_unique:1:1 ]
+    │
+  1 │ WARN "\@!"
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:4:2 ]
+    │
+  4 │     {warn_unique}
+    │     ──────┬──────  
+    │           ╰──────── interpolated here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:12:2 ]
+    │
+ 12 │     m
+    │     ┬  
+    │     ╰── macro called here
+────╯
+[-Wuser] warning: _u1!
+    ╭─[ warn_unique:1:1 ]
+    │
+  1 │ WARN "\@!"
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:6:3 ]
+    │
+  6 │        {warn_unique}
+    │        ──────┬──────  
+    │              ╰──────── interpolated here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:5:2 ]
+    │
+  5 │     REPT 2
+    │     ──┬─  
+    │       ╰─── loop beginning here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:12:2 ]
+    │
+ 12 │     m
+    │     ┬  
+    │     ╰── macro called here
+────╯
+[-Wuser] warning: _u2!
+    ╭─[ warn_unique:1:1 ]
+    │
+  1 │ WARN "\@!"
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:6:3 ]
+    │
+  6 │        {warn_unique}
+    │        ──────┬──────  
+    │              ╰──────── interpolated here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:5:2 ]
+    │
+  5 │     REPT 2
+    │     ──┬─  
+    │       ╰─── loop beginning here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:12:2 ]
+    │
+ 12 │     m
+    │     ┬  
+    │     ╰── macro called here
+────╯
+[-Wuser] warning: _u0!
+    ╭─[ warn_unique:1:1 ]
+    │
+  1 │ WARN "\@!"
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:8:2 ]
+    │
+  8 │     {warn_unique}
+    │     ──────┬──────  
+    │           ╰──────── interpolated here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:12:2 ]
+    │
+ 12 │     m
+    │     ┬  
+    │     ╰── macro called here
+────╯
+error: a unique identifier is not available in this context
+    ╭─[ warn_unique:1:7 ]
+    │
+  1 │ WARN "\@!"
+    │       ─┬  
+    │        ╰── cannot use `\@` here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:13:2 ]
+    │
+ 13 │     {warn_unique}
+    │     ──────┬──────  
+    │           ╰──────── interpolated here
+    │ 
+    │ Help: unique identifiers are available inside of macros and loops
+────╯
+[-Wuser] warning: !
+    ╭─[ warn_unique:1:1 ]
+    │
+  1 │ WARN "\@!"
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:13:2 ]
+    │
+ 13 │     {warn_unique}
+    │     ──────┬──────  
+    │           ╰──────── interpolated here
+────╯
+[-Wuser] warning: _u3!
+    ╭─[ warn_unique:1:1 ]
+    │
+  1 │ WARN "\@!"
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:4:2 ]
+    │
+  4 │     {warn_unique}
+    │     ──────┬──────  
+    │           ╰──────── interpolated here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:14:2 ]
+    │
+ 14 │     m
+    │     ┬  
+    │     ╰── macro called here
+────╯
+[-Wuser] warning: _u4!
+    ╭─[ warn_unique:1:1 ]
+    │
+  1 │ WARN "\@!"
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:6:3 ]
+    │
+  6 │        {warn_unique}
+    │        ──────┬──────  
+    │              ╰──────── interpolated here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:5:2 ]
+    │
+  5 │     REPT 2
+    │     ──┬─  
+    │       ╰─── loop beginning here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:14:2 ]
+    │
+ 14 │     m
+    │     ┬  
+    │     ╰── macro called here
+────╯
+[-Wuser] warning: _u5!
+    ╭─[ warn_unique:1:1 ]
+    │
+  1 │ WARN "\@!"
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:6:3 ]
+    │
+  6 │        {warn_unique}
+    │        ──────┬──────  
+    │              ╰──────── interpolated here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:5:2 ]
+    │
+  5 │     REPT 2
+    │     ──┬─  
+    │       ╰─── loop beginning here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:14:2 ]
+    │
+ 14 │     m
+    │     ┬  
+    │     ╰── macro called here
+────╯
+[-Wuser] warning: _u3!
+    ╭─[ warn_unique:1:1 ]
+    │
+  1 │ WARN "\@!"
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:8:2 ]
+    │
+  8 │     {warn_unique}
+    │     ──────┬──────  
+    │           ╰──────── interpolated here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:14:2 ]
+    │
+ 14 │     m
+    │     ┬  
+    │     ╰── macro called here
+────╯
+error: a unique identifier is not available in this context
+    ╭─[ warn_unique:1:7 ]
+    │
+  1 │ WARN "\@!"
+    │       ─┬  
+    │        ╰── cannot use `\@` here
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:15:2 ]
+    │
+ 15 │     {warn_unique}
+    │     ──────┬──────  
+    │           ╰──────── interpolated here
+    │ 
+    │ Help: unique identifiers are available inside of macros and loops
+────╯
+[-Wuser] warning: !
+    ╭─[ warn_unique:1:1 ]
+    │
+  1 │ WARN "\@!"
+    │
+    ├─[ tests/rgbasm/unique-id/test.asm:15:2 ]
+    │
+ 15 │     {warn_unique}
+    │     ──────┬──────  
+    │           ╰──────── interpolated here
+────╯
+3 errors generated.
