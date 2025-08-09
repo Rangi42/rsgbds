@@ -13,11 +13,15 @@ const RGBLINK_PATH: &str = "rgblink"; // TODO: use rsgblink when it's complete
 
 const ACTION_ENV_VAR_NAME: &str = "SNAPSHOTS_ASM";
 
+// Game Boy release date, 1989-04-21T12:34:56Z (for reproducible test results)
+const TIMESTAMP: &str = "609165296";
+
 fn run_test(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
     // We need to pass the path to `rgbasm`, but we don't really care for security.
     let obj_file = NamedTempFile::new().context("Unable to create temp obj file")?;
 
     let mut cmd = Command::new(RGBASM_PATH)
+        .env("SOURCE_DATE_EPOCH", TIMESTAMP)
         .arg(asm_path)
         .arg("-o")
         .arg(obj_file.path())
@@ -63,6 +67,7 @@ fn run_test(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
         let bin_file = NamedTempFile::new().context("Unable to create temp bin file")?;
 
         Command::new(RGBLINK_PATH)
+            .env("SOURCE_DATE_EPOCH", TIMESTAMP)
             .arg(obj_file.path())
             .arg("-o")
             .arg(bin_file.path())

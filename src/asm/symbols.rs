@@ -123,8 +123,42 @@ impl Symbols {
             );
         }
 
-        let now = chrono::Local::now();
-        let now_utc = now.with_timezone(&chrono::Utc);
+        // https://reproducible-builds.org/docs/source-date-epoch/
+        let (now_utc, now) = match std::env::var("SOURCE_DATE_EPOCH") {
+            Err(std::env::VarError::NotPresent) => Err(None),
+            Ok(var) => match var.parse() {
+                Ok(timestamp) => {
+                    use chrono::LocalResult;
+                    match Utc.timestamp_opt(timestamp, 0) {
+                        LocalResult::Single(now_utc) => {
+                            Ok((now_utc, now_utc.with_timezone(&Local)))
+                        }
+                        LocalResult::None => Err(Some("unrepresentable timestamp".into())),
+                        // The API promises not to return this.
+                        LocalResult::Ambiguous(_, _) => unreachable!("ambiguous timestamp!?"),
+                    }
+                }
+                Err(err) => Err(Some(err.to_string())),
+            },
+            Err(err @ std::env::VarError::NotUnicode(_)) => Err(Some(err.to_string())),
+        }
+        .unwrap_or_else(|res| {
+            if let Some(err) = res {
+                diagnostics::error(
+                    &Span::CommandLine,
+                    |error| {
+                        error.set_message(
+                            "unable to parse `SOURCE_DATE_EPOCH` environment variable",
+                        );
+                        error.set_note(err);
+                    },
+                    nb_errors_left,
+                    options,
+                )
+            }
+            let now = chrono::Local::now();
+            (now.with_timezone(&chrono::Utc), now)
+        });
         def_builtin(
             "__TIME__",
             string(now.format("\"%H:%M:%S\"").to_string().into()),
