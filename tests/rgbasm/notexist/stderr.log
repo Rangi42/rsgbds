@@ -1,0 +1,5 @@
+error: failed to open "tests/rgbasm/notexist/test.asm"
+  │ 
+  │ Note: No such file or directory (os error 2)
+──╯
+1 error generated.

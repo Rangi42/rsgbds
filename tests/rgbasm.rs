@@ -5,7 +5,9 @@ use tempfile::NamedTempFile;
 
 datatest_stable::harness! {
     { test = run_test, root = "tests/rgbasm", pattern = r"test\.asm$" },
-    // TODO: `version.asm`, `notexist.asn`, other special tests in `test.sh`
+    // Intentionally testing opening a file that doesn't exist.
+    { test = run_notexist_test, root = "tests/rgbasm", pattern = r"notexist/stderr\.log$" },
+    // TODO: `version.asm`, other special tests in `test.sh`
 }
 
 const RGBASM_PATH: &str = env!("CARGO_BIN_EXE_rgbasm");
@@ -15,6 +17,10 @@ const ACTION_ENV_VAR_NAME: &str = "SNAPSHOTS_ASM";
 
 // Game Boy release date, 1989-04-21T12:34:56Z (for reproducible test results)
 const TIMESTAMP: &str = "609165296";
+
+fn run_notexist_test(err_path: &Utf8Path) -> datatest_stable::Result<()> {
+    run_test(&err_path.with_file_name("test.asm"))
+}
 
 fn run_test(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
     // We need to pass the path to `rgbasm`, but we don't really care for security.
