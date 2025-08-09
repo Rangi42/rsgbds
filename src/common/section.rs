@@ -25,11 +25,11 @@ impl MemRegion {
     }
     pub fn max_addr(&self) -> u16 {
         match self {
-            Self::Rom0 => 0x3FFF,
+            Self::Rom0 => 0x7FFF, // In tiny mode.
             Self::Romx => 0x7FFF,
             Self::Vram => 0x9FFF,
             Self::Sram => 0xBFFF,
-            Self::Wram0 => 0xCFFF,
+            Self::Wram0 => 0xDFFF, // In unbanked-WRAM mode.
             Self::Wramx => 0xDFFF,
             Self::Oam => 0xFE9F,
             Self::Hram => 0xFFFE,
