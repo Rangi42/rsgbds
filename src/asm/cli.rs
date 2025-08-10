@@ -325,10 +325,11 @@ impl RuntimeOptions {
         };
 
         // Try to match the flag against a parametric warning.
-        for &(name, WarningKind(id), nb_levels) in &diagnostics::PARAMETRIC_WARNINGS {
+        for &(name, WarningKind(id), nb_levels, default_level) in &diagnostics::PARAMETRIC_WARNINGS
+        {
             if flag == name {
                 let level = match param {
-                    None => 1, // TODO: allow specifying other defaults
+                    None => default_level,
                     Some(level) => {
                         if level > nb_levels {
                             return Err(WarningParseErr::ParamOutOfRange(name, level, nb_levels));

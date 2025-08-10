@@ -33,8 +33,13 @@ struct Warning {
 
 #[derive(Debug)]
 enum WarningKind {
-    Boolean { meta_level: u8 },
-    Parametric { meta_levels: Vec<u8> },
+    Boolean {
+        meta_level: u8,
+    },
+    Parametric {
+        meta_levels: Vec<u8>,
+        default_level: u8,
+    },
 }
 
 const META_WARNINGS: [&str; 3] = ["all", "extra", "everything"];
@@ -115,7 +120,7 @@ const DEFAULT_WARNINGS: [MetaWarningKind; NB_WARNINGS] = ["
                 )
                 .unwrap();
             }
-            WarningKind::Parametric { meta_levels } => {
+            WarningKind::Parametric { meta_levels, .. } => {
                 for (level, meta_level) in meta_levels.iter().enumerate() {
                     writeln!(
                         &mut file,
@@ -153,15 +158,19 @@ pub(crate) const SIMPLE_WARNINGS: [(&str, WarningKind); NB_SIMPLE_WARNINGS] = ["
         "];
 const NB_SIMPLE_WARNINGS: usize = {nb_simple_warnings};
 
-pub(crate) const PARAMETRIC_WARNINGS: [(&str, WarningKind, usize); NB_PARAMETRIC_WARNINGS] = ["
+pub(crate) const PARAMETRIC_WARNINGS: [(&str, WarningKind, usize, usize); NB_PARAMETRIC_WARNINGS] = ["
     )
     .unwrap();
     let mut nb_parametric_warnings = 0;
     for warning in &warnings {
-        if let WarningKind::Parametric { meta_levels } = &warning.kind {
+        if let WarningKind::Parametric {
+            meta_levels,
+            default_level,
+        } = &warning.kind
+        {
             writeln!(
                 &mut file,
-                "\t(\"{}\", warning!(\"{}=1\"), {}),",
+                "\t(\"{}\", warning!(\"{}=1\"), {}, {default_level}),",
                 warning.name,
                 warning.name,
                 meta_levels.len(),
@@ -272,6 +281,7 @@ fn parse_all_warnings() -> Vec<Warning> {
         {
             // This is a parametric warning.
             let mut meta_levels = vec![];
+            let mut default_level = None;
 
             for f in std::fs::read_dir(&path).expect("Failed to list parametric warning directory")
             {
@@ -279,6 +289,16 @@ fn parse_all_warnings() -> Vec<Warning> {
                 let name = f.file_name();
 
                 if name == "descr.mdoc" {
+                    let line = read_first_line(&f.path(), &mut line_buf);
+
+                    let (name, value) = parse_directive(line);
+                    match name {
+                        "default-level" => {
+                            default_level =
+                                Some(value.parse().expect("Bad value for `default-level`"))
+                        }
+                        _ => panic!("Unknown descr.mdoc directive `{name}`"),
+                    }
                 } else {
                     // Parse the file name; it should be `<level>.mdoc`.
                     let level = name
@@ -354,7 +374,10 @@ fn parse_all_warnings() -> Vec<Warning> {
 
             (
                 warning.file_name().to_string_lossy().into(),
-                WarningKind::Parametric { meta_levels },
+                WarningKind::Parametric {
+                    meta_levels,
+                    default_level: default_level.expect("Missing descr.mdoc"),
+                },
             )
         } else {
             // This is a simple warning.
