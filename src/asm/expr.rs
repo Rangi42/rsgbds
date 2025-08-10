@@ -481,14 +481,16 @@ impl BinOp {
                 }
                 (Ok((lhs, left_span)), Ok((rhs, right_span))) => (Ok(lhs.wrapping_sub(rhs)))
                     .map(|value| (value, left_span.merged_with(&right_span))),
-                (Ok(_), Err(err)) | (Err(err), _) => Err(err),
+                (Ok(_), Err(err)) | (Err(err), _) => Err(err.bubble_up()),
             },
+            // TODO: symbol alignment can be constant
             BinOp::And => greedy!(|lhs, rhs| Ok(lhs & rhs)),
             BinOp::Or => greedy!(|lhs, rhs| Ok(lhs | rhs)),
             BinOp::Xor => greedy!(|lhs, rhs| Ok(lhs ^ rhs)),
-            BinOp::LeftShift => todo!(),
-            BinOp::RightShift => todo!(),
-            BinOp::UnsignedRightShift => todo!(),
+            // TODO: `-Wshift-amount`
+            BinOp::LeftShift => greedy!(|lhs, rhs| Ok(shift_left(lhs, rhs))),
+            BinOp::RightShift => greedy!(|lhs, rhs| Ok(shift_right(lhs, rhs))),
+            BinOp::UnsignedRightShift => greedy!(|lhs, rhs| Ok(shift_right_unsigned(lhs, rhs))),
             BinOp::Multiply => greedy!(|lhs, rhs| Ok((lhs as u32).wrapping_mul(rhs as u32) as i32)),
             BinOp::Divide => greedy!(|(lhs, left_span), (rhs, right_span)| if rhs == 0 {
                 Err(Error {
@@ -496,11 +498,69 @@ impl BinOp {
                     kind: ErrKind::DivBy0,
                 })
             } else {
-                Ok((lhs.wrapping_div(rhs), left_span.merged_with(&right_span)))
+                Ok((div_floor(lhs, rhs), left_span.merged_with(&right_span)))
             }),
-            BinOp::Modulo => todo!(),
+            BinOp::Modulo => greedy!(|(lhs, left_span), (rhs, right_span)| if rhs == 0 {
+                Err(Error {
+                    span: right_span,
+                    kind: ErrKind::DivBy0,
+                })
+            } else {
+                Ok((modulo(lhs, rhs), left_span.merged_with(&right_span)))
+            }),
             BinOp::Exponent => greedy!(|lhs, rhs| Ok(lhs.wrapping_pow(rhs as u32))),
         }
+    }
+}
+
+// From the Rust standard library, currently unstable.
+fn div_floor(lhs: i32, rhs: i32) -> i32 {
+    let d = lhs / rhs;
+    let r = lhs % rhs;
+
+    // If the remainder is non-zero, we need to subtract one if the
+    // signs of lhs and rhs differ, as this means we rounded upwards
+    // instead of downwards. We do this branchlessly by creating a mask
+    // which is all-ones iff the signs differ, and 0 otherwise. Then by
+    // adding this mask (which corresponds to the signed value -1), we
+    // get our correction.
+    let correction = (lhs ^ rhs) >> (i32::BITS - 1);
+    if r != 0 {
+        d + correction
+    } else {
+        d
+    }
+}
+fn modulo(lhs: i32, rhs: i32) -> i32 {
+    let remainder = lhs / rhs;
+    // Adjust module to have the sign of the divisor, not the sign of the dividend.
+    remainder + rhs * from_bool((remainder < 0) != (rhs < 0))
+}
+fn shift_left(lhs: i32, rhs: i32) -> i32 {
+    match rhs {
+        0..=31 => lhs << rhs,
+        32.. => 0,
+        rhs => shift_right(lhs, -rhs),
+    }
+}
+fn shift_right(lhs: i32, rhs: i32) -> i32 {
+    match rhs {
+        0..=31 => lhs >> rhs,
+        32.. => {
+            if lhs < 0 {
+                -1
+            } else {
+                0
+            }
+        }
+        rhs => shift_left(lhs, -rhs),
+    }
+}
+fn shift_right_unsigned(lhs: i32, rhs: i32) -> i32 {
+    match rhs {
+        0..=31 => ((lhs as u32) >> rhs) as i32,
+        32.. => 0,
+        rhs => shift_left(lhs, -rhs),
     }
 }
 

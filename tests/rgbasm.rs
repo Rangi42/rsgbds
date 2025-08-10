@@ -4,7 +4,7 @@ use snapbox::{cmd::Command, data::DataFormat, Assert, Data};
 use tempfile::NamedTempFile;
 
 datatest_stable::harness! {
-    { test = run_test, root = "tests/rgbasm", pattern = r"test\.asm$" },
+    { test = run_test, root = "tests/rgbasm", pattern = r"/test\.asm$" },
     // Intentionally testing opening a file that doesn't exist.
     { test = run_notexist_test, root = "tests/rgbasm", pattern = r"notexist/stderr\.log$" },
     // TODO: `version.asm`, other special tests in `test.sh`
