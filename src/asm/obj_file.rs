@@ -12,7 +12,9 @@ use crate::{
     common::section::MemRegion,
     diagnostics,
     expr::{BinOp, Expr, OpKind, UnOp},
-    section::{AddrConstraint, Contents, LinkTimeExpr, PatchKind, SectionKind, Sections},
+    section::{
+        AddrConstraint, AssertLevel, Contents, LinkTimeExpr, PatchKind, SectionKind, Sections,
+    },
     sources::{FileNode, NormalSpan, Span, SpanKind},
     symbols::{SymbolData, SymbolKind, Symbols},
     Identifier, Identifiers, Options,
@@ -104,7 +106,7 @@ pub fn emit(
     io_err(ctx.write_file_nodes())?;
     io_err(ctx.write_symbols())?;
     io_err(ctx.write_sections())?;
-    io_err(ctx.write_long(0))?; // TODO: assertions
+    io_err(ctx.write_assertions(usize_to_u32(ctx.sections.assertions.len(), "assertions")?))?;
 
     io_err(ctx.file.flush())?;
     Ok(())
@@ -404,6 +406,22 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                     }
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn write_assertions(&mut self, nb_asserts: u32) -> std::io::Result<()> {
+        self.write_long(nb_asserts)?;
+
+        for assertion in &self.sections.assertions {
+            self.write_link_time_expr(
+                &assertion.rest,
+                match assertion.level {
+                    AssertLevel::Warn => 0,
+                    AssertLevel::Error => 1,
+                    AssertLevel::Fatal => 2,
+                },
+            )?;
         }
         Ok(())
     }
