@@ -368,13 +368,13 @@ impl Sections {
     ) {
         match res {
             Ok((value, span)) => {
-                if *value < -255 || *value > 255 {
+                if *value < -256 || *value > 255 {
                     diagnostics::warn(
                         warning!("truncation=1"),
                         span,
                         |warning| {
                             warning.set_message("this expression's value is not 8-bit");
-                            warning.add_label(diagnostics::warning_label(span).with_message(format!("this expression evaluates to {value}, which is not between -255 and 255")));
+                            warning.add_label(diagnostics::warning_label(span).with_message(format!("this expression evaluates to {value}, which is not between -256 and 255")));
                             warning.set_help(
                                 "you can use the `low()` function to truncate an expression",
                             );
@@ -430,13 +430,13 @@ impl Sections {
     ) {
         match res {
             Ok((value, span)) => {
-                if *value < -65535 || *value > 65535 {
+                if *value < -65536 || *value > 65535 {
                     diagnostics::warn(
                         warning!("truncation=1"),
                         span,
                         |warning| {
                             warning.set_message("this expression's value is not 16-bit");
-                            warning.add_label(diagnostics::warning_label(span).with_message(format!("this expression evaluates to {value}, which is not between -65535 and 65535")));
+                            warning.add_label(diagnostics::warning_label(span).with_message(format!("this expression evaluates to {value}, which is not between -65536 and 65535")));
                         },
                         ctx.nb_errors_left,
                         ctx.options,

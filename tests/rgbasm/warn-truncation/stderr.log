@@ -1,64 +1,449 @@
-warning: warn-truncation.asm(35) -> warn-truncation.asm::try(23): [-Wtruncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-warning: warn-truncation.asm(35) -> warn-truncation.asm::try(24): [-Wtruncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-warning: warn-truncation.asm(35) -> warn-truncation.asm::try(25): [-Wtruncation]
-    Expression must be 16-bit
-warning: warn-truncation.asm(35) -> warn-truncation.asm::try(26): [-Wtruncation]
-    Expression must be 16-bit
-warning: warn-truncation.asm(35) -> warn-truncation.asm::try(28): [-Wtruncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-warning: warn-truncation.asm(35) -> warn-truncation.asm::try(29): [-Wtruncation]
-    Expression must be 16-bit
-warning: warn-truncation.asm(35) -> warn-truncation.asm::try(30): [-Wtruncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-warning: warn-truncation.asm(35) -> warn-truncation.asm::try(31): [-Wtruncation]
-    Expression must be 16-bit
-warning: warn-truncation.asm(37) -> warn-truncation.asm::try(23): [-Wtruncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-warning: warn-truncation.asm(37) -> warn-truncation.asm::try(24): [-Wtruncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-warning: warn-truncation.asm(37) -> warn-truncation.asm::try(25): [-Wtruncation]
-    Expression must be 16-bit
-warning: warn-truncation.asm(37) -> warn-truncation.asm::try(26): [-Wtruncation]
-    Expression must be 16-bit
-warning: warn-truncation.asm(38) -> warn-truncation.asm::try(23): [-Wtruncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-warning: warn-truncation.asm(38) -> warn-truncation.asm::try(24): [-Wtruncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-warning: warn-truncation.asm(38) -> warn-truncation.asm::try(25): [-Wtruncation]
-    Expression must be 16-bit
-warning: warn-truncation.asm(38) -> warn-truncation.asm::try(26): [-Wtruncation]
-    Expression must be 16-bit
-warning: warn-truncation.asm(38) -> warn-truncation.asm::try(28): [-Wtruncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-warning: warn-truncation.asm(38) -> warn-truncation.asm::try(29): [-Wtruncation]
-    Expression must be 16-bit
-warning: warn-truncation.asm(38) -> warn-truncation.asm::try(30): [-Wtruncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-warning: warn-truncation.asm(38) -> warn-truncation.asm::try(31): [-Wtruncation]
-    Expression must be 16-bit
-error: warn-truncation.asm(39) -> warn-truncation.asm::try(23): [-Werror=truncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-error: warn-truncation.asm(39) -> warn-truncation.asm::try(24): [-Werror=truncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-error: warn-truncation.asm(39) -> warn-truncation.asm::try(25): [-Werror=truncation]
-    Expression must be 16-bit
-error: warn-truncation.asm(39) -> warn-truncation.asm::try(26): [-Werror=truncation]
-    Expression must be 16-bit
-error: warn-truncation.asm(40) -> warn-truncation.asm::try(23): [-Werror=truncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-error: warn-truncation.asm(40) -> warn-truncation.asm::try(24): [-Werror=truncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-error: warn-truncation.asm(40) -> warn-truncation.asm::try(25): [-Werror=truncation]
-    Expression must be 16-bit
-error: warn-truncation.asm(40) -> warn-truncation.asm::try(26): [-Werror=truncation]
-    Expression must be 16-bit
-error: warn-truncation.asm(40) -> warn-truncation.asm::try(28): [-Werror=truncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-error: warn-truncation.asm(40) -> warn-truncation.asm::try(29): [-Werror=truncation]
-    Expression must be 16-bit
-error: warn-truncation.asm(40) -> warn-truncation.asm::try(30): [-Werror=truncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-error: warn-truncation.asm(40) -> warn-truncation.asm::try(31): [-Werror=truncation]
-    Expression must be 16-bit
+[-Wtruncation=1] warning: this expression's value is not 8-bit
+    ╭─[ test.asm:23:5 ]
+    │
+ 23 │     db 1 << 8
+    │        ───┬──  
+    │           ╰──── this expression evaluates to 256, which is not between -256 and 255
+    │
+    ├─[ test.asm:35:2 ]
+    │
+ 35 │     try Wtruncation
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=1] warning: this expression's value is not 8-bit
+    ╭─[ test.asm:24:5 ]
+    │
+ 24 │     db ~(1 << 8)
+    │        ────┬───  
+    │            ╰───── this expression evaluates to -257, which is not between -256 and 255
+    │
+    ├─[ test.asm:35:2 ]
+    │
+ 35 │     try Wtruncation
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=1] warning: this expression's value is not 16-bit
+    ╭─[ test.asm:25:5 ]
+    │
+ 25 │     dw $1d200
+    │        ───┬──  
+    │           ╰──── this expression evaluates to 119296, which is not between -65536 and 65535
+    │
+    ├─[ test.asm:35:2 ]
+    │
+ 35 │     try Wtruncation
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=1] warning: this expression's value is not 16-bit
+    ╭─[ test.asm:26:5 ]
+    │
+ 26 │     dw -$1d200
+    │        ───┬───  
+    │           ╰───── this expression evaluates to -119296, which is not between -65536 and 65535
+    │
+    ├─[ test.asm:35:2 ]
+    │
+ 35 │     try Wtruncation
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=2] warning: this expression's value doesn't seem to be 8-bit
+    ╭─[ test.asm:28:5 ]
+    │
+ 28 │     db ~(1 << BAR_F)
+    │        ──────┬─────  
+    │              ╰─────── this expression evaluates to -129, which is not between -128 and 255
+    │
+    ├─[ test.asm:35:2 ]
+    │
+ 35 │     try Wtruncation
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=2] warning: this expression's value doesn't seem to be 16-bit
+    ╭─[ test.asm:29:5 ]
+    │
+ 29 │     dw -wLabel
+    │        ───┬───  
+    │           ╰───── this expression evaluates to -54528, which is not between -32767 and 65535
+    │
+    ├─[ test.asm:35:2 ]
+    │
+ 35 │     try Wtruncation
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=2] warning: this expression's value doesn't seem to be 8-bit
+    ╭─[ test.asm:30:5 ]
+    │
+ 30 │     db ~$ff
+    │        ──┬─  
+    │          ╰─── this expression evaluates to -256, which is not between -128 and 255
+    │
+    ├─[ test.asm:35:2 ]
+    │
+ 35 │     try Wtruncation
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=2] warning: this expression's value doesn't seem to be 16-bit
+    ╭─[ test.asm:31:5 ]
+    │
+ 31 │     dw ~$ffff
+    │        ───┬──  
+    │           ╰──── this expression evaluates to -65536, which is not between -32767 and 65535
+    │
+    ├─[ test.asm:35:2 ]
+    │
+ 35 │     try Wtruncation
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=1] warning: this expression's value is not 8-bit
+    ╭─[ test.asm:23:5 ]
+    │
+ 23 │     db 1 << 8
+    │        ───┬──  
+    │           ╰──── this expression evaluates to 256, which is not between -256 and 255
+    │
+    ├─[ test.asm:37:2 ]
+    │
+ 37 │     try Wtruncation=1
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=1] warning: this expression's value is not 8-bit
+    ╭─[ test.asm:24:5 ]
+    │
+ 24 │     db ~(1 << 8)
+    │        ────┬───  
+    │            ╰───── this expression evaluates to -257, which is not between -256 and 255
+    │
+    ├─[ test.asm:37:2 ]
+    │
+ 37 │     try Wtruncation=1
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=1] warning: this expression's value is not 16-bit
+    ╭─[ test.asm:25:5 ]
+    │
+ 25 │     dw $1d200
+    │        ───┬──  
+    │           ╰──── this expression evaluates to 119296, which is not between -65536 and 65535
+    │
+    ├─[ test.asm:37:2 ]
+    │
+ 37 │     try Wtruncation=1
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=1] warning: this expression's value is not 16-bit
+    ╭─[ test.asm:26:5 ]
+    │
+ 26 │     dw -$1d200
+    │        ───┬───  
+    │           ╰───── this expression evaluates to -119296, which is not between -65536 and 65535
+    │
+    ├─[ test.asm:37:2 ]
+    │
+ 37 │     try Wtruncation=1
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=1] warning: this expression's value is not 8-bit
+    ╭─[ test.asm:23:5 ]
+    │
+ 23 │     db 1 << 8
+    │        ───┬──  
+    │           ╰──── this expression evaluates to 256, which is not between -256 and 255
+    │
+    ├─[ test.asm:38:2 ]
+    │
+ 38 │     try Wtruncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=1] warning: this expression's value is not 8-bit
+    ╭─[ test.asm:24:5 ]
+    │
+ 24 │     db ~(1 << 8)
+    │        ────┬───  
+    │            ╰───── this expression evaluates to -257, which is not between -256 and 255
+    │
+    ├─[ test.asm:38:2 ]
+    │
+ 38 │     try Wtruncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=1] warning: this expression's value is not 16-bit
+    ╭─[ test.asm:25:5 ]
+    │
+ 25 │     dw $1d200
+    │        ───┬──  
+    │           ╰──── this expression evaluates to 119296, which is not between -65536 and 65535
+    │
+    ├─[ test.asm:38:2 ]
+    │
+ 38 │     try Wtruncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=1] warning: this expression's value is not 16-bit
+    ╭─[ test.asm:26:5 ]
+    │
+ 26 │     dw -$1d200
+    │        ───┬───  
+    │           ╰───── this expression evaluates to -119296, which is not between -65536 and 65535
+    │
+    ├─[ test.asm:38:2 ]
+    │
+ 38 │     try Wtruncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=2] warning: this expression's value doesn't seem to be 8-bit
+    ╭─[ test.asm:28:5 ]
+    │
+ 28 │     db ~(1 << BAR_F)
+    │        ──────┬─────  
+    │              ╰─────── this expression evaluates to -129, which is not between -128 and 255
+    │
+    ├─[ test.asm:38:2 ]
+    │
+ 38 │     try Wtruncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=2] warning: this expression's value doesn't seem to be 16-bit
+    ╭─[ test.asm:29:5 ]
+    │
+ 29 │     dw -wLabel
+    │        ───┬───  
+    │           ╰───── this expression evaluates to -54528, which is not between -32767 and 65535
+    │
+    ├─[ test.asm:38:2 ]
+    │
+ 38 │     try Wtruncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=2] warning: this expression's value doesn't seem to be 8-bit
+    ╭─[ test.asm:30:5 ]
+    │
+ 30 │     db ~$ff
+    │        ──┬─  
+    │          ╰─── this expression evaluates to -256, which is not between -128 and 255
+    │
+    ├─[ test.asm:38:2 ]
+    │
+ 38 │     try Wtruncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=2] warning: this expression's value doesn't seem to be 16-bit
+    ╭─[ test.asm:31:5 ]
+    │
+ 31 │     dw ~$ffff
+    │        ───┬──  
+    │           ╰──── this expression evaluates to -65536, which is not between -32767 and 65535
+    │
+    ├─[ test.asm:38:2 ]
+    │
+ 38 │     try Wtruncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=1] error: this expression's value is not 8-bit
+    ╭─[ test.asm:23:5 ]
+    │
+ 23 │     db 1 << 8
+    │        ───┬──  
+    │           ╰──── this expression evaluates to 256, which is not between -256 and 255
+    │
+    ├─[ test.asm:39:2 ]
+    │
+ 39 │     try Werror=truncation=1
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=1] error: this expression's value is not 8-bit
+    ╭─[ test.asm:24:5 ]
+    │
+ 24 │     db ~(1 << 8)
+    │        ────┬───  
+    │            ╰───── this expression evaluates to -257, which is not between -256 and 255
+    │
+    ├─[ test.asm:39:2 ]
+    │
+ 39 │     try Werror=truncation=1
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=1] error: this expression's value is not 16-bit
+    ╭─[ test.asm:25:5 ]
+    │
+ 25 │     dw $1d200
+    │        ───┬──  
+    │           ╰──── this expression evaluates to 119296, which is not between -65536 and 65535
+    │
+    ├─[ test.asm:39:2 ]
+    │
+ 39 │     try Werror=truncation=1
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=1] error: this expression's value is not 16-bit
+    ╭─[ test.asm:26:5 ]
+    │
+ 26 │     dw -$1d200
+    │        ───┬───  
+    │           ╰───── this expression evaluates to -119296, which is not between -65536 and 65535
+    │
+    ├─[ test.asm:39:2 ]
+    │
+ 39 │     try Werror=truncation=1
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=1] error: this expression's value is not 8-bit
+    ╭─[ test.asm:23:5 ]
+    │
+ 23 │     db 1 << 8
+    │        ───┬──  
+    │           ╰──── this expression evaluates to 256, which is not between -256 and 255
+    │
+    ├─[ test.asm:40:2 ]
+    │
+ 40 │     try Werror=truncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=1] error: this expression's value is not 8-bit
+    ╭─[ test.asm:24:5 ]
+    │
+ 24 │     db ~(1 << 8)
+    │        ────┬───  
+    │            ╰───── this expression evaluates to -257, which is not between -256 and 255
+    │
+    ├─[ test.asm:40:2 ]
+    │
+ 40 │     try Werror=truncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=1] error: this expression's value is not 16-bit
+    ╭─[ test.asm:25:5 ]
+    │
+ 25 │     dw $1d200
+    │        ───┬──  
+    │           ╰──── this expression evaluates to 119296, which is not between -65536 and 65535
+    │
+    ├─[ test.asm:40:2 ]
+    │
+ 40 │     try Werror=truncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=1] error: this expression's value is not 16-bit
+    ╭─[ test.asm:26:5 ]
+    │
+ 26 │     dw -$1d200
+    │        ───┬───  
+    │           ╰───── this expression evaluates to -119296, which is not between -65536 and 65535
+    │
+    ├─[ test.asm:40:2 ]
+    │
+ 40 │     try Werror=truncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=2] error: this expression's value doesn't seem to be 8-bit
+    ╭─[ test.asm:28:5 ]
+    │
+ 28 │     db ~(1 << BAR_F)
+    │        ──────┬─────  
+    │              ╰─────── this expression evaluates to -129, which is not between -128 and 255
+    │
+    ├─[ test.asm:40:2 ]
+    │
+ 40 │     try Werror=truncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=2] error: this expression's value doesn't seem to be 16-bit
+    ╭─[ test.asm:29:5 ]
+    │
+ 29 │     dw -wLabel
+    │        ───┬───  
+    │           ╰───── this expression evaluates to -54528, which is not between -32767 and 65535
+    │
+    ├─[ test.asm:40:2 ]
+    │
+ 40 │     try Werror=truncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+[-Wtruncation=2] error: this expression's value doesn't seem to be 8-bit
+    ╭─[ test.asm:30:5 ]
+    │
+ 30 │     db ~$ff
+    │        ──┬─  
+    │          ╰─── this expression evaluates to -256, which is not between -128 and 255
+    │
+    ├─[ test.asm:40:2 ]
+    │
+ 40 │     try Werror=truncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: you can use the `low()` function to truncate an expression
+────╯
+[-Wtruncation=2] error: this expression's value doesn't seem to be 16-bit
+    ╭─[ test.asm:31:5 ]
+    │
+ 31 │     dw ~$ffff
+    │        ───┬──  
+    │           ╰──── this expression evaluates to -65536, which is not between -32767 and 65535
+    │
+    ├─[ test.asm:40:2 ]
+    │
+ 40 │     try Werror=truncation=2
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+12 errors generated.
