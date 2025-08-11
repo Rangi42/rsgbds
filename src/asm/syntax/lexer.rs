@@ -1826,7 +1826,7 @@ impl Lexer {
             !span.bytes.is_empty(),
             "Consume the first char before calling `read_identifier`"
         );
-        debug_assert!(matches!(first_char, chars!(ident_start)));
+        debug_assert!(matches!(first_char, chars!(ident_start) | '.'));
 
         let mut name = CompactString::default();
         let local_without_scope = if first_char == '.' {
