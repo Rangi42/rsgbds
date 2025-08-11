@@ -202,6 +202,7 @@ fn parse_section_attrs(
                     }
                 };
 
+                let align_size = 1 << align;
                 let align_ofs = if matches_tok!(after_expr, ",") {
                     lookahead = parse_ctx.next_token();
                     // Allow a trailing comma.
@@ -209,17 +210,17 @@ fn parse_section_attrs(
                     lookahead = after_expr;
                     maybe_expr.map_or(0, |expr| {
                         match parse_ctx.try_const_eval(&expr) {
-                            Ok((value, span)) => if (value as u32) >= (1 << align) {
-                                parse_ctx.error(&span, |error| {
-                                    error.set_message("alignment offset is larger than the alignment");
-                                    error.add_label(
-                                        diagnostics::error_label(&span)
-                                            .with_message(format!("this expression evaluates to {value}, which is larger than 1 << {align}"))
-                                    );
-                                });
-                                (1 << align) - 1
-                            } else {
-                                value as u16
+                            Ok((value, span)) => {
+                                if value >= align_size || value <= -align_size {
+                                    parse_ctx.warn(warning!("align-ofs"), &span, |warning| {
+                                        warning.set_message("alignment offset is larger than alignment size");
+                                        warning.add_label(
+                                            diagnostics::warning_label(&span)
+                                                .with_message(format!("requested an alignment to {align_size} bytes and an offset of {value} bytes")),
+                                        );
+                                    });
+                                }
+                                value.rem_euclid(align_size) as u16
                             },
                             Err(err) => {
                                 parse_ctx.report_expr_error(err);
@@ -454,15 +455,16 @@ pub(in super::super) fn parse_align(keyword: Token, parse_ctx: &mut parse_ctx!()
             };
 
             let align_size = 1 << alignment;
-            let offset = if offset >= align_size || offset <= -align_size {
+            if offset >= align_size || offset <= -align_size {
                 parse_ctx.warn(warning!("align-ofs"), &keyword.span, |warning| {
-                warning.set_message("alignment offset is larger than alignment size");
-                warning.add_label(diagnostics::warning_label(&keyword.span).with_message(format!("requested an alignment to ${align_size:02X} bytes and an offset of ${offset:02X} bytes")));
-            });
-                (offset % align_size) as u16
-            } else {
-                offset as u16
+                    warning.set_message("alignment offset is larger than alignment size");
+                    warning.add_label(
+                        diagnostics::warning_label(&keyword.span)
+                            .with_message(format!("requested an alignment to ${align_size:02X} bytes and an offset of ${offset:02X} bytes")),
+                    );
+                });
             };
+            let offset = offset.rem_euclid(align_size) as u16;
 
             if let Some((_data_section, symbol_section)) =
                 parse_ctx.sections.active_section.as_mut()

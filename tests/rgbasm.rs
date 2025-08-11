@@ -57,12 +57,14 @@ fn run_test(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
 
     let err_file_path = asm_path.with_file_name("stderr.log");
     let result = if err_file_path.exists() {
-        result.failure().stderr_eq(
+        // Note that the presence of a stderr log does not indicate failure is expected;
+        // possibly the log contains only warnings.
+        result.stderr_eq(
             Data::try_read_from(err_file_path.as_std_path(), Some(DataFormat::Text))
                 .context("Error reading errput")?,
         )
     } else {
-        result.success()
+        result.success().stderr_eq([].as_slice())
     };
 
     let out_file_path = asm_path.with_file_name("stdout.log");
