@@ -9,7 +9,11 @@ use crate::{
     Options,
 };
 
-use super::{expect_one_of, matches_tok, parse_ctx, string};
+use super::{
+    expect_one_of, matches_tok,
+    misc::{self, StrOrNum},
+    parse_ctx, string,
+};
 
 // The implementation strategy is a Pratt parser.
 //
@@ -55,13 +59,42 @@ fn parse_subexpr(
         },
         Token { span } @ |"identifier"(ident, _)| => {
             let lookahead = parse_ctx.next_token();
-            if matches_tok!(lookahead, "(") {
-                todo!(); // Function call.
+            if matches_tok!(lookahead, "(") { // Function call.
+                let (expr, _opening_span, closing_span, lookahead) = misc::parse_parens_pair(lookahead, parse_ctx, |lookahead, parse_ctx| {
+                    todo!();
+                });
+                todo!();
+                (expr, lookahead)
             } else {
                 (Expr::symbol(ident, span), lookahead)
             }
         },
 
+        Token { span } @ |"bank"| => {
+            let (res, _opening_span, closing_span, lookahead) = misc::parse_parens_pair(parse_ctx.next_token(), parse_ctx, |lookahead, parse_ctx| {
+                let (maybe_string, lookahead) = string::parse_string_expr(lookahead, parse_ctx);
+                match maybe_string {
+                    Some((string, _span)) => (Some(Ok(string)), lookahead),
+                    None => expect_one_of! { lookahead => {
+                        |"identifier"(ident, _)| => (Some(Err(ident)), parse_ctx.next_token()),
+                        else |unexpected| => {
+                            parse_ctx.report_syntax_error(&unexpected, |error, span| {
+                                error.add_label(diagnostics::error_label(span).with_message("expected an identifier or string expression between the parentheses"));
+                            });
+                            (None, unexpected)
+                        }
+                    }}
+                }
+            });
+
+            let span = span.merged_with(&closing_span);
+            let expr = match res {
+                None => Expr::nothing(span),
+                Some(Ok(string)) => Expr::bank_of_section(string, span),
+                Some(Err(ident)) => Expr::bank_of_symbol(ident, span)
+            };
+            (expr, lookahead)
+        },
         // TODO: all of the function calls...
 
         else |other| => {

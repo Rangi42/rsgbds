@@ -450,6 +450,10 @@ impl Section {
         }
     }
 
+    pub fn bank(&self) -> Option<u32> {
+        self.attrs.bank
+    }
+
     pub fn bytes_until_alignment(&self, alignment: u8, offset: u16, ofs_into_sect: usize) -> usize {
         let (cur_align, cur_offset) = match self.attrs.address {
             AddrConstraint::None => return 0, // The section is going to be newly constrained.

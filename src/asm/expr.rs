@@ -1,5 +1,7 @@
 use std::cell::Cell;
 
+use compact_str::CompactString;
+
 use crate::{
     diagnostics,
     macro_args::MacroArgs,
@@ -24,10 +26,12 @@ pub struct Op {
     pub kind: OpKind,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum OpKind {
     Number(i32),
     Symbol(Identifier),
+    BankOfSym(Identifier),
+    BankOfSect(CompactString),
     Binary(BinOp),
     Unary(UnOp),
     Low,
@@ -57,6 +61,9 @@ enum ErrKind {
         name: Identifier,
         just_the_sym: bool,
     },
+    SymBankNotConst(Identifier),
+    BankOfNonLabel(Identifier, &'static str),
+    SectBankNotConst(CompactString),
     DivBy0,
     RstRange(i32),
     LdhRange(i32),
@@ -91,6 +98,20 @@ impl Expr {
         Self::from_terminal(Op {
             span,
             kind: OpKind::Symbol(name),
+        })
+    }
+
+    pub fn bank_of_symbol(name: Identifier, span: Span) -> Self {
+        Self::from_terminal(Op {
+            span,
+            kind: OpKind::BankOfSym(name),
+        })
+    }
+
+    pub fn bank_of_section(name: CompactString, span: Span) -> Self {
+        Self::from_terminal(Op {
+            span,
+            kind: OpKind::BankOfSect(name),
         })
     }
 }
@@ -163,9 +184,9 @@ impl Expr {
 
         let mut eval_stack = vec![];
         for op in &self.payload {
-            let res = match op.kind {
-                OpKind::Number(value) => Ok((value, op.span.clone())),
-                OpKind::Symbol(name) => match symbols.find(&name) {
+            let res = match &op.kind {
+                &OpKind::Number(value) => Ok((value, op.span.clone())),
+                &OpKind::Symbol(name) => match symbols.find(&name) {
                     None => Err(Error {
                         span: op.span.clone(),
                         kind: ErrKind::SymNotFound(name),
@@ -182,6 +203,42 @@ impl Expr {
                                 name,
                                 just_the_sym: true,
                             },
+                        }),
+                    },
+                },
+                &OpKind::BankOfSym(name) => match symbols.find(&name) {
+                    None => Err(Error {
+                        span: op.span.clone(),
+                        kind: ErrKind::SymNotFound(name),
+                    }),
+                    Some(SymbolData::Deleted(span)) => Err(Error {
+                        span: op.span.clone(),
+                        kind: ErrKind::SymDeleted(name, span.clone()),
+                    }),
+                    Some(sym) => match sym.get_section_and_offset(sections) {
+                        Some((sect_id, _ofs)) => match sections.sections[sect_id].bank() {
+                            Some(value) => Ok((value as i32, op.span.clone())),
+                            None => Err(Error {
+                                span: op.span.clone(),
+                                kind: ErrKind::SymBankNotConst(name),
+                            }),
+                        },
+                        None => Err(Error {
+                            span: op.span.clone(),
+                            kind: ErrKind::BankOfNonLabel(name, sym.kind_name()),
+                        }),
+                    },
+                },
+                OpKind::BankOfSect(name) => match sections.sections.get(name) {
+                    None => Err(Error {
+                        span: op.span.clone(),
+                        kind: ErrKind::SectBankNotConst(name.clone()),
+                    }),
+                    Some(section) => match section.bank() {
+                        Some(value) => Ok((value as i32, op.span.clone())),
+                        None => Err(Error {
+                            span: op.span.clone(),
+                            kind: ErrKind::SectBankNotConst(name.clone()),
                         }),
                     },
                 },
@@ -235,7 +292,7 @@ impl Expr {
                         Err(err) => Err(err.bubble_up()),
                     }
                 }
-                OpKind::BitCheck(or_mask) => {
+                &OpKind::BitCheck(or_mask) => {
                     let value = eval_stack.pop().unwrap();
                     match value {
                         Ok((number @ 0..=7, span)) => Ok((number | i32::from(or_mask), span)),
@@ -291,7 +348,7 @@ impl Expr {
                         .iter()
                         .map(|op| Op {
                             span: op.span.clone(),
-                            kind: match op.kind {
+                            kind: match &op.kind {
                                 // Eagerly evaluate symbols that can be.
                                 OpKind::Symbol(name) => match symbols
                                     .find(&name)
@@ -300,9 +357,9 @@ impl Expr {
                                     Some(value) => OpKind::Number(value),
                                     // TODO: we might want to create a `Ref` here;
                                     // but we'd need to also ensure it doesn't get deleted, even after it gets replaced...
-                                    None => OpKind::Symbol(name),
+                                    None => OpKind::Symbol(*name),
                                 },
-                                kind => kind,
+                                kind => kind.clone(),
                             },
                         })
                         .collect(),
@@ -332,17 +389,19 @@ impl Expr {
 }
 
 impl Op {
+    /// Returns whether the operation references a symbol; used for the object file emission.
     pub fn get_symbol(&self) -> Option<Identifier> {
         match self.kind {
-            OpKind::Symbol(ident) => Some(ident),
-            OpKind::Number(_)
-            | OpKind::Binary(_)
-            | OpKind::Unary(_)
+            OpKind::Symbol(ident) | OpKind::BankOfSym(ident) => Some(ident),
+            OpKind::Number(..)
+            | OpKind::BankOfSect(..)
+            | OpKind::Binary(..)
+            | OpKind::Unary(..)
             | OpKind::Low
             | OpKind::High
             | OpKind::Rst
             | OpKind::Ldh
-            | OpKind::BitCheck(_)
+            | OpKind::BitCheck(..)
             | OpKind::Nothing => None,
         }
     }
@@ -647,6 +706,24 @@ impl ErrKind {
             Self::SymNotConst { name, .. } => (
                 format!("`{}` is not constant", identifiers.resolve(*name).unwrap()),
                 "this symbol's value is not known at this point".into(),
+            ),
+            Self::SymBankNotConst(name) => (
+                format!(
+                    "the bank of `{}` is not constant",
+                    identifiers.resolve(*name).unwrap(),
+                ),
+                "this symbol's bank is not known at this point".into(),
+            ),
+            ErrKind::BankOfNonLabel(name, kind_name) => (
+                format!(
+                    "requested the bank of `{}`, which is not a label",
+                    identifiers.resolve(*name).unwrap(),
+                ),
+                format!("this symbol is a {kind_name}"),
+            ),
+            Self::SectBankNotConst(name) => (
+                format!("the bank of \"{name}\" is not constant",),
+                "this section's bank is not known at this point".into(),
             ),
             Self::DivBy0 => ("division by zero".into(), "this is equal to zero".into()),
             Self::RstRange(value) => (

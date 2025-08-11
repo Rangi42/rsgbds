@@ -58,13 +58,42 @@ pub(super) fn parse_str_or_expr(
     if let Some(expr) = maybe_expr {
         (Some(StrOrNum::Num(expr)), lookahead)
     } else {
-        parse_ctx.error(&lookahead.span, |error| {
-            error.set_message(format!("syntax error: unexpected {}", lookahead.payload));
+        parse_ctx.report_syntax_error(&lookahead, |error, span| {
             error.add_label(
-                diagnostics::error_label(&lookahead.span)
+                diagnostics::error_label(span)
                     .with_message("expected a numeric or string expression"),
             );
         });
         (None, lookahead)
     }
+}
+
+pub(super) fn parse_parens_pair<Ret, F: FnOnce(Token, &mut parse_ctx!()) -> (Ret, Token)>(
+    lookahead: Token,
+    parse_ctx: &mut parse_ctx!(),
+    callback: F,
+) -> (Ret, Span, Span, Token) {
+    let (opening_span, lookahead) = expect_one_of! { lookahead => {
+        |"("| => (lookahead.span, parse_ctx.next_token()),
+        else |unexpected| => {
+            parse_ctx.report_syntax_error(&unexpected, |error,span| {
+                error.add_label(diagnostics::error_label(span).with_message("expected an opening parenthesis"));
+            });
+            (unexpected.span.clone(), unexpected)
+        }
+    }};
+
+    let (res, lookahead) = callback(lookahead, parse_ctx);
+
+    let (closing_span, lookahead) = expect_one_of! { lookahead => {
+        |")"| => (lookahead.span, parse_ctx.next_token()),
+        else |unexpected| => {
+            parse_ctx.report_syntax_error(&unexpected, |error,span| {
+                error.add_label(diagnostics::error_label(span).with_message("expected a closing parenthesis"));
+            });
+            (unexpected.span.clone(), unexpected)
+        }
+    }};
+
+    (res, opening_span, closing_span, lookahead)
 }

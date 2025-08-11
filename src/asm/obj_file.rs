@@ -464,9 +464,17 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
 
     fn write_expr(&mut self, expr: &Expr) -> std::io::Result<()> {
         let len = expr.ops().fold(0, |len, op| {
-            len + match op.kind {
+            len + match &op.kind {
                 OpKind::Number(_) => 5,
                 OpKind::Symbol(_) => 5,
+                &OpKind::BankOfSym(ident) => {
+                    if ident == Symbols::pc_ident() {
+                        1
+                    } else {
+                        5
+                    }
+                }
+                OpKind::BankOfSect(name) => 2 + name.len(),
                 OpKind::Binary(_) => 1,
                 OpKind::Unary(operator) => {
                     if matches!(operator, UnOp::Identity) {
@@ -483,15 +491,15 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                 OpKind::Nothing => unreachable!("empty op at emission time!?"),
             }
         });
-        self.write_long(len)?;
+        self.write_long(len.try_into().expect("overly long RPN expr"))?;
 
         for op in expr.ops() {
-            match op.kind {
-                OpKind::Number(number) => {
+            match &op.kind {
+                &OpKind::Number(number) => {
                     self.write_byte(0x80)?;
                     self.write_long(number as u32)?;
                 }
-                OpKind::Symbol(ident) => {
+                &OpKind::Symbol(ident) => {
                     self.write_byte(0x81)?;
                     self.write_long(if ident == Symbols::pc_ident() {
                         u32::MAX
@@ -501,6 +509,23 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                             .expect("non-registered symbol in expr!?")
                             as u32
                     })?;
+                }
+                &OpKind::BankOfSym(ident) => {
+                    if ident == Symbols::pc_ident() {
+                        self.write_byte(0x52)?;
+                    } else {
+                        self.write_byte(0x50)?;
+                        self.write_long(
+                            self.registered_symbols
+                                .get_index_of(&ident)
+                                .expect("non-registered symbol in bank expr!?")
+                                as u32,
+                        )?;
+                    }
+                }
+                OpKind::BankOfSect(name) => {
+                    self.write_byte(0x51)?;
+                    self.write_string(name)?;
                 }
                 OpKind::Binary(operator) => self.write_byte(match operator {
                     BinOp::LogicalOr => 0x22,
@@ -534,7 +559,7 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                 OpKind::High => self.write_byte(0x70)?,
                 OpKind::Rst => self.write_byte(0x61)?,
                 OpKind::Ldh => self.write_byte(0x60)?,
-                OpKind::BitCheck(mask) => {
+                &OpKind::BitCheck(mask) => {
                     self.write_byte(0x62)?;
                     self.write_byte(mask)?;
                 }
