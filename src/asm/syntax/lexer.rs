@@ -26,7 +26,7 @@ use crate::{
     macro_args::{MacroArgs, UniqueId},
     section::Sections,
     sources::{FileNode, NormalSpan, Source, Span, SpanKind},
-    symbols::Symbols,
+    symbols::{SymbolData, Symbols},
     Identifier, Identifiers, Options,
 };
 
@@ -602,7 +602,7 @@ impl Lexer {
         chars: &mut Peekable<CharIndices>,
         text: &'text str,
         identifiers: &Identifiers,
-        symbols: &Symbols,
+        symbols: &'text Symbols,
         macro_args: &'ret mut Option<&'mac_args mut MacroArgs>,
         unique_id: &'ret mut UniqueId,
         sections: &Sections,
@@ -658,7 +658,10 @@ impl Lexer {
                         };
                         let name = &text[ofs..end_ofs];
                         match identifiers.get(name).and_then(|ident| symbols.find(&ident)) {
-                            None => return Some(Err(MacroArgError::NoSuchSym(name))),
+                            None => return Some(Err(MacroArgError::NoSuchSym(name, None))),
+                            Some(SymbolData::Deleted(span)) => {
+                                return Some(Err(MacroArgError::NoSuchSym(name, Some(span))))
+                            }
                             Some(sym) => match sym.get_number(macro_args.as_deref(), sections) {
                                 None => return Some(Err(MacroArgError::SymNotConst(name))),
                                 Some(idx) => idx as usize,
@@ -2506,7 +2509,7 @@ enum MacroArgError<'text> {
     /// invalid character in bracketed macro argument
     InvalidBracketedChar,
     /// no such symbol `{0}`
-    NoSuchSym(&'text str),
+    NoSuchSym(&'text str, Option<&'text Span>),
     /// the symbol `{0}` is not constant
     SymNotConst(&'text str),
 }
@@ -2524,7 +2527,10 @@ impl MacroArgError<'_> {
                 "expected a number or symbol name between the angle brackets".into()
             }
             Self::InvalidBracketedChar => "invalid character for bracketed macro argument".into(),
-            Self::NoSuchSym(_name) => "no symbol by this name is defined at this point".into(),
+            // TODO: highlight the deletion point
+            Self::NoSuchSym(_name, _opt_del_span) => {
+                "no symbol by this name is defined at this point".into()
+            }
             Self::SymNotConst(_name) => {
                 "a symbol by this name exists, but is not a constant".into()
             }

@@ -217,14 +217,18 @@ impl Symbols {
         self.symbols.get(name)
     }
 
-    pub fn find_macro(&self, name: &Identifier) -> Option<Result<&NormalSpan, &SymbolData>> {
+    pub fn find_macro(
+        &self,
+        name: &Identifier,
+    ) -> Result<Result<&NormalSpan, &SymbolData>, Option<&Span>> {
         match self.find(name) {
             Some(SymbolData::User {
                 kind: SymbolKind::Macro(slice),
                 ..
-            }) => Some(Ok(slice)),
-            None => None,
-            Some(sym) => Some(Err(sym)),
+            }) => Ok(Ok(slice)),
+            None => Err(None),
+            Some(SymbolData::Deleted(span)) => Err(Some(span)),
+            Some(sym) => Ok(Err(sym)),
         }
     }
 
@@ -248,7 +252,7 @@ impl Symbols {
             fmt.write_str(&s, buf, sym.kind_name())?;
             Ok(())
         } else if let SymbolData::Deleted(span) = sym {
-            Err(SymbolError::Deleted(span))
+            Err(SymbolError::Deleted(name_str, span))
         } else {
             Err(SymbolError::FormatError(FormatError::BadKind {
                 sym_kind: sym.kind_name(),
@@ -671,11 +675,11 @@ impl Symbols {
 
 #[derive(Debug, displaydoc::Display, derive_more::From)]
 pub enum SymbolError<'name, 'sym> {
-    /// The symbol `{0}` doesn't exist
+    /// the symbol `{0}` doesn't exist
     NotFound(&'name str),
-    /// A symbol by this name existed, but it has been deleted
+    /// the symbol `{0}` was deleted
     #[from(ignore)]
-    Deleted(&'sym Span),
+    Deleted(&'name str, &'sym Span),
     /// {0}
     FormatError(FormatError),
 }

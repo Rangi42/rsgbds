@@ -241,14 +241,20 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
 
             let name = parse_ctx.identifiers.resolve(ident).unwrap();
             match parse_ctx.symbols.find_macro(&ident) {
-                None => parse_ctx.error(&first_token.span, |error| {
+                Err(maybe_deleted) => parse_ctx.error(&first_token.span, |error| {
                     error.set_message(format!("macro `{name}` does not exist"));
                     error.add_label(
                         diagnostics::error_label(&first_token.span)
                             .with_message("attempting to call the macro here"),
                     );
+                    if let Some(del_span) = maybe_deleted {
+                        error.add_label(
+                            diagnostics::error_label(del_span)
+                                .with_message("it has been deleted here"),
+                        );
+                    }
                 }),
-                Some(Err(other)) => parse_ctx.error(&first_token.span, |error| {
+                Ok(Err(other)) => parse_ctx.error(&first_token.span, |error| {
                     error.set_message(format!("`{name}` is not a macro"));
                     error.add_labels([
                         diagnostics::error_label(&first_token.span).with_message("Macro call here"),
@@ -256,7 +262,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
                             .with_message("a symbol by this name was defined here"),
                     ]);
                 }),
-                Some(Ok(slice)) => {
+                Ok(Ok(slice)) => {
                     let Span::Normal(span) = first_token.span else {
                         unreachable!();
                     };

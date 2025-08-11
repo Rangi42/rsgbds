@@ -51,12 +51,12 @@ impl Default for FormatSpec {
 
 #[derive(Debug, displaydoc::Display)]
 pub enum FormatError {
-    /// Unexpected character '{unexpected}' {for_what}
+    /// unexpected character '{unexpected}' {for_what}
     UnexpectedChar {
         unexpected: char,
         for_what: &'static str,
     },
-    /// Missing character {for_what}
+    /// missing character {for_what}
     MissingChar { for_what: &'static str },
     /// a {sym_kind} symbol cannot be formatted as {fmt_kind}
     BadKind {
