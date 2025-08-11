@@ -140,6 +140,12 @@ fn register_file_nodes<'nodes>(
         };
         register_span(span);
     }
+    for assertion in &sections.assertions {
+        let Span::Normal(span) = &assertion.rest.span else {
+            unreachable!()
+        };
+        register_span(span);
+    }
 
     registry
 }

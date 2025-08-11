@@ -1,2 +1,8 @@
-FATAL: assert-fatal.asm(1):
-    Assertion failed: there are four lights
+error: assertion failed
+   ╭─[ test.asm:1:15 ]
+   │
+ 1 │ assert fatal, 2 + 2 == 5, "there are four lights"
+   │               ─────┬────  
+   │                    ╰────── there are four lights
+───╯
+1 error generated.
