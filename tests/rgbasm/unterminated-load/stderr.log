@@ -1,2 +1,7 @@
-warning: unterminated-load.asm(3): [-Wunterminated-load]
-    `LOAD` block without `ENDL` terminated by EOF
+[-Wunterminated-load] warning: unterminated `load` block
+   ╭─[ test.asm:2:6 ]
+   │
+ 2 │ LOAD "ram", WRAM0
+   │      ──┬──  
+   │        ╰──── this section is terminated by the end of input
+───╯

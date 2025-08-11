@@ -272,6 +272,28 @@ impl Sections {
             );
         }
     }
+
+    pub fn warn_if_unclosed_load_block(&self, nb_errors_left: &Cell<usize>, options: &Options) {
+        match self.active_section.as_ref() {
+            Some((data_sect, sym_sect)) if !data_sect.points_to_same_as(sym_sect) => {
+                let span = &self.sections[sym_sect.id].def_span;
+                diagnostics::warn(
+                    warning!("unterminated-load"),
+                    span,
+                    |warning| {
+                        warning.set_message("unterminated `load` block");
+                        warning.add_label(
+                            diagnostics::warning_label(span)
+                                .with_message("this section is terminated by the end of input"),
+                        );
+                    },
+                    nb_errors_left,
+                    options,
+                );
+            }
+            _ => {}
+        }
+    }
 }
 
 impl From<(u8, u16)> for AddrConstraint {

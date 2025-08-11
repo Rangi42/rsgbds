@@ -338,7 +338,7 @@ impl Lexer {
                     error.set_message("unterminated conditional block");
                     error.add_label(
                         diagnostics::error_label(&condition.opening_span)
-                            .with_message("this `IF` is missing a corresponding `ENDC`"),
+                            .with_message("this `if` is missing a corresponding `endc`"),
                     );
                 },
                 nb_errors_left,

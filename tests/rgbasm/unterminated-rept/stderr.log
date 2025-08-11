@@ -1,3 +1,8 @@
-error: unterminated-rept.asm(2):
-    Unterminated REPT/FOR block
-Assembly aborted with 1 error!
+error: unterminated loop
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ REPT 3
+   │ ──┬─  
+   │   ╰─── loop starting here
+───╯
+1 error generated.

@@ -95,7 +95,7 @@ fn main() -> ExitCode {
     );
 
     // TODO: unclosed UNION
-    // TODO: unclosed LOAD
+    sections.warn_if_unclosed_load_block(&nb_errors_left, &options);
     sections.check_section_sizes(&nb_errors_left, &options);
     // TODO: unclosed PUSHO
     // TODO: unclosed PUSHC

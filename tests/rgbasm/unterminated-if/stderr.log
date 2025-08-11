@@ -1,2 +1,14 @@
-FATAL: unterminated-if.asm(13) -> unterminated-if-include.inc(4):
-    Ended block with 1 unterminated IF construct
+error: unterminated conditional block
+    ╭─[ unterminated-if-include.inc:1:1 ]
+    │
+  1 │ if 1
+    │ ─┬  
+    │  ╰── this `if` is missing a corresponding `endc`
+    │
+    ├─[ test.asm:13:1 ]
+    │
+ 13 │ INCLUDE "unterminated-if-include.inc"
+    │ ───┬───  
+    │    ╰───── file included from here
+────╯
+1 error generated.

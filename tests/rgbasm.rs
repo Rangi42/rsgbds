@@ -94,7 +94,7 @@ fn run_test(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
             .arg("-o")
             .arg(bin_file.path())
             .arg("-x")
-            //.arg("-Weverything")
+            //.arg("-Weverything") TODO
             .assert()
             .success()
             .stdout_eq([].as_slice())

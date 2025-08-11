@@ -1,2 +1,15 @@
-FATAL: unterminated-if-eof.asm(2):
-    Ended block with 1 unterminated IF construct
+error: unterminated conditional block
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ if 0
+   │ ─┬  
+   │  ╰── this `if` is missing a corresponding `endc`
+───╯
+error: unterminated conditional block
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ if 0
+   │ ─┬  
+   │  ╰── this `if` is missing a corresponding `endc`
+───╯
+2 errors generated.
