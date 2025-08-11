@@ -356,7 +356,9 @@ impl RuntimeOptions {
             // Try to match against a "meta" warning.
             for (i, &meta_warning) in META_WARNINGS.iter().enumerate() {
                 if flag == meta_warning {
-                    self.meta_warnings[i + 1].update(state);
+                    for idx in 0..=i {
+                        self.meta_warnings[idx + 1].update(state);
+                    }
                     return Ok(());
                 }
             }
