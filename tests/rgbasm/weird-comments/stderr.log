@@ -1,2 +1,7 @@
-warning: weird-comments.asm(2): [-Wnested-comment]
-    /* in block comment
+[-Wnested-comment] warning: `/*` in block comment
+   ╭─[ test.asm:2:12 ]
+   │
+ 2 │ PRINTLN /*//*/ "this is not commented out"
+   │            ─┬  
+   │             ╰── is a previous block comment unclosed?
+───╯

@@ -924,21 +924,40 @@ impl Lexer {
         {}
     }
 
-    fn read_block_comment(chars: &mut Peekable<CharIndices>) -> Result<(), BlockCommentErr> {
-        let mut nesting_depth = 0usize;
-        while let Some((_ofs, ch)) = chars.next() {
+    fn read_block_comment(
+        chars: &mut Peekable<CharIndices>,
+        ctx: &Context,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) -> Result<(), BlockCommentErr> {
+        // We don't do nested block comments, for reasons outlined in this post:
+        // https://futhark-lang.org/blog/2017-10-10-block-comments-are-a-bad-idea.html
+        while let Some((ofs, ch)) = chars.next() {
             match ch {
                 '*' => {
                     if chars.next_if(|&(_ofs, ch)| ch == '/').is_some() {
-                        match nesting_depth.checked_sub(1) {
-                            Some(new_depth) => nesting_depth = new_depth,
-                            None => return Ok(()),
-                        }
+                        return Ok(());
                     }
                 }
                 '/' => {
-                    if chars.next_if(|&(_ofs, ch)| ch == '*').is_some() {
-                        nesting_depth += 1;
+                    if matches!(chars.peek(), Some((_, '*'))) {
+                        let mut span = ctx.new_span();
+                        span.bytes.start += ofs;
+                        span.bytes.end = span.bytes.start + 2;
+                        let span = Span::Normal(span);
+                        diagnostics::warn(
+                            warning!("nested-comment"),
+                            &span,
+                            |warning| {
+                                warning.set_message("`/*` in block comment");
+                                warning.add_label(
+                                    diagnostics::warning_label(&span)
+                                        .with_message("is a previous block comment unclosed?"),
+                                );
+                            },
+                            nb_errors_left,
+                            options,
+                        )
                     }
                 }
                 _ => {}
@@ -1201,7 +1220,12 @@ impl Lexer {
                             return 0;
                         };
 
-                        if let Err(err) = Self::read_block_comment(&mut chars) {
+                        if let Err(err) = Self::read_block_comment(
+                            &mut chars,
+                            ctx,
+                            params.nb_errors_left,
+                            params.options,
+                        ) {
                             let mut span = ctx.new_span();
                             span.bytes.end = span.bytes.start + "/*".len();
                             let span = Span::Normal(span);
@@ -2188,7 +2212,12 @@ impl Lexer {
                     }
                     '/' => {
                         if chars.next_if(|&(_ofs, ch)| ch == '*').is_some() {
-                            if let Err(err) = Self::read_block_comment(&mut chars) {
+                            if let Err(err) = Self::read_block_comment(
+                                &mut chars,
+                                ctx,
+                                params.nb_errors_left,
+                                params.options,
+                            ) {
                                 let mut span = ctx.new_span();
                                 span.bytes.start += ofs;
                                 span.bytes.end = span.bytes.start + "/*".len();
