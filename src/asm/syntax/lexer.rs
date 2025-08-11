@@ -2273,6 +2273,9 @@ impl Lexer {
                                     });
                                 }
                             }
+                        } else if matches!(ch, Some((_, ','))) {
+                            // This escape is only valid in raw contexts.
+                            string.push(',');
                         } else if let Some(value) =
                             Self::get_char_escape(ch, ofs, ctx, text, &mut chars, &params)
                         {
