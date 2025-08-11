@@ -1,12 +1,36 @@
-error: assert.asm(4):
-    Assertion failed
-error: assert.asm(7):
-    Assertion failed: @ ain't 0 now? (Hint: it's $1)
-warning: assert.asm(10): [-Wassert]
-    Assertion failed
-error: assert.asm(18):
-    Expected constant expression: 'FloatingBase' is not constant at assembly time
-error: assert.asm(18):
-    Assertion failed
-FATAL: assert.asm(21):
-    Assertion failed
+error: assertion failed
+   ╭─[ test.asm:4:9 ]
+   │
+ 4 │     assert FixedBase ; This should eval (and fail) at compile time
+   │            ────┬────  
+   │                ╰────── this expression evaluates to 0
+───╯
+error: assertion failed
+   ╭─[ test.asm:7:16 ]
+   │
+ 7 │     static_assert @ - FixedBase == 0, "@ ain't 0 now? (Hint: it's {@})"
+   │                   ─────────┬────────  
+   │                            ╰────────── @ ain't 0 now? (Hint: it's $1)
+───╯
+error: assertion failed
+    ╭─[ test.asm:10:15 ]
+    │
+ 10 │     assert WARN, @ - FixedBase != 42 ; This should also eval at compile time
+    │                  ─────────┬─────────  
+    │                           ╰─────────── this expression evaluates to 0
+────╯
+error: `FloatingBase` is not constant
+    ╭─[ test.asm:18:22 ]
+    │
+ 18 │     static_assert FAIL, FloatingBase != 0 ; This is not constant!
+    │                         ──────┬─────  
+    │                               ╰─────── this symbol's value is not known at this point
+────╯
+error: assertion failed
+    ╭─[ test.asm:21:23 ]
+    │
+ 21 │     static_assert FATAL, FixedBase != 0 ; This will fail... ↓
+    │                          ───────┬──────  
+    │                                 ╰──────── this expression evaluates to 0
+────╯
+5 errors generated.

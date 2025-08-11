@@ -77,8 +77,42 @@ pub(in super::super) fn parse_assert(
     parse_ctx: &mut parse_ctx!(),
 ) -> Option<Token> {
     let (level, lookahead) = expect_one_of! { parse_ctx.next_token() => {
-        |"warn"| => (AssertLevel::Warn, parse_ctx.next_token()),
-        |"fatal"| => (AssertLevel::Fatal, parse_ctx.next_token()),
+        |"warn"| => {
+            let lookahead = expect_one_of! { parse_ctx.next_token() => {
+                |","| => parse_ctx.next_token(),
+                else |unexpected| => {
+                    parse_ctx.report_syntax_error(&unexpected, |error, span| {
+                        error.add_label(diagnostics::error_label(span).with_message("expected a comma here"));
+                    });
+                    unexpected
+                }
+            }};
+            (AssertLevel::Warn, lookahead)
+        },
+        |"fail"| => {
+            let lookahead = expect_one_of! { parse_ctx.next_token() => {
+                |","| => parse_ctx.next_token(),
+                else |unexpected| => {
+                    parse_ctx.report_syntax_error(&unexpected, |error, span| {
+                        error.add_label(diagnostics::error_label(span).with_message("expected a comma here"));
+                    });
+                    unexpected
+                }
+            }};
+            (AssertLevel::Error, lookahead)
+        },
+        |"fatal"| => {
+            let lookahead = expect_one_of! { parse_ctx.next_token() => {
+                |","| => parse_ctx.next_token(),
+                else |unexpected| => {
+                    parse_ctx.report_syntax_error(&unexpected, |error, span| {
+                        error.add_label(diagnostics::error_label(span).with_message("expected a comma here"));
+                    });
+                    unexpected
+                }
+            }};
+            (AssertLevel::Fatal, lookahead)
+        },
         else |unexpected| => (AssertLevel::Error, unexpected)
     }};
 
@@ -127,8 +161,42 @@ pub(in super::super) fn parse_static_assert(
     parse_ctx: &mut parse_ctx!(),
 ) -> Option<Token> {
     let (level, lookahead) = expect_one_of! { parse_ctx.next_token() => {
-        |"warn"| => (AssertLevel::Warn, parse_ctx.next_token()),
-        |"fatal"| => (AssertLevel::Fatal, parse_ctx.next_token()),
+        |"warn"| => {
+            let lookahead = expect_one_of! { parse_ctx.next_token() => {
+                |","| => parse_ctx.next_token(),
+                else |unexpected| => {
+                    parse_ctx.report_syntax_error(&unexpected, |error, span| {
+                        error.add_label(diagnostics::error_label(span).with_message("expected a comma here"));
+                    });
+                    unexpected
+                }
+            }};
+            (AssertLevel::Warn, lookahead)
+        },
+        |"fail"| => {
+            let lookahead = expect_one_of! { parse_ctx.next_token() => {
+                |","| => parse_ctx.next_token(),
+                else |unexpected| => {
+                    parse_ctx.report_syntax_error(&unexpected, |error, span| {
+                        error.add_label(diagnostics::error_label(span).with_message("expected a comma here"));
+                    });
+                    unexpected
+                }
+            }};
+            (AssertLevel::Error, lookahead)
+        },
+        |"fatal"| => {
+            let lookahead = expect_one_of! { parse_ctx.next_token() => {
+                |","| => parse_ctx.next_token(),
+                else |unexpected| => {
+                    parse_ctx.report_syntax_error(&unexpected, |error, span| {
+                        error.add_label(diagnostics::error_label(span).with_message("expected a comma here"));
+                    });
+                    unexpected
+                }
+            }};
+            (AssertLevel::Fatal, lookahead)
+        },
         else |unexpected| => (AssertLevel::Error, unexpected)
     }};
 
