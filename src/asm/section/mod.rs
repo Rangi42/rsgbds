@@ -274,6 +274,15 @@ impl Sections {
     }
 }
 
+impl From<(u8, u16)> for AddrConstraint {
+    fn from((alignment, offset): (u8, u16)) -> Self {
+        match alignment {
+            0 => Self::None,
+            1..=15 => Self::Align(alignment, offset),
+            16.. => Self::Addr(offset),
+        }
+    }
+}
 impl AddrConstraint {
     pub fn merge(&mut self, other: Self, offset: usize) -> Result<(), MergeError> {
         match (self as &mut _, other) {
@@ -288,41 +297,51 @@ impl AddrConstraint {
                 AddrConstraint::Align(align, align_ofs),
                 AddrConstraint::Align(other_align, other_align_ofs),
             ) => {
-                if other_align_ofs % (1 << *align) == *align_ofs % (1 << other_align) {
+                let cur_offset = align_ofs
+                    .wrapping_add(offset as u16)
+                    .rem_euclid(1 << *align);
+                if other_align_ofs % (1 << *align) == cur_offset % (1 << other_align) {
                     if *align < other_align {
                         *align = other_align;
-                        *align_ofs = other_align_ofs;
+                        *align_ofs = other_align_ofs
+                            .wrapping_sub(offset as u16)
+                            .rem_euclid(1 << other_align);
                     }
                     Ok(())
                 } else {
                     Err(MergeError::ConflictingAlign(
                         *align,
-                        *align_ofs,
+                        cur_offset,
                         other_align,
                         other_align_ofs,
                     ))
                 }
             }
             (AddrConstraint::Align(align, align_ofs), AddrConstraint::Addr(addr)) => {
-                if addr % (1 << *align) == *align_ofs {
+                let cur_offset = align_ofs
+                    .wrapping_add(offset as u16)
+                    .rem_euclid(1 << *align);
+                if addr % (1 << *align) == cur_offset {
                     *self = AddrConstraint::Addr(addr);
                     Ok(())
                 } else {
-                    Err(MergeError::BadAlignFixed(*align, *align_ofs, addr))
+                    Err(MergeError::BadAlignFixed(*align, cur_offset, addr))
                 }
             }
             (AddrConstraint::Addr(addr), AddrConstraint::Align(align, align_ofs)) => {
-                if *addr % (1 << align) == align_ofs {
+                let cur_addr = addr.wrapping_add(offset as u16);
+                if cur_addr % (1 << align) == align_ofs {
                     Ok(())
                 } else {
-                    Err(MergeError::FixedBadAlign(*addr, align, align_ofs))
+                    Err(MergeError::FixedBadAlign(cur_addr, align, align_ofs))
                 }
             }
             (AddrConstraint::Addr(addr), AddrConstraint::Addr(other_addr)) => {
-                if *addr == other_addr {
+                let cur_addr = addr.wrapping_add(offset as u16);
+                if cur_addr == other_addr {
                     Ok(())
                 } else {
-                    Err(MergeError::AddrMismatch(*addr, other_addr))
+                    Err(MergeError::AddrMismatch(cur_addr, other_addr))
                 }
             }
         }
@@ -407,6 +426,23 @@ impl Section {
             AddrConstraint::None | AddrConstraint::Align(_, _) => None,
             AddrConstraint::Addr(addr) => Some(addr),
         }
+    }
+
+    pub fn bytes_until_alignment(&self, alignment: u8, offset: u16, ofs_into_sect: usize) -> usize {
+        let (cur_align, cur_offset) = match self.attrs.address {
+            AddrConstraint::None => return 0, // The section is going to be newly constrained.
+            AddrConstraint::Align(cur_alignment, pc_value) => {
+                debug_assert!(cur_alignment < 16, "alignment {cur_alignment} >= 16!?");
+                (cur_alignment, pc_value)
+            }
+            AddrConstraint::Addr(pc_value) => (16, pc_value),
+        };
+
+        // We need `(cur_offset + ofs_into_sect + return value) % (1 << alignment) == offset`
+        usize::from(offset)
+            .wrapping_sub(ofs_into_sect)
+            .wrapping_sub(cur_offset.into())
+            .rem_euclid(1 << std::cmp::min(alignment, cur_align))
     }
 }
 
