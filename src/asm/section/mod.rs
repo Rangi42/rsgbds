@@ -389,7 +389,7 @@ impl MergeError {
                     S::from(*align),
                 ),
                 format!(
-                    "the fixed address would have the bit{} equal to {} at this point",
+                    "the fixed address would have the bit{} equal to ${:02x} at this point",
                     S::from(*align),
                     addr % (1 << align),
                 ),
@@ -397,19 +397,18 @@ impl MergeError {
             Self::BadAlignFixed(align, align_ofs, addr) => (
                 format!("cannot place the section at address ${addr:04x}"),
                 format!(
-                    "the lower {align} bit{} of the address are equal to ${} here",
+                    "the lower {align} bit{} of the address are equal to ${align_ofs:02x} here",
                     S::from(*align),
-                    addr % (1 << align),
                 ),
             ),
             Self::ConflictingAlign(align, align_ofs, other_align, other_align_ofs) => (
                 format!(
-                    "cannot align the section's lower {align} bit{} to {align_ofs}",
-                    S::from(*align),
+                    "cannot align the section's lower {other_align} bit{} to ${other_align_ofs:02x}",
+                    S::from(*other_align),
                 ),
                 format!(
-                    "the bits would be equal to {} at this point",
-                    align_ofs % (1 << other_align),
+                    "the lower {align} bit{} would be equal to ${align_ofs:02x} at this point",
+                    S::from(*align),
                 ),
             ),
         }

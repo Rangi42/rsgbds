@@ -1,5 +1,15 @@
-error: align-large.asm(1):
-    Alignment must be between 0 and 16, not 17
-error: align-large.asm(2):
-    Alignment must be between 0 and 16, not 17
-Assembly aborted with 2 errors!
+error: alignment cannot be larger than 16
+   ╭─[ test.asm:1:42 ]
+   │
+ 1 │ SECTION "You lost the game", ROM0, ALIGN[17, 99]
+   │                                          ─┬  
+   │                                           ╰── an alignment of 17 is invalid
+───╯
+error: alignment cannot be larger than 16
+   ╭─[ test.asm:2:7 ]
+   │
+ 2 │ ALIGN 17, 99
+   │       ─┬  
+   │        ╰── an alignment of 17 is invalid
+───╯
+2 errors generated.

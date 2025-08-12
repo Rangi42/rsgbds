@@ -1,15 +1,64 @@
-error: invalid-alignment.asm(9):
-    Section is misaligned (at PC = $4000, expected ALIGN[16, 0], got ALIGN[16, 16384])
-error: invalid-alignment.asm(11):
-    Alignment must be between 0 and 16, not 20
-error: invalid-alignment.asm(13):
-    Alignment must be between 0 and 16, not 20
-error: invalid-alignment.asm(15):
-    Alignment must be between 0 and 16, not 20
-error: invalid-alignment.asm(19):
-    Section "d"'s fixed address doesn't match its alignment
-error: invalid-alignment.asm(21):
-    Section "e"'s fixed address doesn't match its alignment
-error: invalid-alignment.asm(23):
-    Section "f"'s fixed address doesn't match its alignment
-Assembly aborted with 7 errors!
+error: cannot place the section at address $0000
+   ╭─[ test.asm:9:1 ]
+   │
+ 9 │ align 16
+   │ ──┬──  
+   │   ╰──── the section is already fixed at address $4000
+───╯
+error: alignment cannot be larger than 16
+    ╭─[ test.asm:11:33 ]
+    │
+ 11 │ SECTION "a", ROMX[$4000], ALIGN[20]
+    │                                 ─┬  
+    │                                  ╰── an alignment of 20 is invalid
+────╯
+error: cannot place the section at address $0000
+    ╭─[ test.asm:11:27 ]
+    │
+ 11 │ SECTION "a", ROMX[$4000], ALIGN[20]
+    │                           ──┬──  
+    │                             ╰──── the section is already fixed at address $4000
+────╯
+error: alignment cannot be larger than 16
+    ╭─[ test.asm:13:42 ]
+    │
+ 13 │ SECTION FRAGMENT "b", ROM0[$0000], ALIGN[20]
+    │                                          ─┬  
+    │                                           ╰── an alignment of 20 is invalid
+────╯
+error: alignment cannot be larger than 16
+    ╭─[ test.asm:15:40 ]
+    │
+ 15 │ SECTION UNION "c", WRAM0[$c000], ALIGN[20]
+    │                                        ─┬  
+    │                                         ╰── an alignment of 20 is invalid
+────╯
+error: cannot place the section at address $0000
+    ╭─[ test.asm:15:34 ]
+    │
+ 15 │ SECTION UNION "c", WRAM0[$c000], ALIGN[20]
+    │                                  ──┬──  
+    │                                    ╰──── the section is already fixed at address $c000
+────╯
+error: cannot align the section's lower 10 bits to 0
+    ╭─[ test.asm:19:27 ]
+    │
+ 19 │ SECTION "d", HRAM[$ff80], ALIGN[10]
+    │                           ──┬──  
+    │                             ╰──── the fixed address would have the bits equal to $380 at this point
+────╯
+error: cannot align the section's lower 15 bits to 0
+    ╭─[ test.asm:21:36 ]
+    │
+ 21 │ SECTION FRAGMENT "e", ROMX[$4000], ALIGN[15]
+    │                                    ──┬──  
+    │                                      ╰──── the fixed address would have the bits equal to $4000 at this point
+────╯
+error: cannot align the section's lower 15 bits to 0
+    ╭─[ test.asm:23:34 ]
+    │
+ 23 │ SECTION UNION "f", WRAM0[$c000], ALIGN[15]
+    │                                  ──┬──  
+    │                                    ╰──── the fixed address would have the bits equal to $4000 at this point
+────╯
+9 errors generated.

@@ -1,3 +1,7 @@
-error: align-large-ofs.asm(2):
-    The absolute alignment offset (2) must be less than alignment size (2)
-Assembly aborted with 1 error!
+[-Walign-ofs] warning: alignment offset is larger than alignment size
+   ╭─[ test.asm:2:32 ]
+   │
+ 2 │ SECTION "Tesst", ROM0, ALIGN[1,2]
+   │                                ┬  
+   │                                ╰── requested an alignment to 2 bytes and an offset of 2 bytes
+───╯

@@ -1,4 +1,8 @@
-error: incompatible-alignment.asm(8):
-    Section already declared with incompatible 256-byte alignment (offset 0)
-FATAL: incompatible-alignment.asm(8):
-    Cannot create section "Test" (1 error)
+error: cannot align the section's lower 8 bits to $00
+   ╭─[ test.asm:8:18 ]
+   │
+ 8 │ SECTION FRAGMENT "Test", ROM0,ALIGN[8]
+   │                  ───┬──  
+   │                     ╰──── the lower 8 bits would be equal to $01 at this point
+───╯
+1 error generated.

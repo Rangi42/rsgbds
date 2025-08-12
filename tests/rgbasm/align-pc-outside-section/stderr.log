@@ -1,3 +1,8 @@
-error: align-pc-outside-section.asm(1):
-    Cannot output data outside of a SECTION
-Assembly aborted with 1 error!
+error: `align` used outside of a section
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ align 1
+   │ ──┬──  
+   │   ╰──── this directive is invalid
+───╯
+1 error generated.
