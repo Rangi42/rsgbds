@@ -1,5 +1,17 @@
-error: ds-bad.asm(3):
-    Expected constant expression: 'unknown' is not constant at assembly time
-warning: ds-bad.asm(4): [-Wtruncation]
-    Expression must be 8-bit; use LOW() to force 8-bit
-Assembly aborted with 1 error!
+error: no symbol called `unknown`
+   ╭─[ test.asm:3:5 ]
+   │
+ 3 │     ds unknown, 0
+   │        ───┬───  
+   │           ╰───── no symbol by this name exists at this point
+───╯
+[-Wtruncation=1] warning: this expression's value is not 8-bit
+   ╭─[ test.asm:4:8 ]
+   │
+ 4 │     ds 1, $100
+   │           ──┬─  
+   │             ╰─── this expression evaluates to 256, which is not between -256 and 255
+   │ 
+   │ Help: you can use the `low()` function to truncate an expression
+───╯
+1 error generated.

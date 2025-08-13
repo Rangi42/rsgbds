@@ -1,2 +1,8 @@
-FATAL: divzero-instr.asm(2):
-    Division by zero
+error: division by zero
+   ╭─[ test.asm:2:11 ]
+   │
+ 2 │     ld  a, 1/0
+   │              ┬  
+   │              ╰── this is equal to zero
+───╯
+1 error generated.

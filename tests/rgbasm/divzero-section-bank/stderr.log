@@ -1,2 +1,8 @@
-FATAL: divzero-section-bank.asm(1):
-    Division by zero
+error: division by zero
+   ╭─[ test.asm:1:23 ]
+   │
+ 1 │ SECTION "sec", ROMX[1/0]
+   │                       ┬  
+   │                       ╰── this is equal to zero
+───╯
+1 error generated.
