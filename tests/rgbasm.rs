@@ -141,7 +141,7 @@ impl<D: std::fmt::Display> std::fmt::Debug for BinDiff<D> {
 
         let mut expected = self.expected.iter();
         let mut actual = self.actual.iter();
-        while !expected.as_slice().is_empty() && !actual.as_slice().is_empty() {
+        while !expected.as_slice().is_empty() || !actual.as_slice().is_empty() {
             for _ in 0..NB_BYTES_PER_LINE {
                 match actual.next() {
                     Some(&byte) => write!(f, "{byte:02x} ")?,
