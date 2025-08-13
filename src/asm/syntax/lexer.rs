@@ -754,7 +754,7 @@ impl Lexer {
                             return Err(());
                         } else {
                             match res {
-                                Ok(_) => todo!(),
+                                Ok((_kind, text)) => name.push_str(text.contents.text()),
                                 Err(err) => {
                                     let mut span = ctx.new_span();
                                     span.bytes.start += ofs;
