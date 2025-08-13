@@ -1,15 +1,43 @@
-error: code-after-endm-endr-endc.asm(6):
-    syntax error, unexpected PRINTLN, expecting end of line or end of buffer or end of fragment literal
-error: code-after-endm-endr-endc.asm(7):
-    Macro "mac" not defined
-error: code-after-endm-endr-endc.asm(12):
-    syntax error, unexpected PRINTLN, expecting end of line or end of buffer or end of fragment literal
-error: code-after-endm-endr-endc.asm(17):
-    syntax error, unexpected PRINTLN, expecting end of line
-error: code-after-endm-endr-endc.asm(19):
-    syntax error, unexpected PRINTLN, expecting end of line or end of buffer or end of fragment literal
-error: code-after-endm-endr-endc.asm(23):
-    syntax error, unexpected PRINTLN, expecting end of line
-error: code-after-endm-endr-endc.asm(25):
-    syntax error, unexpected PRINTLN, expecting end of line or end of buffer or end of fragment literal
-Assembly aborted with 7 errors!
+error: syntax error: unexpected println
+   ╭─[ test.asm:5:6 ]
+   │
+ 5 │ ENDM println "<_<"
+   │      ───┬───  
+   │         ╰───── expected nothing else on this line
+───╯
+error: syntax error: unexpected println
+    ╭─[ test.asm:10:6 ]
+    │
+ 10 │ ENDR println "<_<"
+    │      ───┬───  
+    │         ╰───── expected nothing else on this line
+────╯
+error: syntax error: unexpected println
+    ╭─[ test.asm:15:6 ]
+    │
+ 15 │ ELSE println "<_<"
+    │      ───┬───  
+    │         ╰───── expected nothing else on this line
+────╯
+error: syntax error: unexpected println
+    ╭─[ test.asm:17:6 ]
+    │
+ 17 │ ENDC println "<_<"
+    │      ───┬───  
+    │         ╰───── expected nothing else on this line
+────╯
+error: syntax error: unexpected println
+    ╭─[ test.asm:21:6 ]
+    │
+ 21 │ ELSE println "<_<"
+    │      ───┬───  
+    │         ╰───── expected nothing else on this line
+────╯
+error: syntax error: unexpected println
+    ╭─[ test.asm:23:6 ]
+    │
+ 23 │ ENDC println "<_<"
+    │      ───┬───  
+    │         ╰───── expected nothing else on this line
+────╯
+6 errors generated.

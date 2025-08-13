@@ -47,7 +47,7 @@ pub(in super::super) fn parse_macro(_keyword: Token, parse_ctx: &mut parse_ctx!(
         return discard_rest_of_line(unexpected, parse_ctx);
     } }
 
-    let lookahead = expect_eol(parse_ctx.next_token(), parse_ctx);
+    let _ = expect_eol(parse_ctx.next_token(), parse_ctx);
 
     let (body, res) = parse_ctx
         .lexer
@@ -70,7 +70,7 @@ pub(in super::super) fn parse_macro(_keyword: Token, parse_ctx: &mut parse_ctx!(
         parse_ctx.options,
     );
 
-    lookahead
+    parse_ctx.next_token()
 }
 
 pub(in super::super) fn parse_rept(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
@@ -91,7 +91,7 @@ pub(in super::super) fn parse_rept(keyword: Token, parse_ctx: &mut parse_ctx!())
         })
     }
 
-    let lookahead = parse_ctx.next_token(); // Lex this token before switching parse contexts!
+    let lookahead = expect_eol(parse_ctx.next_token(), parse_ctx); // Do this before pushing the loop context.
 
     match parse_ctx.try_const_eval(&expr) {
         Ok((0, _span)) => {} // `REPT 0` acts like `IF 0`.
@@ -193,7 +193,7 @@ pub(in super::super) fn parse_for(keyword: Token, parse_ctx: &mut parse_ctx!()) 
         })
     }
 
-    let lookahead = parse_ctx.next_token();
+    let lookahead = expect_eol(parse_ctx.next_token(), parse_ctx); // Do this before pushing the loop context.
 
     // Parsing is (finally!) done; time to push the loop.
 

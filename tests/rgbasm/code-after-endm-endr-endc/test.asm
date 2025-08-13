@@ -1,12 +1,10 @@
 println "start"
 
-; will not define 'mac'
 MACRO mac
 	println \1
 ENDM println "<_<"
 	mac "argument"
 
-; will not repeat
 REPT 3
 	println "hey!"
 ENDR println "<_<"
@@ -21,7 +19,7 @@ ENDC println "<_<"
 IF 1
 	println "if clause"
 ELSE println "<_<"
-	println "not skipped"
+	println "still skipped"
 ENDC println "<_<"
 
 println "done"
