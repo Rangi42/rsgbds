@@ -1,3 +1,8 @@
-error: label-outside-section.asm(1):
-    Label "bad" created outside of a SECTION
-Assembly aborted with 1 error!
+error: label defined outside of a section
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ bad:
+   │ ─┬─  
+   │  ╰─── no section is active at this point
+───╯
+1 error generated.

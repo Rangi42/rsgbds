@@ -1,5 +1,15 @@
-error: use-label-outside-section.asm(1):
-    Label "lab" created outside of a SECTION
-error: use-label-outside-section.asm(2):
-    Expected constant expression: 'lab' is not constant at assembly time
-Assembly aborted with 2 errors!
+error: label defined outside of a section
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ lab:
+   │ ─┬─  
+   │  ╰─── no section is active at this point
+───╯
+error: no symbol called `lab`
+   ╭─[ test.asm:2:10 ]
+   │
+ 2 │     PRINTLN lab-lab
+   │             ─┬─  
+   │              ╰─── no symbol by this name exists at this point
+───╯
+2 errors generated.

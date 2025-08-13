@@ -199,6 +199,11 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
                         parse_ctx.nb_errors_remaining,
                         parse_ctx.options
                     );
+                } else {
+                    parse_ctx.error(&first_token.span, |error| {
+                        error.set_message("label defined outside of a section");
+                        error.add_label(diagnostics::error_label(&first_token.span).with_message("no section is active at this point"));
+                    });
                 }
                 first_token = parse_ctx.next_token();
             },
@@ -214,6 +219,11 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
                         parse_ctx.nb_errors_remaining,
                         parse_ctx.options
                     );
+                } else {
+                    parse_ctx.error(&first_token.span, |error| {
+                        error.set_message("label defined outside of a section");
+                        error.add_label(diagnostics::error_label(&first_token.span).with_message("no section is active at this point"));
+                    });
                 }
                 first_token = parse_ctx.next_token();
             },
