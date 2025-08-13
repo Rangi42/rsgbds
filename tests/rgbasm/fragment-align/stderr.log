@@ -1,3 +1,8 @@
-error: fragment-align.asm(25):
-    Section is misaligned ($0004 bytes into the section, expected ALIGN[2, 0], got ALIGN[2, 1])
-Assembly aborted with 1 error!
+error: cannot align the section's lower 2 bits to $00
+    ╭─[ test.asm:25:2 ]
+    │
+ 25 │     align 2 ; Uh oh
+    │     ──┬──  
+    │       ╰──── the lower 1 bit would be equal to $01 at this point
+────╯
+1 error generated.
