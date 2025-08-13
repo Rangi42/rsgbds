@@ -289,7 +289,7 @@ impl Display for NumberFormatter {
                     write!(f, "{}", self.number as i32)
                 }
             }
-            FormatKind::Unsigned | FormatKind::Default => {
+            FormatKind::Unsigned => {
                 if self.pad_with_zeros {
                     write!(f, "{:0width$}", self.number)
                 } else {
@@ -303,7 +303,7 @@ impl Display for NumberFormatter {
                     write!(f, "{:x}", self.number)
                 }
             }
-            FormatKind::UpperHex => {
+            FormatKind::UpperHex | FormatKind::Default => {
                 if self.pad_with_zeros {
                     write!(f, "{:0width$X}", self.number)
                 } else {

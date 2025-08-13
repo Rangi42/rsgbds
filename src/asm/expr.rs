@@ -799,6 +799,7 @@ impl ErrKind {
                 format!("the bank of \"{name}\" is not constant",),
                 "this section's bank is not known at this point".into(),
             ),
+            // TODO: if the section is active, suggest `endsection`
             Self::SizeOfSectNotConst(name) => (
                 format!("\"{name}\"'s size is not constant"),
                 "rgbasm can only know the size of non-active normal sections".into(),

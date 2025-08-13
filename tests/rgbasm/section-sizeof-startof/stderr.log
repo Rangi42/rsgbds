@@ -1,11 +1,43 @@
-error: section-sizeof-startof.asm(5):
-    Expected constant expression: Section "sect"'s size is not known
-error: section-sizeof-startof.asm(21):
-    Expected constant expression: Section "sect2"'s bank is not known
-error: section-sizeof-startof.asm(22):
-    Expected constant expression: Section "sect2"'s size is not known
-error: section-sizeof-startof.asm(23):
-    Expected constant expression: Section "sect2"'s start is not known
-error: section-sizeof-startof.asm(30):
-    Expected constant expression: Section "sect3"'s size is not known
-Assembly aborted with 5 errors!
+error: "sect"'s size is not constant
+   ╭─[ test.asm:5:9 ]
+   │
+ 5 │ DEF X = SIZEOF("sect") ; unknown
+   │         ───────┬──────  
+   │                ╰──────── rgbasm can only know the size of non-active normal sections
+───╯
+error: the symbol `X` doesn't exist
+   ╭─[ test.asm:8:23 ]
+   │
+ 8 │     println "sect1: {W} {X} {Y}"
+   │                          ┬  
+   │                          ╰── this interpolation is invalid
+───╯
+error: the bank of "sect2" is not constant
+    ╭─[ test.asm:21:9 ]
+    │
+ 21 │ DEF W = BANK("sect2") ; unknown
+    │         ──────┬──────  
+    │               ╰──────── this section's bank is not known at this point
+────╯
+error: "sect2"'s size is not constant
+    ╭─[ test.asm:22:9 ]
+    │
+ 22 │ DEF X = SIZEOF("sect2") ; unknown
+    │         ───────┬───────  
+    │                ╰───────── rgbasm can only know the size of non-active normal sections
+────╯
+error: "sect2"'s address is not constant
+    ╭─[ test.asm:23:9 ]
+    │
+ 23 │ DEF Y = STARTOF("sect2") ; unknown
+    │         ────────┬───────  
+    │                 ╰───────── this section's address is not known at this point
+────╯
+error: "sect3"'s size is not constant
+    ╭─[ test.asm:30:9 ]
+    │
+ 30 │ DEF X = SIZEOF("sect3") ; unknown
+    │         ───────┬───────  
+    │                ╰───────── rgbasm can only know the size of non-active normal sections
+────╯
+6 errors generated.
