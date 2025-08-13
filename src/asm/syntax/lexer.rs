@@ -531,14 +531,6 @@ impl Lexer {
                 if span_is_empty {
                     span.bytes.start = span.bytes.end;
                 }
-            } else {
-                debug_assert!(
-                    Rc::ptr_eq(&span.node.src, &ctx.span.node.parent.as_ref().unwrap().node.src),
-                    "Span is pointing neither at current buffer ({}) nor its parent ({}), but at {}",
-                    &ctx.span.node.src.name,
-                    &ctx.span.node.parent.as_ref().unwrap().node.src.name,
-                    &span.node.src.name,
-                );
             }
         };
 
