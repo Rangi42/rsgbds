@@ -210,6 +210,18 @@ impl Sections {
         &self.sections[section_id]
     }
 
+    pub fn is_active_or_in_stack(&self, section_id: usize) -> bool {
+        let refs_section = |opt: &Option<(ActiveSection, ActiveSection)>| {
+            opt.as_ref().is_some_and(|(data_sect, sym_sect)| {
+                data_sect.id == section_id || sym_sect.id == section_id
+            })
+        };
+        refs_section(&self.active_section)
+            || self
+                .section_stack
+                .iter()
+                .any(|(_span, opt)| refs_section(opt))
+    }
     pub fn push_active_section(&mut self, pushs_span: Span) {
         self.section_stack
             .push((pushs_span, self.active_section.take()));
@@ -477,7 +489,7 @@ impl Section {
 }
 
 impl Contents {
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         match self {
             Self::Data(data) => data.len(),
             Self::NoData(len) => *len,

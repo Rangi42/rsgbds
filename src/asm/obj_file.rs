@@ -354,10 +354,7 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
             self.write_long(line_no)?;
 
             // Section sizes have been checked, and are known to be below u16::MAX.
-            match &section.bytes {
-                Contents::Data(data) => self.write_long(data.len() as u32)?,
-                Contents::NoData(len) => self.write_long(*len as u32)?,
-            }
+            self.write_long(section.bytes.len() as u32)?;
 
             let flags = match section.attrs.kind {
                 SectionKind::Normal => 0x00,
@@ -474,8 +471,9 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                         5
                     }
                 }
-                OpKind::BankOfSect(name) => 2 + name.len(),
-                OpKind::StartOfSect(name) => 2 + name.len(),
+                OpKind::BankOfSect(name) | OpKind::StartOfSect(name) | OpKind::SizeOfSect(name) => {
+                    2 + name.len()
+                }
                 OpKind::Binary(_) => 1,
                 OpKind::Unary(operator) => {
                     if matches!(operator, UnOp::Identity) {
@@ -530,6 +528,10 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                 }
                 OpKind::StartOfSect(name) => {
                     self.write_byte(0x54)?;
+                    self.write_string(name)?;
+                }
+                OpKind::SizeOfSect(name) => {
+                    self.write_byte(0x55)?;
                     self.write_string(name)?;
                 }
                 OpKind::Binary(operator) => self.write_byte(match operator {

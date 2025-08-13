@@ -5,7 +5,7 @@ use compact_str::CompactString;
 use crate::{
     diagnostics,
     macro_args::MacroArgs,
-    section::Sections,
+    section::{SectionKind, Sections},
     sources::Span,
     symbols::{SymbolData, Symbols},
     syntax::tokens::{tok, TokenPayload},
@@ -32,6 +32,7 @@ pub enum OpKind {
     Symbol(Identifier),
     BankOfSym(Identifier),
     BankOfSect(CompactString),
+    SizeOfSect(CompactString),
     StartOfSect(CompactString),
     Binary(BinOp),
     Unary(UnOp),
@@ -66,6 +67,7 @@ enum ErrKind {
         name: CompactString,
         just_the_sect: bool,
     },
+    SizeOfSectNotConst(CompactString),
     SymBankNotConst(Identifier),
     BankOfNonLabel(Identifier, &'static str),
     SectBankNotConst(CompactString),
@@ -117,6 +119,13 @@ impl Expr {
         Self::from_terminal(Op {
             span,
             kind: OpKind::BankOfSect(name),
+        })
+    }
+
+    pub fn size_of_section(name: CompactString, span: Span) -> Self {
+        Self::from_terminal(Op {
+            span,
+            kind: OpKind::SizeOfSect(name),
         })
     }
 
@@ -252,6 +261,24 @@ impl Expr {
                         kind: ErrKind::SectBankNotConst(name.clone()),
                     }),
                 },
+                // Sections can grow if they are still active (including in the section stack),
+                // or if they are `union`/`fragment` typed (because the linker will merge pieces).
+                OpKind::SizeOfSect(name) => {
+                    match sections
+                        .sections
+                        .get_full(name)
+                        .and_then(|(idx, _name, section)| {
+                            (!sections.is_active_or_in_stack(idx)).then_some(section)
+                        }) {
+                        Some(section) if matches!(section.attrs.kind, SectionKind::Normal) => {
+                            Ok((section.bytes.len() as i32, op.span.clone()))
+                        }
+                        _ => Err(Error {
+                            span: op.span.clone(),
+                            kind: ErrKind::SizeOfSectNotConst(name.clone()),
+                        }),
+                    }
+                }
                 OpKind::StartOfSect(name) => match sections
                     .sections
                     .get(name)
@@ -420,6 +447,7 @@ impl Op {
             OpKind::Number(..)
             | OpKind::BankOfSect(..)
             | OpKind::StartOfSect(..)
+            | OpKind::SizeOfSect(..)
             | OpKind::Binary(..)
             | OpKind::Unary(..)
             | OpKind::Low
@@ -742,6 +770,10 @@ impl ErrKind {
             Self::SectBankNotConst(name) => (
                 format!("the bank of \"{name}\" is not constant",),
                 "this section's bank is not known at this point".into(),
+            ),
+            Self::SizeOfSectNotConst(name) => (
+                format!("\"{name}\"'s size is not constant"),
+                "rgbasm can only know the size of non-active normal sections".into(),
             ),
             Self::DivBy0 => ("division by zero".into(), "this is equal to zero".into()),
             Self::RstRange(value) => (
