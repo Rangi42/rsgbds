@@ -1,5 +1,25 @@
-error: empty-raw-identifier.asm(5) -> empty-raw-identifier.asm::macro(3):
-    Invalid character in bracketed macro argument '?'
-error: empty-raw-identifier.asm(5) -> empty-raw-identifier.asm::macro(3):
-    Empty raw symbol in bracketed macro argument
-Assembly aborted with 2 errors!
+error: invalid character in bracketed macro argument
+   ╭─[ test.asm:3:21 ]
+   │
+ 3 │     println "bad args: \<?>, \<#>"
+   │                        ─┬  
+   │                         ╰── this bracketed macro argument is invalid
+   │ 
+ 5 │     #macro a, #b, c, 1, #2, 3
+   │     ───┬──  
+   │        ╰──── macro called here
+───╯
+error: empty bracketed macro argument
+   ╭─[ test.asm:3:27 ]
+   │
+ 3 │     println "bad args: \<?>, \<#>"
+   │                              ──┬─  
+   │                                ╰─── expected a number or symbol name between the angle brackets
+   │ 
+ 5 │     #macro a, #b, c, 1, #2, 3
+   │     ───┬──  
+   │        ╰──── macro called here
+   │ 
+   │ Help: it kind of looks like a fish, doesn't it?
+───╯
+2 errors generated.

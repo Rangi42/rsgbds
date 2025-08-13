@@ -638,8 +638,13 @@ impl Lexer {
                         }
                     },
 
-                    Err(Some(chars!(ident_start) | '@')) => {
-                        let (ofs, _ch) = chars.next().unwrap();
+                    Err(Some(chars!(ident_start) | '@' | '#')) => {
+                        let (ofs, first_char) = chars.next().unwrap();
+                        let ofs = if first_char == '#' {
+                            ofs + '#'.len_utf8()
+                        } else {
+                            ofs
+                        };
                         let end_ofs = loop {
                             match chars.peek() {
                                 Some((_ofs, chars!(ident))) => {
@@ -653,6 +658,10 @@ impl Lexer {
                             }
                         };
                         let name = &text[ofs..end_ofs];
+                        if name.is_empty() {
+                            // This is possible if `first_char` is '#'.
+                            return Some(Err(MacroArgError::EmptyBracketed));
+                        }
                         match identifiers.get(name).and_then(|ident| symbols.find(&ident)) {
                             None => return Some(Err(MacroArgError::NoSuchSym(name, None))),
                             Some(SymbolData::Deleted(span)) => {
@@ -2561,7 +2570,7 @@ impl MacroArgError<'_> {
             Self::EmptyBracketed => {
                 "expected a number or symbol name between the angle brackets".into()
             }
-            Self::InvalidBracketedChar => "invalid character for bracketed macro argument".into(),
+            Self::InvalidBracketedChar => "this bracketed macro argument is invalid".into(),
             // TODO: highlight the deletion point
             Self::NoSuchSym(_name, _opt_del_span) => {
                 "no symbol by this name is defined at this point".into()
