@@ -894,6 +894,21 @@ impl Lexer {
             }
         }
 
+        let mut span = ctx.new_span();
+        span.bytes.start += first_ofs.unwrap_or(text.len());
+        span.bytes.end = span.bytes.start;
+        let span = Span::Normal(span);
+        diagnostics::error(
+            &span,
+            |error| {
+                error.set_message("unterminated interpolation");
+                error.add_label(
+                    diagnostics::error_label(&span).with_message("no closing brace before this"),
+                );
+            },
+            nb_errors_left,
+            options,
+        );
         Err(())
     }
 
