@@ -1,7 +1,22 @@
-error: macro-args-outside-macro.asm(1):
-    '\1' cannot be used outside of a macro
-error: macro-args-outside-macro.asm(2):
-    '\<2>' cannot be used outside of a macro
-error: macro-args-outside-macro.asm(3):
-    '\#' cannot be used outside of a macro
-Assembly aborted with 3 errors!
+error: a macro argument was used outside of a macro
+   ╭─[ test.asm:1:10 ]
+   │
+ 1 │     println \1
+   │             ─┬  
+   │              ╰── cannot use a macro argument here
+───╯
+error: a macro argument was used outside of a macro
+   ╭─[ test.asm:2:10 ]
+   │
+ 2 │     println \<2>
+   │             ──┬─  
+   │               ╰─── cannot use a macro argument here
+───╯
+error: a macro argument was used outside of a macro
+   ╭─[ test.asm:3:10 ]
+   │
+ 3 │     println \#
+   │             ─┬  
+   │              ╰── cannot use a macro argument here
+───╯
+3 errors generated.

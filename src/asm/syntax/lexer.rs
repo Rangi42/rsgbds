@@ -1146,7 +1146,7 @@ impl Lexer {
                                         diagnostics::error_label(&span)
                                             .with_message(err.label_msg()),
                                     );
-                                    if ctx.ofs_scanned_for_expansion > 0 {
+                                    if matches!(ctx.span.node.kind, SpanKind::MacroArg(..)) {
                                         error.set_help("characters inside of macro args cannot start an expansion themselves");
                                     }
                                 })
@@ -1658,8 +1658,10 @@ impl Lexer {
                 // Default case.
                 Some(ch) => {
                     debug_assert!(span.bytes.is_empty());
-                    let was_blue_painted =
-                        self.active_context().unwrap().ofs_scanned_for_expansion > 0;
+                    let was_blue_painted = matches!(
+                        self.active_context().unwrap().span.node.kind,
+                        SpanKind::MacroArg(..)
+                    );
                     self.consume(&mut span);
 
                     let err_span = Span::Normal(span);
@@ -1670,7 +1672,7 @@ impl Lexer {
                             diagnostics::error_label(&err_span)
                                 .with_message("this character was not expected at this point"),
                         );
-                        if was_blue_painted&&matches!(ch, '{'|'}'|'\\') {
+                        if was_blue_painted && matches!(ch, '{'|'}'|'\\') {
                             error.set_help("characters inside of macro args cannot start an expansion themselves")
                         }
                     });
@@ -2305,7 +2307,7 @@ impl Lexer {
                                         error.add_label(
                                             diagnostics::error_label(&span)
                                                 .with_message(err.label_msg()),
-                                        )
+                                        );
                                     });
                                 }
                             }
