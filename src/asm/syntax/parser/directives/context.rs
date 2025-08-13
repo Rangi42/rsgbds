@@ -264,7 +264,7 @@ pub(in super::super) fn parse_break(keyword: Token, parse_ctx: &mut parse_ctx!()
     // Parse up to EOL right now, since we're about to switch contexts.
     let lookahead = expect_eol(parse_ctx.next_token(), parse_ctx);
 
-    if let Err(loop_context_somewhere) = parse_ctx.lexer.break_loop() {
+    if let Err(loop_context_somewhere) = parse_ctx.break_loop() {
         parse_ctx.error(&keyword.span, |error| {
             error.set_message("`break` used outside of a loop");
             error.add_label(diagnostics::error_label(&keyword.span).with_message("not currently inside of a loop"));
@@ -384,6 +384,16 @@ impl parse_ctx!() {
             }
 
             _ => unreachable!(),
+        }
+    }
+
+    pub fn break_loop(&mut self) -> Result<(), bool> {
+        match self.lexer.break_loop() {
+            Ok(()) => {
+                self.unique_id.exit_unique_ctx();
+                Ok(())
+            }
+            Err(err) => Err(err),
         }
     }
 }
