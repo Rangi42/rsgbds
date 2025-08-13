@@ -80,6 +80,7 @@ impl Lexer {
         self.push_context(
             NormalSpan::new(file, SpanKind::File, parent),
             Default::default(),
+            true,
             nb_errors_left,
             options,
         )
@@ -95,7 +96,7 @@ impl Lexer {
     ) -> Result<(), ()> {
         contents.node.parent = Some(parent);
         contents.node.kind = SpanKind::Macro(macro_name);
-        self.push_context(contents, Default::default(), nb_errors_left, options)
+        self.push_context(contents, Default::default(), true, nb_errors_left, options)
     }
 
     pub fn push_loop(
@@ -108,7 +109,7 @@ impl Lexer {
     ) -> Result<(), ()> {
         contents.node.parent = Some(parent);
         contents.node.kind = SpanKind::Loop(0);
-        self.push_context(contents, loop_info, nb_errors_left, options)
+        self.push_context(contents, loop_info, true, nb_errors_left, options)
     }
 
     pub fn break_loop(&mut self) -> Result<(), bool> {
@@ -210,6 +211,7 @@ impl Lexer {
         &mut self,
         span: NormalSpan,
         loop_info: LoopInfo,
+        can_contain_expansions: bool,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) -> Result<(), ()> {
@@ -225,11 +227,10 @@ impl Lexer {
         } else {
             self.contexts.push(Context {
                 cur_byte: span.bytes.start,
-                // Expansions that end implicitly cannot contain other expansions.
-                ofs_scanned_for_expansion: if span.node.kind.ends_implicitly() {
-                    span.bytes.end
-                } else {
+                ofs_scanned_for_expansion: if can_contain_expansions {
                     span.bytes.start
+                } else {
+                    span.bytes.end
                 },
                 span,
                 loop_state: loop_info,
@@ -396,6 +397,7 @@ impl Lexer {
                                         Some(Rc::new(trigger_span)),
                                     ),
                                     Default::default(),
+                                    false, // Macro args cannot contain more expansions.
                                     params.nb_errors_left,
                                     params.options,
                                 );
@@ -481,6 +483,7 @@ impl Lexer {
                             Some(Rc::new(trigger_span)),
                         ),
                         Default::default(),
+                        true, // Interpolations *can* contain other expansions.
                         params.nb_errors_left,
                         params.options,
                     );
@@ -1137,7 +1140,7 @@ impl Lexer {
                                             .with_message(err.label_msg()),
                                     );
                                     if ctx.ofs_scanned_for_expansion > 0 {
-                                        error.set_help("characters inside of interpolations and macro args cannot start one themselves");
+                                        error.set_help("characters inside of macro args cannot start an expansion themselves");
                                     }
                                 })
                             }
@@ -1648,6 +1651,8 @@ impl Lexer {
                 // Default case.
                 Some(ch) => {
                     debug_assert!(span.bytes.is_empty());
+                    let was_blue_painted =
+                        self.active_context().unwrap().ofs_scanned_for_expansion > 0;
                     self.consume(&mut span);
 
                     let err_span = Span::Normal(span);
@@ -1658,6 +1663,9 @@ impl Lexer {
                             diagnostics::error_label(&err_span)
                                 .with_message("this character was not expected at this point"),
                         );
+                        if was_blue_painted&&matches!(ch, '{'|'}'|'\\') {
+                            error.set_help("characters inside of macro args cannot start an expansion themselves")
+                        }
                     });
 
                     // Borrowck is not happy otherwise, but this should hopefully compile to nothing.
