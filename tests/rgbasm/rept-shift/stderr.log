@@ -1,7 +1,34 @@
-warning: rept-shift.asm(15) -> rept-shift.asm::m(10): [-Wmacro-shift]
-    Cannot shift macro arguments past their end
-warning: rept-shift.asm(15) -> rept-shift.asm::m(11): [-Wmacro-shift]
-    Cannot shift macro arguments past their end
-error: rept-shift.asm(15) -> rept-shift.asm::m(12):
-    Macro argument '\1' not defined
-Assembly aborted with 1 error!
+[-Wmacro-shift] warning: attempting to shift by more than the 0 available macro arguments
+    ╭─[ test.asm:10:2 ]
+    │
+ 10 │     SHIFT
+    │     ──┬──  
+    │       ╰──── attempting to shift by 1 here
+    │ 
+ 15 │  m This, used, not, to, work
+    │  ┬  
+    │  ╰── macro called here
+────╯
+[-Wmacro-shift] warning: attempting to shift by more than the 0 available macro arguments
+    ╭─[ test.asm:11:8 ]
+    │
+ 11 │     SHIFT 256
+    │           ─┬─  
+    │            ╰─── attempting to shift by 256 here
+    │ 
+ 15 │  m This, used, not, to, work
+    │  ┬  
+    │  ╰── macro called here
+────╯
+error: macro argument #1 doesn't exist
+    ╭─[ test.asm:12:11 ]
+    │
+ 12 │     PRINTLN "\1?"
+    │              ─┬  
+    │               ╰── 0 macro arguments are available
+    │ 
+ 15 │  m This, used, not, to, work
+    │  ┬  
+    │  ╰── macro called here
+────╯
+1 error generated.

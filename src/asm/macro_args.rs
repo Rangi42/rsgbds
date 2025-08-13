@@ -3,6 +3,7 @@ use std::{cell::Cell, cmp::Ordering, rc::Rc};
 use compact_str::{format_compact, CompactString};
 
 use crate::{
+    common::S,
     diagnostics::{self, warning},
     sources::{Source, Span},
     Options,
@@ -71,8 +72,9 @@ impl MacroArgs {
                     span,
                     |warning| {
                         warning.set_message(format!(
-                            "attempting to shift by more than the {} available macro arguments",
-                            self.max_valid()
+                            "attempting to shift by more than the {} available macro argument{}",
+                            self.max_valid(),
+                            S::from(self.max_valid()),
                         ));
                         warning.add_label(
                             diagnostics::warning_label(span)
@@ -83,7 +85,7 @@ impl MacroArgs {
                     options,
                 );
 
-                self.shift = self.max_valid();
+                self.shift = self.args.len();
             }
 
             Ordering::Less if -offset as usize > self.shift => {
@@ -92,8 +94,9 @@ impl MacroArgs {
                     span,
                     |warning| {
                         warning.set_message(format!(
-                            "attempting to unshift by more than the {} shifted arguments",
-                            self.shift
+                            "attempting to unshift by more than the {} shifted argument{}",
+                            self.shift,
+                            S::from(self.shift),
                         ));
                         warning.add_label(
                             diagnostics::warning_label(span)

@@ -1,8 +1,44 @@
-warning: shift-negative.asm(20) -> shift-negative.asm::m(13): [-Wmacro-shift]
-    Cannot shift macro arguments past their end
-warning: shift-negative.asm(20) -> shift-negative.asm::m(14): [-Wmacro-shift]
-    Cannot shift macro arguments past their beginning
-warning: shift-negative.asm(20) -> shift-negative.asm::m(16): [-Wmacro-shift]
-    Cannot shift macro arguments past their end
-warning: shift-negative.asm(20) -> shift-negative.asm::m(18): [-Wmacro-shift]
-    Cannot shift macro arguments past their beginning
+[-Wmacro-shift] warning: attempting to shift by more than the 1 available macro argument
+    ╭─[ test.asm:13:8 ]
+    │
+ 13 │     shift 2
+    │           ┬  
+    │           ╰── attempting to shift by 2 here
+    │ 
+ 20 │     m one
+    │     ┬  
+    │     ╰── macro called here
+────╯
+[-Wmacro-shift] warning: attempting to unshift by more than the 1 shifted argument
+    ╭─[ test.asm:14:8 ]
+    │
+ 14 │     shift -3
+    │           ─┬  
+    │            ╰── attempting to shift by -3 here
+    │ 
+ 20 │     m one
+    │     ┬  
+    │     ╰── macro called here
+────╯
+[-Wmacro-shift] warning: attempting to shift by more than the 0 available macro arguments
+    ╭─[ test.asm:16:8 ]
+    │
+ 16 │     shift 1
+    │           ┬  
+    │           ╰── attempting to shift by 1 here
+    │ 
+ 20 │     m one
+    │     ┬  
+    │     ╰── macro called here
+────╯
+[-Wmacro-shift] warning: attempting to unshift by more than the 0 shifted arguments
+    ╭─[ test.asm:18:8 ]
+    │
+ 18 │     shift -1
+    │           ─┬  
+    │            ╰── attempting to shift by -1 here
+    │ 
+ 20 │     m one
+    │     ┬  
+    │     ╰── macro called here
+────╯
