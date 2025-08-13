@@ -361,7 +361,7 @@ impl AddrConstraint {
                     .wrapping_add(offset as u16)
                     .rem_euclid(1 << *align);
                 if addr % (1 << *align) == cur_align_offset {
-                    *self = AddrConstraint::Addr(addr);
+                    *self = AddrConstraint::Addr(addr.wrapping_sub(offset as u16));
                     Ok(())
                 } else {
                     Err(MergeError::BadAlignFixed(*align, cur_align_offset, addr))
