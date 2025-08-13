@@ -182,58 +182,10 @@ fn parse_section_attrs(
                     }
                 }};
 
-                let (expr, after_expr) = expr::expect_numeric_expr(lookahead, parse_ctx);
-                let align = match parse_ctx.try_const_eval(&expr) {
-                    Ok((value, span)) => if (value as u32) > 16 {
-                        parse_ctx.error(&span, |error| {
-                            error.set_message("specified alignment is larger than 16");
-                            error.add_label(
-                                diagnostics::error_label(&span)
-                                    .with_message(format!("this expression evaluates to {value}"))
-                            );
-                        });
-                        16
-                    } else {
-                        value as u8
-                    },
-                    Err(err) => {
-                        parse_ctx.report_expr_error(err);
-                        0
-                    }
-                };
-
-                let align_size = 1 << align;
-                let align_ofs = if matches_tok!(after_expr, ",") {
-                    lookahead = parse_ctx.next_token();
-                    // Allow a trailing comma.
-                    let (maybe_expr, after_expr) = expr::parse_numeric_expr(lookahead, parse_ctx);
-                    lookahead = after_expr;
-                    maybe_expr.map_or(0, |expr| {
-                        match parse_ctx.try_const_eval(&expr) {
-                            Ok((value, span)) => {
-                                if value >= align_size || value <= -align_size {
-                                    parse_ctx.warn(warning!("align-ofs"), &span, |warning| {
-                                        warning.set_message("alignment offset is larger than alignment size");
-                                        warning.add_label(
-                                            diagnostics::warning_label(&span)
-                                                .with_message(format!("requested an alignment to {align_size} bytes and an offset of {value} bytes")),
-                                        );
-                                    });
-                                }
-                                value.rem_euclid(align_size) as u16
-                            },
-                            Err(err) => {
-                                parse_ctx.report_expr_error(err);
-                                0
-                            }
-                        }
-                    })
-                } else {
-                    lookahead = after_expr;
-                    0
-                };
+                let (align, align_ofs, after_args) = parse_align_args(lookahead, parse_ctx);
+                lookahead = after_args;
                 // If there is already a constraint, it must match at the same offset.
-                if let Err(err) = attrs.address.merge(AddrConstraint::Align(align, align_ofs), 0) {
+                if let Err(err) = attrs.address.merge((align, align_ofs).into(), 0) {
                     let (msg, label_msg) = err.details();
                     parse_ctx.error(
                         &align_span,
@@ -277,6 +229,73 @@ fn parse_section_attrs(
     }
 
     (span, attrs, name, lookahead)
+}
+pub(super) fn parse_align_args(
+    mut lookahead: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (u8, u16, Token) {
+    let (expr, after_expr) = expr::expect_numeric_expr(lookahead, parse_ctx);
+    let align = match parse_ctx.try_const_eval(&expr) {
+        Ok((value, span)) => match value {
+            0..=16 => value as u8,
+            17.. => {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("alignment cannot be larger than 16");
+                    error.add_label(
+                        diagnostics::error_label(&span)
+                            .with_message(format!("an alignment of {value} is invalid")),
+                    );
+                });
+                16
+            }
+            ..=-1 => {
+                parse_ctx.error(&span, |error| {
+                    error.set_message("alignment cannot be negative");
+                    error.add_label(
+                        diagnostics::error_label(&span)
+                            .with_message(format!("an alignment of {value} is invalid")),
+                    );
+                });
+                0
+            }
+        },
+        Err(err) => {
+            parse_ctx.report_expr_error(err);
+            0
+        }
+    };
+
+    let align_size = 1 << align;
+    let align_ofs = if matches_tok!(after_expr, ",") {
+        lookahead = parse_ctx.next_token();
+        // Allow a trailing comma.
+        let (maybe_expr, after_expr) = expr::parse_numeric_expr(lookahead, parse_ctx);
+        lookahead = after_expr;
+        maybe_expr.map_or(0, |expr| {
+            match parse_ctx.try_const_eval(&expr) {
+                Ok((value, span)) => {
+                    if value >= align_size || value <= -align_size {
+                        parse_ctx.warn(warning!("align-ofs"), &span, |warning| {
+                            warning.set_message("alignment offset is larger than alignment size");
+                            warning.add_label(
+                                diagnostics::warning_label(&span)
+                                    .with_message(format!("requested an alignment to {align_size} bytes and an offset of {value} bytes")),
+                            );
+                        });
+                    }
+                    value.rem_euclid(align_size) as u16
+                },
+                Err(err) => {
+                    parse_ctx.report_expr_error(err);
+                    0
+                }
+            }
+        })
+    } else {
+        lookahead = after_expr;
+        0
+    };
+    (align, align_ofs, lookahead)
 }
 pub(in super::super) fn parse_section(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     let (def_span, attrs, name, lookahead) = parse_section_attrs(parse_ctx.next_token(), parse_ctx);
@@ -410,93 +429,26 @@ pub(in super::super) fn parse_pops(keyword: Token, parse_ctx: &mut parse_ctx!())
 }
 
 pub(in super::super) fn parse_align(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    let (expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
-
-    let (offset, lookahead) = expect_one_of! { lookahead => {
-        |","| => {
-            let (ofs_expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
-
-            let ofs = match parse_ctx.try_const_eval(&ofs_expr){
-                Ok((value, _span)) => value,
-                Err(error) => {
-                    parse_ctx.report_expr_error(error);
-                    0
-                }
-            };
-            (ofs, lookahead)
-        },
-        else |unexpected| => (0, unexpected)
-    }};
-
-    match parse_ctx.try_const_eval(&expr) {
-        Ok((value, span)) => {
-            let alignment = match value {
-                0..=16 => value as u8,
-                17.. => {
-                    parse_ctx.error(&span, |error| {
-                        error.set_message("alignment cannot be larger than 16");
-                        error.add_label(
-                            diagnostics::error_label(&span)
-                                .with_message(format!("an alignment of {value} is invalid")),
-                        );
-                    });
-                    16
-                }
-                ..=-1 => {
-                    parse_ctx.error(&span, |error| {
-                        error.set_message("alignment cannot be negative");
-                        error.add_label(
-                            diagnostics::error_label(&span)
-                                .with_message(format!("an alignment of {value} is invalid")),
-                        );
-                    });
-                    0
-                }
-            };
-
-            let align_size = 1 << alignment;
-            if offset >= align_size || offset <= -align_size {
-                parse_ctx.warn(warning!("align-ofs"), &keyword.span, |warning| {
-                    warning.set_message("alignment offset is larger than alignment size");
-                    warning.add_label(
-                        diagnostics::warning_label(&keyword.span)
-                            .with_message(format!("requested an alignment to ${align_size:02X} bytes and an offset of ${offset:02X} bytes")),
-                    );
-                });
-            };
-            let offset = offset.rem_euclid(align_size) as u16;
-
-            if let Some((_data_section, symbol_section)) =
-                parse_ctx.sections.active_section.as_mut()
-            {
-                let constraint = if alignment == 16 {
-                    AddrConstraint::Addr(offset)
-                } else {
-                    AddrConstraint::Align(alignment, offset)
-                };
-                if let Err(err) = parse_ctx.sections.sections[symbol_section.id]
-                    .attrs
-                    .address
-                    .merge(constraint, symbol_section.offset)
-                {
-                    parse_ctx.error(&keyword.span, |error| {
-                        let (msg, label) = err.details();
-                        error.set_message(msg);
-                        error
-                            .add_label(diagnostics::error_label(&keyword.span).with_message(label));
-                    });
-                }
-            } else {
-                parse_ctx.error(&keyword.span, |error| {
-                    error.set_message("`align` used outside of a section");
-                    error.add_label(
-                        diagnostics::error_label(&keyword.span)
-                            .with_message("this directive is invalid"),
-                    );
-                });
-            }
+    let (alignment, offset, lookahead) = parse_align_args(parse_ctx.next_token(), parse_ctx);
+    if let Some((_data_section, symbol_section)) = parse_ctx.sections.active_section.as_mut() {
+        if let Err(err) = parse_ctx.sections.sections[symbol_section.id]
+            .attrs
+            .address
+            .merge((alignment, offset).into(), symbol_section.offset)
+        {
+            parse_ctx.error(&keyword.span, |error| {
+                let (msg, label) = err.details();
+                error.set_message(msg);
+                error.add_label(diagnostics::error_label(&keyword.span).with_message(label));
+            });
         }
-        Err(error) => parse_ctx.report_expr_error(error),
+    } else {
+        parse_ctx.error(&keyword.span, |error| {
+            error.set_message("`align` used outside of a section");
+            error.add_label(
+                diagnostics::error_label(&keyword.span).with_message("this directive is invalid"),
+            );
+        });
     }
 
     lookahead

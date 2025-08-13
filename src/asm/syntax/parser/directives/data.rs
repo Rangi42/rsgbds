@@ -1,5 +1,6 @@
 use crate::{
     diagnostics,
+    section::AddrConstraint,
     syntax::{
         parser::{expect_one_of, expr, misc, parse_ctx},
         tokens::Token,
@@ -9,7 +10,44 @@ use crate::{
 pub(in super::super) fn parse_ds(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
     let (length, lookahead) = expect_one_of! { parse_ctx.next_token() => {
         |"align"| => {
-            todo!();
+            let lookahead = expect_one_of! { parse_ctx.next_token() => {
+                |"["| => parse_ctx.next_token(),
+                else |other| => {
+                    parse_ctx.report_syntax_error(&other, |error, span| {
+                        error.add_label(
+                            diagnostics::error_label(span)
+                                .with_message("`ds align` must have the alignment constraint between braces")
+                        )
+                    });
+                    other // Keep trying to parse.
+                }
+            }};
+
+            let (align, align_ofs, lookahead) = super::section::parse_align_args(lookahead, parse_ctx);
+
+            let lookahead = expect_one_of! { lookahead => {
+                |"]"| => parse_ctx.next_token(),
+                else |other| => {
+                    parse_ctx.report_syntax_error(&other, |error, span| {
+                        error.add_label(
+                            diagnostics::error_label(span)
+                                .with_message("missing closing brace after `ds align`")
+                        )
+                    });
+                    other
+                }
+            }};
+
+            let length = if let Some((_data_section, sym_section)) = parse_ctx.sections.active_section.as_ref() {
+                let section = &mut parse_ctx.sections.sections[sym_section.id];
+                let length = section.bytes_until_alignment(align, align_ofs, sym_section.offset);
+                section.attrs.address.merge((align, align_ofs).into(), sym_section.offset + length).unwrap();
+                length
+            } else {
+                0 // The data emission stage will produce an error anyway.
+            };
+
+            (length, lookahead)
         },
         else |unexpected| => {
             let (res, lookahead) = expr::parse_numeric_expr(unexpected, parse_ctx);

@@ -539,7 +539,7 @@ impl BinOp {
                             if left_sect == right_sect =>
                         {
                             Ok((
-                                right_ofs.wrapping_sub(left_ofs) as i32,
+                                left_ofs.wrapping_sub(right_ofs) as i32,
                                 left_span.merged_with(&right_span),
                             ))
                         }
