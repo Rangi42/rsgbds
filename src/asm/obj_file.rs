@@ -361,16 +361,7 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                 SectionKind::Union => 0x80,
                 SectionKind::Fragment => 0x40,
             };
-            let mem_region = match section.attrs.mem_region {
-                MemRegion::Wram0 => 0,
-                MemRegion::Vram => 1,
-                MemRegion::Romx => 2,
-                MemRegion::Rom0 => 3,
-                MemRegion::Hram => 4,
-                MemRegion::Wramx => 5,
-                MemRegion::Sram => 6,
-                MemRegion::Oam => 7,
-            };
+            let mem_region = serialise_region(section.attrs.mem_region);
             self.write_byte(flags | mem_region)?;
 
             self.write_long(section.address().map_or(u32::MAX, Into::into))?;
@@ -474,6 +465,7 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                 OpKind::BankOfSect(name) | OpKind::StartOfSect(name) | OpKind::SizeOfSect(name) => {
                     2 + name.len()
                 }
+                OpKind::StartOfRegion(_) | OpKind::SizeOfRegion(_) => 2,
                 OpKind::Binary(_) => 1,
                 OpKind::Unary(operator) => {
                     if matches!(operator, UnOp::Identity) {
@@ -534,6 +526,14 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                     self.write_byte(0x55)?;
                     self.write_string(name)?;
                 }
+                &OpKind::SizeOfRegion(region) => {
+                    self.write_byte(0x55)?;
+                    self.write_byte(serialise_region(region))?;
+                }
+                &OpKind::StartOfRegion(region) => {
+                    self.write_byte(0x56)?;
+                    self.write_byte(serialise_region(region))?;
+                }
                 OpKind::Binary(operator) => self.write_byte(match operator {
                     BinOp::LogicalOr => 0x22,
                     BinOp::LogicalAnd => 0x21,
@@ -575,5 +575,18 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
         }
 
         Ok(())
+    }
+}
+
+fn serialise_region(mem_region: MemRegion) -> u8 {
+    match mem_region {
+        MemRegion::Wram0 => 0,
+        MemRegion::Vram => 1,
+        MemRegion::Romx => 2,
+        MemRegion::Rom0 => 3,
+        MemRegion::Hram => 4,
+        MemRegion::Wramx => 5,
+        MemRegion::Sram => 6,
+        MemRegion::Oam => 7,
     }
 }

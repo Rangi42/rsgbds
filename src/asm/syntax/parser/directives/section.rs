@@ -5,10 +5,30 @@ use crate::{
     diagnostics::{self, warning},
     section::{AddrConstraint, SectionAttrs, SectionKind},
     sources::Span,
-    syntax::{parser::Expected, tokens::Token},
+    syntax::{
+        parser::{discard_rest_of_line, Expected},
+        tokens::Token,
+    },
 };
 
 use super::super::{expect_one_of, expr, matches_tok, parse_ctx, require, string};
+
+pub(in super::super) fn parse_mem_region(
+    first_token: Token,
+    parse_ctx: &mut parse_ctx!(),
+) -> (Option<MemRegion>, Token) {
+    expect_one_of! { first_token => {
+        |"rom0"| => (Some(MemRegion::Rom0), parse_ctx.next_token()),
+        |"romx"| => (Some(MemRegion::Romx), parse_ctx.next_token()),
+        |"vram"| => (Some(MemRegion::Vram), parse_ctx.next_token()),
+        |"sram"| => (Some(MemRegion::Sram), parse_ctx.next_token()),
+        |"wram0"| => (Some(MemRegion::Wram0), parse_ctx.next_token()),
+        |"wramx"| => (Some(MemRegion::Wramx), parse_ctx.next_token()),
+        |"oam"| => (Some(MemRegion::Oam), parse_ctx.next_token()),
+        |"hram"| => (Some(MemRegion::Hram), parse_ctx.next_token()),
+        else |other| => (None, other)
+    }}
+}
 
 fn parse_section_attrs(
     first_token: Token,
@@ -36,62 +56,34 @@ fn parse_section_attrs(
     let (maybe_string, lookahead) = string::expect_string_expr(lookahead, parse_ctx);
     let (name, span) = maybe_string.unwrap_or_else(|| ("<error>".into(), lookahead.span.clone()));
 
-    require! { lookahead => |","| else |other| {
-        parse_ctx.report_syntax_error(&other, |error,span| {
-            error.add_label(diagnostics::error_label(span).with_message("expected a comma here"));
-        });
+    let lookahead = expect_one_of! { lookahead => {
+        |","| => parse_ctx.next_token(),
+        else |other| => {
+            parse_ctx.report_syntax_error(&other, |error,span| {
+                error.add_label(diagnostics::error_label(span).with_message("expected a comma here"));
+            });
+            other
+        }
     }};
 
-    let mut lookahead = expect_one_of! { parse_ctx.next_token() => {
-        |"rom0"| => {
-            attrs.mem_region = MemRegion::Rom0;
-            parse_ctx.next_token()
-        },
-        |"romx"| => {
-            attrs.mem_region = MemRegion::Romx;
-            parse_ctx.next_token()
-        },
-        |"vram"| => {
-            attrs.mem_region = MemRegion::Vram;
-            parse_ctx.next_token()
-        },
-        |"sram"| => {
-            attrs.mem_region = MemRegion::Sram;
-            parse_ctx.next_token()
-        },
-        |"wram0"| => {
-            attrs.mem_region = MemRegion::Wram0;
-            parse_ctx.next_token()
-        },
-        |"wramx"| => {
-            attrs.mem_region = MemRegion::Wramx;
-            parse_ctx.next_token()
-        },
-        |"oam"| => {
-            attrs.mem_region = MemRegion::Oam;
-            parse_ctx.next_token()
-        },
-        |"hram"| => {
-            attrs.mem_region = MemRegion::Hram;
-            parse_ctx.next_token()
-        },
-        else |other, expected| => {
-            parse_ctx.report_syntax_error(&other, |error,span| {
-                error.add_label(diagnostics::error_label(span).with_message(Expected(expected)))
+    let (region, mut lookahead) = parse_mem_region(lookahead, parse_ctx);
+    match region {
+        Some(region) => attrs.mem_region = region,
+        None => {
+            parse_ctx.report_syntax_error(&lookahead, |error, span| {
+                error.add_label(
+                    diagnostics::error_label(span).with_message("expected a memory region name"),
+                )
             });
 
             // Process the next token if it is expected later in the directive.
             // Otherwise, consume the rest of the line (to avoid reporting an extraneous syntax error), and abort.
-            if !matches_tok!(other, "," | "[" | "number"(_) | "bank" | "align") {
-                let mut lookahead = other;
-                while !matches_tok!(lookahead, "end of input" | "end of line") {
-                    lookahead = parse_ctx.next_token();
-                }
+            if !matches_tok!(lookahead, "," | "[" | "number"(_) | "bank" | "align") {
+                let lookahead = discard_rest_of_line(lookahead, parse_ctx);
                 return (span, attrs, name, lookahead);
             }
-            other
         }
-    }};
+    }
 
     // Address.
     if matches_tok!(lookahead, "[") {

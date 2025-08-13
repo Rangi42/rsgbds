@@ -1,5 +1,7 @@
 use std::cell::Cell;
 
+use either::Either;
+
 use crate::{
     charmap::{CharMapping, Charmap},
     diagnostics,
@@ -10,6 +12,7 @@ use crate::{
 };
 
 use super::{
+    directives::section,
     expect_one_of, matches_tok,
     misc::{self, StrOrNum},
     parse_ctx, string,
@@ -74,9 +77,9 @@ fn parse_subexpr(
             let (res, _opening_span, closing_span, lookahead) = misc::parse_parens_pair(parse_ctx.next_token(), parse_ctx, |lookahead, parse_ctx| {
                 let (maybe_string, lookahead) = string::parse_string_expr(lookahead, parse_ctx);
                 match maybe_string {
-                    Some((string, _span)) => (Some(Ok(string)), lookahead),
+                    Some((string, _span)) => (Some(Either::Left(string)), lookahead),
                     None => expect_one_of! { lookahead => {
-                        |"identifier"(ident, _)| => (Some(Err(ident)), parse_ctx.next_token()),
+                        |"identifier"(ident, _)| => (Some(Either::Right(ident)), parse_ctx.next_token()),
                         else |unexpected| => {
                             parse_ctx.report_syntax_error(&unexpected, |error, span| {
                                 error.add_label(diagnostics::error_label(span).with_message("expected an identifier or string expression between the parentheses"));
@@ -90,8 +93,8 @@ fn parse_subexpr(
             let span = span.merged_with(&closing_span);
             let expr = match res {
                 None => Expr::nothing(span),
-                Some(Ok(string)) => Expr::bank_of_section(string, span),
-                Some(Err(ident)) => Expr::bank_of_symbol(ident, span)
+                Some(Either::Left(string)) => Expr::bank_of_section(string, span),
+                Some(Either::Right(ident)) => Expr::bank_of_symbol(ident, span),
             };
             (expr, lookahead)
         },
@@ -99,12 +102,30 @@ fn parse_subexpr(
             let (res, _opening_span, closing_span, lookahead) = misc::parse_parens_pair(
                 parse_ctx.next_token(),
                 parse_ctx,
-                string::expect_string_expr,
+                |lookahead, parse_ctx| {
+                    let (maybe_string, lookahead) = string::parse_string_expr(lookahead, parse_ctx);
+                    match maybe_string {
+                        Some((string, _span)) => (Some(Either::Left(string)), lookahead),
+                        None => {
+                            let (maybe_region, lookahead) = section::parse_mem_region(lookahead, parse_ctx);
+                            match maybe_region {
+                                Some(region) => (Some(Either::Right(region)), lookahead),
+                                None => {
+                                    parse_ctx.report_syntax_error(&lookahead, |error, span| {
+                                        error.add_label(diagnostics::error_label(span).with_message("expected a string expression or memory region name here"));
+                                    });
+                                    (None, lookahead)
+                                }
+                            }
+                        }
+                    }
+                },
             );
 
             let span = span.merged_with(&closing_span);
             match res {
-                Some((string, _span)) => (Expr::size_of_section(string, span), lookahead),
+                Some(Either::Left(string)) => (Expr::size_of_section(string, span), lookahead),
+                Some(Either::Right(kind)) => (Expr::size_of_region(kind, span), lookahead),
                 None => (Expr::nothing(span), lookahead)
             }
         },
@@ -112,12 +133,30 @@ fn parse_subexpr(
             let (res, _opening_span, closing_span, lookahead) = misc::parse_parens_pair(
                 parse_ctx.next_token(),
                 parse_ctx,
-                string::expect_string_expr,
+                |lookahead, parse_ctx| {
+                    let (maybe_string, lookahead) = string::parse_string_expr(lookahead, parse_ctx);
+                    match maybe_string {
+                        Some((string, _span)) => (Some(Either::Left(string)), lookahead),
+                        None => {
+                            let (maybe_region, lookahead) = section::parse_mem_region(lookahead, parse_ctx);
+                            match maybe_region {
+                                Some(region) => (Some(Either::Right(region)), lookahead),
+                                None => {
+                                    parse_ctx.report_syntax_error(&lookahead, |error, span| {
+                                        error.add_label(diagnostics::error_label(span).with_message("expected a string expression or memory region name here"));
+                                    });
+                                    (None, lookahead)
+                                }
+                            }
+                        }
+                    }
+                },
             );
 
             let span = span.merged_with(&closing_span);
             match res {
-                Some((string, _span)) => (Expr::start_of_section(string, span), lookahead),
+                Some(Either::Left(string)) => (Expr::start_of_section(string, span), lookahead),
+                Some(Either::Right(kind)) => (Expr::start_of_region(kind, span), lookahead),
                 None => (Expr::nothing(span), lookahead)
             }
         },

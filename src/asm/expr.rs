@@ -3,6 +3,7 @@ use std::cell::Cell;
 use compact_str::CompactString;
 
 use crate::{
+    common::section::MemRegion,
     diagnostics,
     macro_args::MacroArgs,
     section::{SectionKind, Sections},
@@ -34,6 +35,8 @@ pub enum OpKind {
     BankOfSect(CompactString),
     SizeOfSect(CompactString),
     StartOfSect(CompactString),
+    SizeOfRegion(MemRegion),
+    StartOfRegion(MemRegion),
     Binary(BinOp),
     Unary(UnOp),
     Low,
@@ -71,6 +74,8 @@ enum ErrKind {
     SymBankNotConst(Identifier),
     BankOfNonLabel(Identifier, &'static str),
     SectBankNotConst(CompactString),
+    SizeOfRegion,
+    StartOfRegion,
     DivBy0,
     RstRange(i32),
     LdhRange(i32),
@@ -128,11 +133,23 @@ impl Expr {
             kind: OpKind::SizeOfSect(name),
         })
     }
+    pub fn size_of_region(kind: MemRegion, span: Span) -> Self {
+        Self::from_terminal(Op {
+            span,
+            kind: OpKind::SizeOfRegion(kind),
+        })
+    }
 
     pub fn start_of_section(name: CompactString, span: Span) -> Self {
         Self::from_terminal(Op {
             span,
             kind: OpKind::StartOfSect(name),
+        })
+    }
+    pub fn start_of_region(kind: MemRegion, span: Span) -> Self {
+        Self::from_terminal(Op {
+            span,
+            kind: OpKind::StartOfRegion(kind),
         })
     }
 }
@@ -293,6 +310,15 @@ impl Expr {
                         },
                     }),
                 },
+                // These can vary depending on linker settings.
+                OpKind::SizeOfRegion(..) => Err(Error {
+                    span: op.span.clone(),
+                    kind: ErrKind::SizeOfRegion,
+                }),
+                OpKind::StartOfRegion(..) => Err(Error {
+                    span: op.span.clone(),
+                    kind: ErrKind::StartOfRegion,
+                }),
                 OpKind::Binary(operator) => {
                     let rhs = eval_stack.pop().unwrap();
                     let lhs = eval_stack.pop().unwrap();
@@ -448,6 +474,8 @@ impl Op {
             | OpKind::BankOfSect(..)
             | OpKind::StartOfSect(..)
             | OpKind::SizeOfSect(..)
+            | OpKind::StartOfRegion(..)
+            | OpKind::SizeOfRegion(..)
             | OpKind::Binary(..)
             | OpKind::Unary(..)
             | OpKind::Low
@@ -774,6 +802,14 @@ impl ErrKind {
             Self::SizeOfSectNotConst(name) => (
                 format!("\"{name}\"'s size is not constant"),
                 "rgbasm can only know the size of non-active normal sections".into(),
+            ),
+            Self::SizeOfRegion => (
+                "the size of memory regions are not constant".into(),
+                "this can depend on linker settings".into(),
+            ),
+            Self::StartOfRegion => (
+                "the start of memory regions are not constant".into(),
+                "this can depend on linker settings".into(),
             ),
             Self::DivBy0 => ("division by zero".into(), "this is equal to zero".into()),
             Self::RstRange(value) => (

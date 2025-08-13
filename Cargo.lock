@@ -1147,6 +1147,7 @@ dependencies = [
  "datatest-stable",
  "derive_more",
  "displaydoc",
+ "either",
  "funty",
  "indexmap",
  "libtest-mimic",

@@ -33,6 +33,7 @@ rgbasm = [
 	"dep:compact_str",
 	"dep:derive_more",
 	"dep:displaydoc",
+	"dep:either",
 	"dep:indexmap",
 	"dep:phf",
 	"dep:rustc-hash",
@@ -93,6 +94,7 @@ derive_more = { version = "0.99.20", default-features = false, features = [
 	"from",
 ], optional = true }
 displaydoc = { version = "0.2.5", optional = true }
+either = { version = "1.15.0", optional = true }
 funty = { version = "2.0", optional = true }
 indexmap = { version = "2.9.0", optional = true }
 os_info = { version = "3.10", default-features = false, optional = true }
