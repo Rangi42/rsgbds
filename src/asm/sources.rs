@@ -18,7 +18,7 @@ pub enum Span {
     Normal(NormalSpan),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct NormalSpan {
     pub node: FileNode,
     pub bytes: Range<usize>,
@@ -92,8 +92,16 @@ impl NormalSpan {
     }
 }
 
-// Required by `ariadne`.
+// Required by `ariadne` to determine whether two spans point to the same file.
 // Instead of comparing sources by contents, we check if both spans point to the same source.
+
+impl PartialEq for NormalSpan {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.node.src, &other.node.src)
+    }
+}
+
+// Required by the object file emitter.
 
 impl PartialEq for FileNode {
     fn eq(&self, other: &Self) -> bool {

@@ -4,9 +4,7 @@
  23 │     db 1 << 8
     │        ───┬──  
     │           ╰──── this expression evaluates to 256, which is not between -256 and 255
-    │
-    ├─[ test.asm:35:2 ]
-    │
+    │ 
  35 │     try Wtruncation
     │     ─┬─  
     │      ╰─── macro called here
@@ -19,9 +17,7 @@
  24 │     db ~(1 << 8)
     │        ────┬───  
     │            ╰───── this expression evaluates to -257, which is not between -256 and 255
-    │
-    ├─[ test.asm:35:2 ]
-    │
+    │ 
  35 │     try Wtruncation
     │     ─┬─  
     │      ╰─── macro called here
@@ -34,9 +30,7 @@
  25 │     dw $1d200
     │        ───┬──  
     │           ╰──── this expression evaluates to 119296, which is not between -65536 and 65535
-    │
-    ├─[ test.asm:35:2 ]
-    │
+    │ 
  35 │     try Wtruncation
     │     ─┬─  
     │      ╰─── macro called here
@@ -47,9 +41,7 @@
  26 │     dw -$1d200
     │        ───┬───  
     │           ╰───── this expression evaluates to -119296, which is not between -65536 and 65535
-    │
-    ├─[ test.asm:35:2 ]
-    │
+    │ 
  35 │     try Wtruncation
     │     ─┬─  
     │      ╰─── macro called here
@@ -60,9 +52,7 @@
  28 │     db ~(1 << BAR_F)
     │        ──────┬─────  
     │              ╰─────── this expression evaluates to -129, which is not between -128 and 255
-    │
-    ├─[ test.asm:35:2 ]
-    │
+    │ 
  35 │     try Wtruncation
     │     ─┬─  
     │      ╰─── macro called here
@@ -75,9 +65,7 @@
  29 │     dw -wLabel
     │        ───┬───  
     │           ╰───── this expression evaluates to -54528, which is not between -32767 and 65535
-    │
-    ├─[ test.asm:35:2 ]
-    │
+    │ 
  35 │     try Wtruncation
     │     ─┬─  
     │      ╰─── macro called here
@@ -88,9 +76,7 @@
  30 │     db ~$ff
     │        ──┬─  
     │          ╰─── this expression evaluates to -256, which is not between -128 and 255
-    │
-    ├─[ test.asm:35:2 ]
-    │
+    │ 
  35 │     try Wtruncation
     │     ─┬─  
     │      ╰─── macro called here
@@ -103,9 +89,7 @@
  31 │     dw ~$ffff
     │        ───┬──  
     │           ╰──── this expression evaluates to -65536, which is not between -32767 and 65535
-    │
-    ├─[ test.asm:35:2 ]
-    │
+    │ 
  35 │     try Wtruncation
     │     ─┬─  
     │      ╰─── macro called here
@@ -116,9 +100,7 @@
  23 │     db 1 << 8
     │        ───┬──  
     │           ╰──── this expression evaluates to 256, which is not between -256 and 255
-    │
-    ├─[ test.asm:37:2 ]
-    │
+    │ 
  37 │     try Wtruncation=1
     │     ─┬─  
     │      ╰─── macro called here
@@ -131,9 +113,7 @@
  24 │     db ~(1 << 8)
     │        ────┬───  
     │            ╰───── this expression evaluates to -257, which is not between -256 and 255
-    │
-    ├─[ test.asm:37:2 ]
-    │
+    │ 
  37 │     try Wtruncation=1
     │     ─┬─  
     │      ╰─── macro called here
@@ -146,9 +126,7 @@
  25 │     dw $1d200
     │        ───┬──  
     │           ╰──── this expression evaluates to 119296, which is not between -65536 and 65535
-    │
-    ├─[ test.asm:37:2 ]
-    │
+    │ 
  37 │     try Wtruncation=1
     │     ─┬─  
     │      ╰─── macro called here
@@ -159,9 +137,7 @@
  26 │     dw -$1d200
     │        ───┬───  
     │           ╰───── this expression evaluates to -119296, which is not between -65536 and 65535
-    │
-    ├─[ test.asm:37:2 ]
-    │
+    │ 
  37 │     try Wtruncation=1
     │     ─┬─  
     │      ╰─── macro called here
@@ -172,9 +148,7 @@
  23 │     db 1 << 8
     │        ───┬──  
     │           ╰──── this expression evaluates to 256, which is not between -256 and 255
-    │
-    ├─[ test.asm:38:2 ]
-    │
+    │ 
  38 │     try Wtruncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -187,9 +161,7 @@
  24 │     db ~(1 << 8)
     │        ────┬───  
     │            ╰───── this expression evaluates to -257, which is not between -256 and 255
-    │
-    ├─[ test.asm:38:2 ]
-    │
+    │ 
  38 │     try Wtruncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -202,9 +174,7 @@
  25 │     dw $1d200
     │        ───┬──  
     │           ╰──── this expression evaluates to 119296, which is not between -65536 and 65535
-    │
-    ├─[ test.asm:38:2 ]
-    │
+    │ 
  38 │     try Wtruncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -215,9 +185,7 @@
  26 │     dw -$1d200
     │        ───┬───  
     │           ╰───── this expression evaluates to -119296, which is not between -65536 and 65535
-    │
-    ├─[ test.asm:38:2 ]
-    │
+    │ 
  38 │     try Wtruncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -228,9 +196,7 @@
  28 │     db ~(1 << BAR_F)
     │        ──────┬─────  
     │              ╰─────── this expression evaluates to -129, which is not between -128 and 255
-    │
-    ├─[ test.asm:38:2 ]
-    │
+    │ 
  38 │     try Wtruncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -243,9 +209,7 @@
  29 │     dw -wLabel
     │        ───┬───  
     │           ╰───── this expression evaluates to -54528, which is not between -32767 and 65535
-    │
-    ├─[ test.asm:38:2 ]
-    │
+    │ 
  38 │     try Wtruncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -256,9 +220,7 @@
  30 │     db ~$ff
     │        ──┬─  
     │          ╰─── this expression evaluates to -256, which is not between -128 and 255
-    │
-    ├─[ test.asm:38:2 ]
-    │
+    │ 
  38 │     try Wtruncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -271,9 +233,7 @@
  31 │     dw ~$ffff
     │        ───┬──  
     │           ╰──── this expression evaluates to -65536, which is not between -32767 and 65535
-    │
-    ├─[ test.asm:38:2 ]
-    │
+    │ 
  38 │     try Wtruncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -284,9 +244,7 @@
  23 │     db 1 << 8
     │        ───┬──  
     │           ╰──── this expression evaluates to 256, which is not between -256 and 255
-    │
-    ├─[ test.asm:39:2 ]
-    │
+    │ 
  39 │     try Werror=truncation=1
     │     ─┬─  
     │      ╰─── macro called here
@@ -299,9 +257,7 @@
  24 │     db ~(1 << 8)
     │        ────┬───  
     │            ╰───── this expression evaluates to -257, which is not between -256 and 255
-    │
-    ├─[ test.asm:39:2 ]
-    │
+    │ 
  39 │     try Werror=truncation=1
     │     ─┬─  
     │      ╰─── macro called here
@@ -314,9 +270,7 @@
  25 │     dw $1d200
     │        ───┬──  
     │           ╰──── this expression evaluates to 119296, which is not between -65536 and 65535
-    │
-    ├─[ test.asm:39:2 ]
-    │
+    │ 
  39 │     try Werror=truncation=1
     │     ─┬─  
     │      ╰─── macro called here
@@ -327,9 +281,7 @@
  26 │     dw -$1d200
     │        ───┬───  
     │           ╰───── this expression evaluates to -119296, which is not between -65536 and 65535
-    │
-    ├─[ test.asm:39:2 ]
-    │
+    │ 
  39 │     try Werror=truncation=1
     │     ─┬─  
     │      ╰─── macro called here
@@ -340,9 +292,7 @@
  23 │     db 1 << 8
     │        ───┬──  
     │           ╰──── this expression evaluates to 256, which is not between -256 and 255
-    │
-    ├─[ test.asm:40:2 ]
-    │
+    │ 
  40 │     try Werror=truncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -355,9 +305,7 @@
  24 │     db ~(1 << 8)
     │        ────┬───  
     │            ╰───── this expression evaluates to -257, which is not between -256 and 255
-    │
-    ├─[ test.asm:40:2 ]
-    │
+    │ 
  40 │     try Werror=truncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -370,9 +318,7 @@
  25 │     dw $1d200
     │        ───┬──  
     │           ╰──── this expression evaluates to 119296, which is not between -65536 and 65535
-    │
-    ├─[ test.asm:40:2 ]
-    │
+    │ 
  40 │     try Werror=truncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -383,9 +329,7 @@
  26 │     dw -$1d200
     │        ───┬───  
     │           ╰───── this expression evaluates to -119296, which is not between -65536 and 65535
-    │
-    ├─[ test.asm:40:2 ]
-    │
+    │ 
  40 │     try Werror=truncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -396,9 +340,7 @@
  28 │     db ~(1 << BAR_F)
     │        ──────┬─────  
     │              ╰─────── this expression evaluates to -129, which is not between -128 and 255
-    │
-    ├─[ test.asm:40:2 ]
-    │
+    │ 
  40 │     try Werror=truncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -411,9 +353,7 @@
  29 │     dw -wLabel
     │        ───┬───  
     │           ╰───── this expression evaluates to -54528, which is not between -32767 and 65535
-    │
-    ├─[ test.asm:40:2 ]
-    │
+    │ 
  40 │     try Werror=truncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -424,9 +364,7 @@
  30 │     db ~$ff
     │        ──┬─  
     │          ╰─── this expression evaluates to -256, which is not between -128 and 255
-    │
-    ├─[ test.asm:40:2 ]
-    │
+    │ 
  40 │     try Werror=truncation=2
     │     ─┬─  
     │      ╰─── macro called here
@@ -439,9 +377,7 @@
  31 │     dw ~$ffff
     │        ───┬──  
     │           ╰──── this expression evaluates to -65536, which is not between -32767 and 65535
-    │
-    ├─[ test.asm:40:2 ]
-    │
+    │ 
  40 │     try Werror=truncation=2
     │     ─┬─  
     │      ╰─── macro called here

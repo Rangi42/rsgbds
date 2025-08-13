@@ -4,63 +4,27 @@ error: recursion is deeper than new limit
   4 │     OPT r9
     │        ─┬─  
     │         ╰─── depth is 11 contexts at this point
-    │
-    ├─[ test.asm:7:3 ]
-    │
+    │ 
   7 │   m
     │   ┬  
     │   ╰── macro called here
-    │
-    ├─[ test.asm:7:3 ]
-    │
-  7 │   m
-    │   ┬  
+    │   │  
     │   ╰── macro called here
-    │
-    ├─[ test.asm:7:3 ]
-    │
-  7 │   m
-    │   ┬  
+    │   │  
     │   ╰── macro called here
-    │
-    ├─[ test.asm:7:3 ]
-    │
-  7 │   m
-    │   ┬  
+    │   │  
     │   ╰── macro called here
-    │
-    ├─[ test.asm:7:3 ]
-    │
-  7 │   m
-    │   ┬  
+    │   │  
     │   ╰── macro called here
-    │
-    ├─[ test.asm:7:3 ]
-    │
-  7 │   m
-    │   ┬  
+    │   │  
     │   ╰── macro called here
-    │
-    ├─[ test.asm:7:3 ]
-    │
-  7 │   m
-    │   ┬  
+    │   │  
     │   ╰── macro called here
-    │
-    ├─[ test.asm:7:3 ]
-    │
-  7 │   m
-    │   ┬  
+    │   │  
     │   ╰── macro called here
-    │
-    ├─[ test.asm:7:3 ]
-    │
-  7 │   m
-    │   ┬  
+    │   │  
     │   ╰── macro called here
-    │
-    ├─[ test.asm:11:3 ]
-    │
+    │ 
  11 │   m
     │   ┬  
     │   ╰── macro called here
@@ -71,65 +35,25 @@ error: maximum recursion depth exceeded
  7 │   m
    │   ┬  
    │   ╰── depth is 64 contexts here, cannot enter a new one
-   │
-   ├─[ test.asm:7:3 ]
-   │
- 7 │   m
-   │   ┬  
+   │   │  
    │   ╰── macro called here
-   │
-   ├─[ test.asm:7:3 ]
-   │
- 7 │   m
-   │   ┬  
+   │   │  
    │   ╰── macro called here
-   │
-   ├─[ test.asm:7:3 ]
-   │
- 7 │   m
-   │   ┬  
+   │   │  
    │   ╰── macro called here
-   │
-   ├─[ test.asm:7:3 ]
-   │
- 7 │   m
-   │   ┬  
+   │   │  
    │   ╰── macro called here
-   │
-   ├─[ test.asm:7:3 ]
-   │
- 7 │   m
-   │   ┬  
+   │   │  
    │   ╰── macro called here
-   │
-   ├─[ test.asm:7:3 ]
-   │
- 7 │   m
-   │   ┬  
+   │   │  
    │   ╰── macro called here
-   │
-   ├─[ test.asm:7:3 ]
-   │
- 7 │   m
-   │   ┬  
+   │   │  
    │   ╰── macro called here
-   │
-   ├─[ test.asm:7:3 ]
-   │
- 7 │   m
-   │   ┬  
+   │   │  
    │   ╰── macro called here
-   │
-   ├─[ test.asm:7:3 ]
-   │
- 7 │   m
-   │   ┬  
+   │   │  
    │   ╰── macro called here
-   │
-   ├─[ test.asm:7:3 ]
-   │
- 7 │   m
-   │   ┬  
+   │   │  
    │   ╰── macro called here
    │ 
    │ Note: ... 54 more levels of nesting omitted

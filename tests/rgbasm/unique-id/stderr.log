@@ -34,9 +34,7 @@ error: a unique identifier is not available in this context
   4 │     {warn_unique}
     │     ──────┬──────  
     │           ╰──────── interpolated here
-    │
-    ├─[ test.asm:12:2 ]
-    │
+    │ 
  12 │     m
     │     ┬  
     │     ╰── macro called here
@@ -48,18 +46,13 @@ error: a unique identifier is not available in this context
     │
     ├─[ test.asm:6:3 ]
     │
-  6 │        {warn_unique}
-    │        ──────┬──────  
-    │              ╰──────── interpolated here
-    │
-    ├─[ test.asm:5:2 ]
-    │
   5 │     REPT 2
     │     ──┬─  
     │       ╰─── loop beginning here
-    │
-    ├─[ test.asm:12:2 ]
-    │
+  6 │        {warn_unique}
+    │        ──────┬──────  
+    │              ╰──────── interpolated here
+    │ 
  12 │     m
     │     ┬  
     │     ╰── macro called here
@@ -71,18 +64,13 @@ error: a unique identifier is not available in this context
     │
     ├─[ test.asm:6:3 ]
     │
-  6 │        {warn_unique}
-    │        ──────┬──────  
-    │              ╰──────── interpolated here
-    │
-    ├─[ test.asm:5:2 ]
-    │
   5 │     REPT 2
     │     ──┬─  
     │       ╰─── loop beginning here
-    │
-    ├─[ test.asm:12:2 ]
-    │
+  6 │        {warn_unique}
+    │        ──────┬──────  
+    │              ╰──────── interpolated here
+    │ 
  12 │     m
     │     ┬  
     │     ╰── macro called here
@@ -97,9 +85,7 @@ error: a unique identifier is not available in this context
   8 │     {warn_unique}
     │     ──────┬──────  
     │           ╰──────── interpolated here
-    │
-    ├─[ test.asm:12:2 ]
-    │
+    │ 
  12 │     m
     │     ┬  
     │     ╰── macro called here
@@ -140,9 +126,7 @@ error: a unique identifier is not available in this context
   4 │     {warn_unique}
     │     ──────┬──────  
     │           ╰──────── interpolated here
-    │
-    ├─[ test.asm:14:2 ]
-    │
+    │ 
  14 │     m
     │     ┬  
     │     ╰── macro called here
@@ -154,18 +138,13 @@ error: a unique identifier is not available in this context
     │
     ├─[ test.asm:6:3 ]
     │
-  6 │        {warn_unique}
-    │        ──────┬──────  
-    │              ╰──────── interpolated here
-    │
-    ├─[ test.asm:5:2 ]
-    │
   5 │     REPT 2
     │     ──┬─  
     │       ╰─── loop beginning here
-    │
-    ├─[ test.asm:14:2 ]
-    │
+  6 │        {warn_unique}
+    │        ──────┬──────  
+    │              ╰──────── interpolated here
+    │ 
  14 │     m
     │     ┬  
     │     ╰── macro called here
@@ -177,18 +156,13 @@ error: a unique identifier is not available in this context
     │
     ├─[ test.asm:6:3 ]
     │
-  6 │        {warn_unique}
-    │        ──────┬──────  
-    │              ╰──────── interpolated here
-    │
-    ├─[ test.asm:5:2 ]
-    │
   5 │     REPT 2
     │     ──┬─  
     │       ╰─── loop beginning here
-    │
-    ├─[ test.asm:14:2 ]
-    │
+  6 │        {warn_unique}
+    │        ──────┬──────  
+    │              ╰──────── interpolated here
+    │ 
  14 │     m
     │     ┬  
     │     ╰── macro called here
@@ -203,9 +177,7 @@ error: a unique identifier is not available in this context
   8 │     {warn_unique}
     │     ──────┬──────  
     │           ╰──────── interpolated here
-    │
-    ├─[ test.asm:14:2 ]
-    │
+    │ 
  14 │     m
     │     ┬  
     │     ╰── macro called here
