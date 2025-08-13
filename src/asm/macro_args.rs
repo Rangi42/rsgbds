@@ -125,8 +125,8 @@ impl MacroArgs {
             );
             for (i, arg) in args.iter().enumerate() {
                 contents.push_str(arg.contents.text());
-                // Commas go between after, and after an empty argument.
-                if i + self.shift < self.args.len() || arg.contents.is_empty() {
+                // Commas go between arguments, and after an empty argument.
+                if i + self.shift + 1 < self.args.len() || arg.contents.is_empty() {
                     contents.push(',');
                 }
             }
