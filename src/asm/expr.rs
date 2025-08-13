@@ -32,6 +32,7 @@ pub enum OpKind {
     Symbol(Identifier),
     BankOfSym(Identifier),
     BankOfSect(CompactString),
+    StartOfSect(CompactString),
     Binary(BinOp),
     Unary(UnOp),
     Low,
@@ -54,12 +55,16 @@ enum ErrKind {
     SymNotFound(Identifier),
     SymDeleted(Identifier, Span),
     // The boolean indicates whether the expression contains just the symbol,
-    //   or if the error has bubbled up some.
+    //   or if the error has bubbled up at least once.
     // This is used to resolve non-constant symbols in some constant ways,
     //   such as subtraction of labels, or ANDing of aligned labels.
     SymNotConst {
         name: Identifier,
         just_the_sym: bool,
+    },
+    SectAddrNotConst {
+        name: CompactString,
+        just_the_sect: bool,
     },
     SymBankNotConst(Identifier),
     BankOfNonLabel(Identifier, &'static str),
@@ -112,6 +117,13 @@ impl Expr {
         Self::from_terminal(Op {
             span,
             kind: OpKind::BankOfSect(name),
+        })
+    }
+
+    pub fn start_of_section(name: CompactString, span: Span) -> Self {
+        Self::from_terminal(Op {
+            span,
+            kind: OpKind::StartOfSect(name),
         })
     }
 }
@@ -229,18 +241,30 @@ impl Expr {
                         }),
                     },
                 },
-                OpKind::BankOfSect(name) => match sections.sections.get(name) {
+                OpKind::BankOfSect(name) => match sections
+                    .sections
+                    .get(name)
+                    .and_then(|section| section.bank())
+                {
+                    Some(value) => Ok((value as i32, op.span.clone())),
                     None => Err(Error {
                         span: op.span.clone(),
                         kind: ErrKind::SectBankNotConst(name.clone()),
                     }),
-                    Some(section) => match section.bank() {
-                        Some(value) => Ok((value as i32, op.span.clone())),
-                        None => Err(Error {
-                            span: op.span.clone(),
-                            kind: ErrKind::SectBankNotConst(name.clone()),
-                        }),
-                    },
+                },
+                OpKind::StartOfSect(name) => match sections
+                    .sections
+                    .get(name)
+                    .and_then(|section| section.address())
+                {
+                    Some(value) => Ok((value as i32, op.span.clone())),
+                    None => Err(Error {
+                        span: op.span.clone(),
+                        kind: ErrKind::SectAddrNotConst {
+                            name: name.clone(),
+                            just_the_sect: true,
+                        },
+                    }),
                 },
                 OpKind::Binary(operator) => {
                     let rhs = eval_stack.pop().unwrap();
@@ -351,7 +375,7 @@ impl Expr {
                             kind: match &op.kind {
                                 // Eagerly evaluate symbols that can be.
                                 OpKind::Symbol(name) => match symbols
-                                    .find(&name)
+                                    .find(name)
                                     .and_then(|sym| sym.get_number(macro_args, sections))
                                 {
                                     Some(value) => OpKind::Number(value),
@@ -395,6 +419,7 @@ impl Op {
             OpKind::Symbol(ident) | OpKind::BankOfSym(ident) => Some(ident),
             OpKind::Number(..)
             | OpKind::BankOfSect(..)
+            | OpKind::StartOfSect(..)
             | OpKind::Binary(..)
             | OpKind::Unary(..)
             | OpKind::Low
@@ -499,26 +524,16 @@ impl BinOp {
                 (
                     Err(Error {
                         span: left_span,
-                        kind:
-                            ErrKind::SymNotConst {
-                                name: left_name,
-                                just_the_sym: true,
-                            },
+                        kind: left_kind,
                     }),
                     Err(Error {
                         span: right_span,
-                        kind:
-                            ErrKind::SymNotConst {
-                                name: right_name,
-                                just_the_sym: true,
-                            },
+                        kind: right_kind,
                     }),
                 ) => {
-                    let left_sym = symbols.find(&left_name).unwrap();
-                    let right_sym = symbols.find(&right_name).unwrap();
                     match (
-                        left_sym.get_section_and_offset(sections),
-                        right_sym.get_section_and_offset(sections),
+                        left_kind.get_section_and_offset(symbols, sections),
+                        right_kind.get_section_and_offset(symbols, sections),
                     ) {
                         (Some((left_sect, left_ofs)), Some((right_sect, right_ofs)))
                             if left_sect == right_sect =>
@@ -531,16 +546,14 @@ impl BinOp {
                         // The symbols aren't two labels belonging to the same section, bubble up the (left-hand) error.
                         (_, _) => Err(Error {
                             span: left_span,
-                            kind: ErrKind::SymNotConst {
-                                name: left_name,
-                                just_the_sym: false,
-                            },
-                        }),
+                            kind: left_kind,
+                        }
+                        .bubble_up()),
                     }
                 }
                 (Ok((lhs, left_span)), Ok((rhs, right_span))) => (Ok(lhs.wrapping_sub(rhs)))
                     .map(|value| (value, left_span.merged_with(&right_span))),
-                (Ok(_), Err(err)) | (Err(err), _) => Err(err.bubble_up()),
+                (Ok(_), Err(err)) | (Err(err), Ok(_)) => Err(err.bubble_up()),
             },
             // TODO: symbol alignment can be constant
             BinOp::And => greedy!(|lhs, rhs| Ok(lhs & rhs)),
@@ -707,6 +720,11 @@ impl ErrKind {
                 format!("`{}` is not constant", identifiers.resolve(*name).unwrap()),
                 "this symbol's value is not known at this point".into(),
             ),
+            // TODO: likewise
+            Self::SectAddrNotConst { name, .. } => (
+                format!("\"{name}\"'s address is not constant"),
+                "this section's address is not known at this point".into(),
+            ),
             Self::SymBankNotConst(name) => (
                 format!(
                     "the bank of `{}` is not constant",
@@ -739,6 +757,27 @@ impl ErrKind {
                 "this must be between 0 and 7 inclusive".into(),
             ),
             Self::NoExpr => unreachable!(),
+        }
+    }
+
+    fn get_section_and_offset(
+        &self,
+        symbols: &Symbols,
+        sections: &Sections,
+    ) -> Option<(usize, usize)> {
+        match self {
+            Self::SymNotConst {
+                name,
+                just_the_sym: true,
+            } => symbols
+                .symbols
+                .get(name)
+                .and_then(|sym| sym.get_section_and_offset(sections)),
+            Self::SectAddrNotConst {
+                name,
+                just_the_sect: true,
+            } => sections.sections.get_index_of(name).map(|idx| (idx, 0)),
+            _ => None,
         }
     }
 }

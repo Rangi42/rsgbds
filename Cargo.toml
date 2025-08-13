@@ -28,6 +28,7 @@ rgbasm = [
 	"dep:shadow-rs",
 	"dep:sysexits",
 	# Specific deps.
+	"dep:arrayvec",
 	"dep:chrono",
 	"dep:compact_str",
 	"dep:derive_more",

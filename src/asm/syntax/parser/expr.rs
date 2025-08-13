@@ -95,6 +95,19 @@ fn parse_subexpr(
             };
             (expr, lookahead)
         },
+        Token { span } @ |"startof"| => {
+            let (res, _opening_span, closing_span, lookahead) = misc::parse_parens_pair(
+                parse_ctx.next_token(),
+                parse_ctx,
+                string::expect_string_expr,
+            );
+
+            let span = span.merged_with(&closing_span);
+            match res {
+                Some((string, _span)) => (Expr::start_of_section(string, span), lookahead),
+                None => (Expr::nothing(span), lookahead)
+            }
+        },
         // TODO: all of the function calls...
 
         else |other| => {

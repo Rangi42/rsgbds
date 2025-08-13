@@ -475,6 +475,7 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                     }
                 }
                 OpKind::BankOfSect(name) => 2 + name.len(),
+                OpKind::StartOfSect(name) => 2 + name.len(),
                 OpKind::Binary(_) => 1,
                 OpKind::Unary(operator) => {
                     if matches!(operator, UnOp::Identity) {
@@ -525,6 +526,10 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                 }
                 OpKind::BankOfSect(name) => {
                     self.write_byte(0x51)?;
+                    self.write_string(name)?;
+                }
+                OpKind::StartOfSect(name) => {
+                    self.write_byte(0x54)?;
                     self.write_string(name)?;
                 }
                 OpKind::Binary(operator) => self.write_byte(match operator {
