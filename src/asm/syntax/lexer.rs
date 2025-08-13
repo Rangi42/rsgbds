@@ -1136,6 +1136,9 @@ impl Lexer {
                                         diagnostics::error_label(&span)
                                             .with_message(err.label_msg()),
                                     );
+                                    if ctx.ofs_scanned_for_expansion > 0 {
+                                        error.set_help("characters inside of interpolations and macro args cannot start one themselves");
+                                    }
                                 })
                             }
                         }
@@ -2015,6 +2018,20 @@ impl Lexer {
                         params.nb_errors_left,
                         params.options,
                     );
+                }
+                '}' if !raw => {
+                    let mut span = ctx.new_span();
+                    span.bytes.start += ofs;
+                    span.bytes.end = span.bytes.start + '}'.len_utf8();
+                    let span = Span::Normal(span);
+                    params.warn(warning!("unescaped-brace"), &span, |warning| {
+                        warning.set_message("unescaped closing brace");
+                        warning.add_label(
+                            diagnostics::warning_label(&span)
+                                .with_message("this isn't part of an interpolation"),
+                        );
+                    });
+                    string.push('}');
                 }
 
                 ch => string.push(ch),
