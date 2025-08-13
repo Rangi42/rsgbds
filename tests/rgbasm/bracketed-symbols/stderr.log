@@ -1,7 +1,22 @@
-error: bracketed-symbols.asm(16):
-    Formatting string as type 'X'
-error: bracketed-symbols.asm(20):
-    "Label" does not have a constant value
-error: bracketed-symbols.asm(21):
-    PC does not have a constant value; the current section is not fixed
-Assembly aborted with 3 errors!
+error: a string symbol cannot be formatted as upper-hex number
+    ╭─[ test.asm:16:12 ]
+    │
+ 16 │ PRINTLN "{X:S}"
+    │            ─┬  
+    │             ╰── this interpolation is invalid
+────╯
+error: a label symbol cannot be formatted as lower-hex number
+    ╭─[ test.asm:20:12 ]
+    │
+ 20 │ PRINTLN "{x:Label}"
+    │            ───┬──  
+    │               ╰──── this interpolation is invalid
+────╯
+error: a label symbol cannot be formatted as lower-hex number
+    ╭─[ test.asm:21:12 ]
+    │
+ 21 │ PRINTLN "{x:@}"
+    │            ─┬  
+    │             ╰── this interpolation is invalid
+────╯
+3 errors generated.

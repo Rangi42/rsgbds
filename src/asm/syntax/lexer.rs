@@ -133,6 +133,7 @@ impl Lexer {
                 ..
             }
         ) {
+            self.cond_stack.truncate(context.cond_stack_depth);
             self.contexts.truncate(i);
             Ok(())
         } else {
