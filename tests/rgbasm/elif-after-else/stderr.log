@@ -1,2 +1,45 @@
-FATAL: elif-after-else.asm(14):
-    Found ELIF after an ELSE block
+error: `elif` found after `else`
+   ╭─[ test.asm:9:2 ]
+   │
+ 7 │     else
+   │     ──┬─  
+   │       ╰─── ...cannot be after this `else`
+   │ 
+ 9 │     elif 2
+   │     ──┬─  
+   │       ╰─── this `elif`...
+───╯
+error: `else` found after another `else`
+    ╭─[ test.asm:11:2 ]
+    │
+  7 │     else
+    │     ──┬─  
+    │       ╰─── ...cannot be after this `else`
+    │ 
+ 11 │     else
+    │     ──┬─  
+    │       ╰─── this `else`...
+────╯
+error: `elif` found after `else`
+    ╭─[ test.asm:14:1 ]
+    │
+  3 │ else
+    │ ──┬─  
+    │   ╰─── ...cannot be after this `else`
+    │ 
+ 14 │ elif 2
+    │ ──┬─  
+    │   ╰─── this `elif`...
+────╯
+error: `else` found after another `else`
+    ╭─[ test.asm:16:1 ]
+    │
+  3 │ else
+    │ ──┬─  
+    │   ╰─── ...cannot be after this `else`
+    │ 
+ 16 │ else
+    │ ──┬─  
+    │   ╰─── this `else`...
+────╯
+4 errors generated.

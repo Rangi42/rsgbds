@@ -1,2 +1,8 @@
-FATAL: else-outside-if.asm(1):
-    Found ELSE outside of an IF construct
+error: `endc` found outside of a conditional block
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ ELSE
+   │ ──┬─  
+   │   ╰─── no `if` matches this
+───╯
+1 error generated.

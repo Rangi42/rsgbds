@@ -1,2 +1,8 @@
-FATAL: elif-after-taken-if.asm(21):
-    Division by zero
+error: division by zero
+    ╭─[ test.asm:21:10 ]
+    │
+ 21 │ elif 1 / 0
+    │          ┬  
+    │          ╰── this is equal to zero
+────╯
+1 error generated.

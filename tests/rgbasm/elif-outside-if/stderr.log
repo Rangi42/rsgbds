@@ -1,2 +1,8 @@
-FATAL: elif-outside-if.asm(1):
-    Found ELIF outside of an IF construct
+error: `elif` found outside of a conditional block
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ ELIF 1
+   │ ──┬─  
+   │   ╰─── no `if` matches this
+───╯
+1 error generated.
