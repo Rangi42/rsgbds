@@ -210,6 +210,40 @@ impl Sections {
         &self.sections[section_id]
     }
 
+    pub fn end_section(&mut self, span: &Span, nb_errors_left: &Cell<usize>, options: &Options) {
+        match self.active_section.take() {
+            None => diagnostics::error(
+                span,
+                |error| {
+                    error.set_message("cannot end a lack of section");
+                    error.add_label(
+                        diagnostics::error_label(span)
+                            .with_message("no section is active at this point"),
+                    );
+                },
+                nb_errors_left,
+                options,
+            ),
+            Some((data_sect, sym_sect)) => {
+                if !data_sect.points_to_same_as(&sym_sect) {
+                    diagnostics::warn(
+                        warning!("unterminated-load"),
+                        span,
+                        |error| {
+                            error.set_message("`load` block terminated by `endsection`");
+                            error.add_label(
+                                diagnostics::warning_label(span)
+                                    .with_message("no `endl` before this point"),
+                            );
+                        },
+                        nb_errors_left,
+                        options,
+                    );
+                }
+            }
+        }
+    }
+
     pub fn is_active_or_in_stack(&self, section_id: usize) -> bool {
         let refs_section = |opt: &Option<(ActiveSection, ActiveSection)>| {
             opt.as_ref().is_some_and(|(data_sect, sym_sect)| {

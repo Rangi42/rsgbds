@@ -304,8 +304,12 @@ pub(in super::super) fn parse_section(_keyword: Token, parse_ctx: &mut parse_ctx
     lookahead
 }
 
-pub(in super::super) fn parse_endsection(_keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    parse_ctx.sections.active_section = None;
+pub(in super::super) fn parse_endsection(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
+    parse_ctx.sections.end_section(
+        &keyword.span,
+        parse_ctx.nb_errors_remaining,
+        parse_ctx.options,
+    );
 
     parse_ctx.next_token()
 }

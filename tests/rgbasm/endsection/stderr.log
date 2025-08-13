@@ -1,3 +1,10 @@
-error: endsection.asm(4):
-    Cannot output data outside of a SECTION
-Assembly aborted with 1 error!
+error: byte emitted outside of a section
+   ╭─[ test.asm:4:2 ]
+   │
+ 4 │     db 2
+   │     ─┬  
+   │      ╰── no section is active at this point
+   │ 
+   │ Help: consider opening a section with `section` before this
+───╯
+1 error generated.

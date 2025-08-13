@@ -1,2 +1,8 @@
-FATAL: endsection-outside-section.asm(1):
-    Cannot end the section outside of a SECTION
+error: cannot end a lack of section
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ ENDSECTION
+   │ ─────┬────  
+   │      ╰────── no section is active at this point
+───╯
+1 error generated.
