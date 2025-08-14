@@ -300,6 +300,7 @@ pub(in super::super) fn parse_section(_keyword: Token, parse_ctx: &mut parse_ctx
         parse_ctx.options,
     );
     parse_ctx.sections.active_section = Some((active_section.clone(), active_section));
+    parse_ctx.symbols.end_scope();
 
     lookahead
 }
@@ -310,6 +311,7 @@ pub(in super::super) fn parse_endsection(keyword: Token, parse_ctx: &mut parse_c
         parse_ctx.nb_errors_remaining,
         parse_ctx.options,
     );
+    parse_ctx.symbols.end_scope();
 
     parse_ctx.next_token()
 }

@@ -502,7 +502,9 @@ impl Symbols {
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
-        // TODO: update the scope
+        if !identifiers.resolve(name).unwrap().contains('.') {
+            self.scope = Some(name);
+        }
 
         self.define_symbol(
             name,
@@ -604,6 +606,10 @@ impl Symbols {
             unreachable!()
         };
         value
+    }
+
+    pub fn end_scope(&mut self) {
+        self.scope = None;
     }
 
     pub fn delete(
