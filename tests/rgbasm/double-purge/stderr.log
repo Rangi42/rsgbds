@@ -1,3 +1,11 @@
-error: double-purge.asm(3):
-    'n' was already purged
-Assembly aborted with 1 error!
+error: `n` was already deleted
+   ╭─[ test.asm:3:7 ]
+   │
+ 2 │ purge n
+   │       ┬  
+   │       ╰── ...because of this one
+ 3 │ purge n
+   │       ┬  
+   │       ╰── cannot perform this deletion...
+───╯
+1 error generated.
