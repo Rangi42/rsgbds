@@ -1,57 +1,525 @@
-error: builtin-overwrite.asm(36) -> builtin-overwrite.asm::tickle(5):
-    Built-in symbol '__UTC_YEAR__' cannot be purged
-error: builtin-overwrite.asm(36) -> builtin-overwrite.asm::tickle(6):
-    Built-in symbol '__UTC_YEAR__' cannot be purged
-error: builtin-overwrite.asm(36) -> builtin-overwrite.asm::tickle(9):
-    '__UTC_YEAR__' already defined at <builtin>
-error: builtin-overwrite.asm(36) -> builtin-overwrite.asm::tickle(10):
-    '__UTC_YEAR__' already defined at <builtin>
-error: builtin-overwrite.asm(36) -> builtin-overwrite.asm::tickle(13):
-    '__UTC_YEAR__' already defined as constant at <builtin>
-error: builtin-overwrite.asm(36) -> builtin-overwrite.asm::tickle(14):
-    '__UTC_YEAR__' already defined as constant at <builtin>
-error: builtin-overwrite.asm(36) -> builtin-overwrite.asm::tickle(17):
-    '__UTC_YEAR__' already defined at <builtin>
-error: builtin-overwrite.asm(36) -> builtin-overwrite.asm::tickle(18):
-    '__UTC_YEAR__' already defined at <builtin>
-error: builtin-overwrite.asm(36) -> builtin-overwrite.asm::tickle(21):
-    '__UTC_YEAR__' already defined as constant at <builtin>
-error: builtin-overwrite.asm(36) -> builtin-overwrite.asm::tickle(22):
-    '__UTC_YEAR__' already defined as constant at <builtin>
-error: builtin-overwrite.asm(36) -> builtin-overwrite.asm::tickle(25):
-    Built-in symbol '__UTC_YEAR__' cannot be redefined
-error: builtin-overwrite.asm(36) -> builtin-overwrite.asm::tickle(26):
-    Built-in symbol '__UTC_YEAR__' cannot be redefined
-error: builtin-overwrite.asm(36) -> builtin-overwrite.asm::tickle(29):
-    '__UTC_YEAR__' already defined as non-EQUS at <builtin>
-error: builtin-overwrite.asm(36) -> builtin-overwrite.asm::tickle(30):
-    '__UTC_YEAR__' already defined as non-EQUS at <builtin>
-error: builtin-overwrite.asm(37) -> builtin-overwrite.asm::tickle(5):
-    Built-in symbol '__ISO_8601_UTC__' cannot be purged
-error: builtin-overwrite.asm(37) -> builtin-overwrite.asm::tickle(6):
-    Built-in symbol '__ISO_8601_UTC__' cannot be purged
-error: builtin-overwrite.asm(37) -> builtin-overwrite.asm::tickle(9):
-    '__ISO_8601_UTC__' already defined at <builtin>
-error: builtin-overwrite.asm(37) -> builtin-overwrite.asm::tickle(10):
-    '__ISO_8601_UTC__' already defined at <builtin>
-error: builtin-overwrite.asm(37) -> builtin-overwrite.asm::tickle(13):
-    '__ISO_8601_UTC__' already defined as constant at <builtin>
-error: builtin-overwrite.asm(37) -> builtin-overwrite.asm::tickle(14):
-    '__ISO_8601_UTC__' already defined as constant at <builtin>
-error: builtin-overwrite.asm(37) -> builtin-overwrite.asm::tickle(17):
-    '__ISO_8601_UTC__' already defined at <builtin>
-error: builtin-overwrite.asm(37) -> builtin-overwrite.asm::tickle(18):
-    '__ISO_8601_UTC__' already defined at <builtin>
-error: builtin-overwrite.asm(37) -> builtin-overwrite.asm::tickle(21):
-    '__ISO_8601_UTC__' already defined as constant at <builtin>
-error: builtin-overwrite.asm(37) -> builtin-overwrite.asm::tickle(22):
-    '__ISO_8601_UTC__' already defined as constant at <builtin>
-error: builtin-overwrite.asm(37) -> builtin-overwrite.asm::tickle(25):
-    '__ISO_8601_UTC__' already defined as non-EQU at <builtin>
-error: builtin-overwrite.asm(37) -> builtin-overwrite.asm::tickle(26):
-    '__ISO_8601_UTC__' already defined as non-EQU at <builtin>
-error: builtin-overwrite.asm(37) -> builtin-overwrite.asm::tickle(29):
-    Built-in symbol '__ISO_8601_UTC__' cannot be redefined
-error: builtin-overwrite.asm(37) -> builtin-overwrite.asm::tickle(30):
-    Built-in symbol '__ISO_8601_UTC__' cannot be redefined
-Assembly aborted with 28 errors!
+error: cannot delete built-in symbol `__UTC_YEAR__`
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ __UTC_YEAR__
+    │ ──────┬─────  
+    │       ╰─────── cannot perform this deletion
+    │
+    ├─[ test.asm:5:7 ]
+    │
+  5 │ PURGE \1
+    │       ─┬  
+    │        ╰── expanded here
+    │ 
+ 36 │     tickle __UTC_YEAR__, 1
+    │     ───┬──  
+    │        ╰──── macro called here
+────╯
+error: cannot delete built-in symbol `__UTC_YEAR__`
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ __UTC_YEAR__
+    │ ──────┬─────  
+    │       ╰─────── cannot perform this deletion
+    │
+    ├─[ test.asm:6:7 ]
+    │
+  6 │ PURGE \1
+    │       ─┬  
+    │        ╰── expanded here
+    │ 
+ 36 │     tickle __UTC_YEAR__, 1
+    │     ───┬──  
+    │        ╰──── macro called here
+────╯
+error: A symbol called "__UTC_YEAR__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:9:1 ]
+    │
+  9 │ DEF \1 EQU 0
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 36 │     tickle __UTC_YEAR__, 1
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__UTC_YEAR__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:10:1 ]
+    │
+ 10 │ DEF \1 EQU 0
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 36 │     tickle __UTC_YEAR__, 1
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__UTC_YEAR__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:13:1 ]
+    │
+ 13 │ DEF \1 = 0
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 36 │     tickle __UTC_YEAR__, 1
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__UTC_YEAR__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:14:1 ]
+    │
+ 14 │ DEF \1 = 0
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 36 │     tickle __UTC_YEAR__, 1
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__UTC_YEAR__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:17:1 ]
+    │
+ 17 │ DEF \1 EQUS "hello"
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 36 │     tickle __UTC_YEAR__, 1
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__UTC_YEAR__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:18:1 ]
+    │
+ 18 │ DEF \1 EQUS "hello"
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 36 │     tickle __UTC_YEAR__, 1
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__UTC_YEAR__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:21:1 ]
+    │
+ 21 │ REDEF \1 = 0
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+ 36 │     tickle __UTC_YEAR__, 1
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__UTC_YEAR__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:22:1 ]
+    │
+ 22 │ REDEF \1 = 0
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+ 36 │     tickle __UTC_YEAR__, 1
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__UTC_YEAR__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:25:1 ]
+    │
+ 25 │ REDEF \1 EQU 0
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+ 36 │     tickle __UTC_YEAR__, 1
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__UTC_YEAR__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:26:1 ]
+    │
+ 26 │ REDEF \1 EQU 0
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+ 36 │     tickle __UTC_YEAR__, 1
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__UTC_YEAR__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:29:1 ]
+    │
+ 29 │ REDEF \1 EQUS "hello"
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+ 36 │     tickle __UTC_YEAR__, 1
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__UTC_YEAR__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:30:1 ]
+    │
+ 30 │ REDEF \1 EQUS "hello"
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+ 36 │     tickle __UTC_YEAR__, 1
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: cannot delete built-in symbol `__ISO_8601_UTC__`
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ __ISO_8601_UTC__
+    │ ────────┬───────  
+    │         ╰───────── cannot perform this deletion
+    │
+    ├─[ test.asm:5:7 ]
+    │
+  5 │ PURGE \1
+    │       ─┬  
+    │        ╰── expanded here
+    │ 
+ 37 │     tickle __ISO_8601_UTC__, 0
+    │     ───┬──  
+    │        ╰──── macro called here
+────╯
+error: cannot delete built-in symbol `__ISO_8601_UTC__`
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ __ISO_8601_UTC__
+    │ ────────┬───────  
+    │         ╰───────── cannot perform this deletion
+    │
+    ├─[ test.asm:6:7 ]
+    │
+  6 │ PURGE \1
+    │       ─┬  
+    │        ╰── expanded here
+    │ 
+ 37 │     tickle __ISO_8601_UTC__, 0
+    │     ───┬──  
+    │        ╰──── macro called here
+────╯
+error: A symbol called "__ISO_8601_UTC__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:9:1 ]
+    │
+  9 │ DEF \1 EQU 0
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 37 │     tickle __ISO_8601_UTC__, 0
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__ISO_8601_UTC__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:10:1 ]
+    │
+ 10 │ DEF \1 EQU 0
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 37 │     tickle __ISO_8601_UTC__, 0
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__ISO_8601_UTC__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:13:1 ]
+    │
+ 13 │ DEF \1 = 0
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 37 │     tickle __ISO_8601_UTC__, 0
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__ISO_8601_UTC__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:14:1 ]
+    │
+ 14 │ DEF \1 = 0
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 37 │     tickle __ISO_8601_UTC__, 0
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__ISO_8601_UTC__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:17:1 ]
+    │
+ 17 │ DEF \1 EQUS "hello"
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 37 │     tickle __ISO_8601_UTC__, 0
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__ISO_8601_UTC__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:18:1 ]
+    │
+ 18 │ DEF \1 EQUS "hello"
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 37 │     tickle __ISO_8601_UTC__, 0
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__ISO_8601_UTC__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:21:1 ]
+    │
+ 21 │ REDEF \1 = 0
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+ 37 │     tickle __ISO_8601_UTC__, 0
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__ISO_8601_UTC__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:22:1 ]
+    │
+ 22 │ REDEF \1 = 0
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+ 37 │     tickle __ISO_8601_UTC__, 0
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__ISO_8601_UTC__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:25:1 ]
+    │
+ 25 │ REDEF \1 EQU 0
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+ 37 │     tickle __ISO_8601_UTC__, 0
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__ISO_8601_UTC__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:26:1 ]
+    │
+ 26 │ REDEF \1 EQU 0
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+ 37 │     tickle __ISO_8601_UTC__, 0
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__ISO_8601_UTC__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:29:1 ]
+    │
+ 29 │ REDEF \1 EQUS "hello"
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+ 37 │     tickle __ISO_8601_UTC__, 0
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "__ISO_8601_UTC__" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:30:1 ]
+    │
+ 30 │ REDEF \1 EQUS "hello"
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+ 37 │     tickle __ISO_8601_UTC__, 0
+    │     ───┬──  
+    │        ╰──── macro called here
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+28 errors generated.

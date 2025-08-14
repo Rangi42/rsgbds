@@ -454,7 +454,9 @@ impl Symbols {
                         diagnostics::error_label(&definition)
                             .with_message("...so it's not available for this definition"),
                     ]);
-                    error.set_help("If this is intentional, consider using `PURGE` to delete the old definition first");
+                    if matches!(existing, SymbolData::User { .. }) {
+                        error.set_help("If this is intentional, consider using `PURGE` to delete the old definition first");
+                    }
                 },
                 nb_errors_left,
                 options,
