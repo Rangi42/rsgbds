@@ -420,6 +420,7 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                     AssertLevel::Fatal => 2,
                 },
             )?;
+            self.write_string(&assertion.message)?;
         }
         Ok(())
     }

@@ -150,6 +150,10 @@ pub(in super::super) fn parse_assert(
                         .as_ref()
                         .map(|(_data_sect, sym_sect)| (sym_sect.id, sym_sect.offset)),
                 },
+                message: match msg {
+                    Some((string, _span)) => string,
+                    None => "assertion failed".into(),
+                },
             });
             Some(())
         }

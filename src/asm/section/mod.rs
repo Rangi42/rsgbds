@@ -77,6 +77,7 @@ pub struct Patch {
 pub struct Assertion {
     pub level: AssertLevel,
     pub rest: LinkTimeExpr,
+    pub message: CompactString,
 }
 #[derive(Debug)]
 pub struct LinkTimeExpr {
