@@ -1,5 +1,15 @@
-error: charmap-empty.asm(1):
-    Cannot map an empty string
-error: charmap-empty.asm(2):
-    syntax error, unexpected end of line
-Assembly aborted with 2 errors!
+error: cannot charmap an empty string
+   ╭─[ test.asm:1:9 ]
+   │
+ 1 │ charmap "", 1
+   │         ─┬  
+   │          ╰── this string shouldn't be empty
+───╯
+error: syntax error: unexpected end of line
+   ╭─[ test.asm:2:20 ]
+   │
+ 2 │ charmap "nonempty", ; nothing
+   │                    ┬  
+   │                    ╰── expected a number or an expression here
+───╯
+2 errors generated.

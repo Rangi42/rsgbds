@@ -40,7 +40,9 @@ pub(in super::super) fn parse_charmap(_keyword: Token, parse_ctx: &mut parse_ctx
     {
         parse_ctx.error(&span, |error| {
             error.set_message("cannot charmap an empty string");
-            diagnostics::error_label(&span).with_message("this string shouldn't be empty");
+            error.add_label(
+                diagnostics::error_label(&span).with_message("this string shouldn't be empty"),
+            );
         });
     }
     lookahead
