@@ -139,6 +139,12 @@ fn register_file_nodes<'nodes>(
             unreachable!()
         };
         register_span(span);
+        for patch in &sect.patches {
+            let Span::Normal(span) = &patch.rest.span else {
+                unreachable!()
+            };
+            register_span(span);
+        }
     }
     for assertion in &sections.assertions {
         let Span::Normal(span) = &assertion.rest.span else {
@@ -169,10 +175,8 @@ fn register_symbols<'sym>(symbols: &'sym Symbols, sections: &Sections) -> SymReg
     // Emit all symbols referenced by patches.
     registry.extend(
         sections
-            .sections
-            .iter()
-            .flat_map(|(_name, sect)| &sect.patches)
-            .flat_map(|patch| patch.rest.expr.ops().filter_map(|op| op.get_symbol()))
+            .all_link_time_exprs()
+            .flat_map(|expr| expr.expr.ops().filter_map(|op| op.get_symbol()))
             .flat_map(|ident| {
                 let SymbolData::User {
                     definition: Span::Normal(span),

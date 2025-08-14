@@ -340,6 +340,14 @@ impl Sections {
             _ => {}
         }
     }
+
+    pub fn all_link_time_exprs(&self) -> impl Iterator<Item = &LinkTimeExpr> {
+        self.sections
+            .iter()
+            .flat_map(|(_name, sect)| &sect.patches)
+            .map(|patch| &patch.rest)
+            .chain(self.assertions.iter().map(|assertion| &assertion.rest))
+    }
 }
 
 impl From<(u8, u16)> for AddrConstraint {
