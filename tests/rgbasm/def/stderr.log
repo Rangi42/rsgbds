@@ -1,11 +1,51 @@
-error: def.asm(23):
-    'constant' already defined at def.asm(10)
-error: def.asm(35):
-    'mac' already defined as non-EQU at def.asm(32)
-error: def.asm(38):
-    'name' already defined at def.asm(37)
-    (should it be {interpolated} to define its contents "constant2"?)
-error: def.asm(42):
-    'name' already defined at def.asm(40)
-    (should it be {interpolated} to define its contents "mac2"?)
-Assembly aborted with 4 errors!
+error: A symbol called "constant" already exists
+    ╭─[ test.asm:23:1 ]
+    │
+ 10 │ DEF constant EQU 42
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+ 23 │ def constant equ 6*7 ; fails
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "mac" already exists
+    ╭─[ test.asm:35:1 ]
+    │
+ 32 │ macro mac
+    │       ─┬─  
+    │        ╰─── the name is defined here...
+    │ 
+ 35 │ redef mac equ 42
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "name" already exists
+    ╭─[ test.asm:38:1 ]
+    │
+ 37 │ def name equs "constant2"
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+ 38 │ def name equ 1337
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "name" already exists
+    ╭─[ test.asm:41:7 ]
+    │
+ 40 │ redef name equs "mac2"
+    │ ──┬──  
+    │   ╰──── the name is defined here...
+ 41 │ macro name
+    │       ──┬─  
+    │         ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+4 errors generated.
