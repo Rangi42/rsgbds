@@ -8,6 +8,7 @@ use crate::{
     common::{section::MemRegion, S},
     diagnostics::{self, warning},
     expr::Expr,
+    macro_args::MacroArgs,
     sources::Span,
     symbols::Symbols,
     Identifier, Identifiers, Options,
@@ -483,6 +484,7 @@ impl ActiveSection {
         identifiers: &Identifiers,
         definition: Span,
         exported: bool,
+        macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
@@ -492,6 +494,8 @@ impl ActiveSection {
             definition,
             (self.id, self.offset),
             exported,
+            Some(self),
+            macro_args,
             nb_errors_left,
             options,
         )

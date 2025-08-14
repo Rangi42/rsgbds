@@ -66,6 +66,12 @@ pub(in super::super) fn parse_macro(_keyword: Token, parse_ctx: &mut parse_ctx!(
         parse_ctx.identifiers,
         span,
         body,
+        parse_ctx
+            .sections
+            .active_section
+            .as_ref()
+            .map(|(_data_sect, sym_sect)| sym_sect),
+        parse_ctx.macro_args.last(),
         parse_ctx.nb_errors_remaining,
         parse_ctx.options,
     );
@@ -203,8 +209,14 @@ pub(in super::super) fn parse_for(keyword: Token, parse_ctx: &mut parse_ctx!()) 
             parse_ctx.identifiers,
             span,
             start,
-            true,
-            false,
+            true,  // Mutable.
+            false, // Unexported.
+            parse_ctx
+                .sections
+                .active_section
+                .as_ref()
+                .map(|(_data_sect, sym_sect)| sym_sect),
+            parse_ctx.macro_args.last(),
             parse_ctx.nb_errors_remaining,
             parse_ctx.options,
         );
@@ -372,6 +384,11 @@ impl parse_ctx!() {
                             loop_state.for_value,
                             true,  // Mutable.
                             false, // Unexported.
+                            self.sections
+                                .active_section
+                                .as_ref()
+                                .map(|(_data_sect, sym_sect)| sym_sect),
+                            self.macro_args.last(),
                             self.nb_errors_remaining,
                             self.options,
                         );

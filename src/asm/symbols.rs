@@ -9,7 +9,7 @@ use crate::{
     diagnostics::{self, warning},
     format::{FormatError, FormatSpec},
     macro_args::MacroArgs,
-    section::Sections,
+    section::{ActiveSection, Sections},
     sources::{NormalSpan, Span},
     Identifier, Identifiers, Options,
 };
@@ -197,6 +197,8 @@ impl Symbols {
                 identifiers,
                 Span::CommandLine,
                 value.into(),
+                None,
+                None,
                 nb_errors_left,
                 options,
             );
@@ -407,6 +409,8 @@ impl Symbols {
         definition: Span,
         payload: SymbolKind,
         exported: bool,
+        active_section: Option<&ActiveSection>,
+        macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
@@ -421,8 +425,14 @@ impl Symbols {
                         identifiers.resolve(name).unwrap()
                     ));
                     error.add_labels([
-                        diagnostics::note_label(existing.def_span())
-                            .with_message("the name is used here..."),
+                        diagnostics::note_label(existing.def_span()).with_message(format!(
+                            "the name is {} here...",
+                            if existing.exists(self.scope.as_ref(), active_section, macro_args) {
+                                "defined"
+                            } else {
+                                "reserved"
+                            }
+                        )),
                         diagnostics::error_label(&definition)
                             .with_message("...so it's not available for this definition"),
                     ]);
@@ -440,6 +450,8 @@ impl Symbols {
         identifiers: &Identifiers,
         definition: Span,
         string: CompactString,
+        active_section: Option<&ActiveSection>,
+        macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
@@ -449,6 +461,8 @@ impl Symbols {
             definition,
             SymbolKind::String(string),
             false,
+            active_section,
+            macro_args,
             nb_errors_left,
             options,
         );
@@ -461,6 +475,8 @@ impl Symbols {
         definition: Span,
         (section_id, offset): (usize, usize),
         exported: bool,
+        active_section: Option<&ActiveSection>,
+        macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
@@ -472,6 +488,8 @@ impl Symbols {
             definition,
             SymbolKind::Label { section_id, offset },
             exported || options.export_all,
+            active_section,
+            macro_args,
             nb_errors_left,
             options,
         )
@@ -485,6 +503,8 @@ impl Symbols {
         value: i32,
         mutable: bool,
         exported: bool,
+        active_section: Option<&ActiveSection>,
+        macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
@@ -494,6 +514,8 @@ impl Symbols {
             definition,
             SymbolKind::Numeric { value, mutable },
             exported,
+            active_section,
+            macro_args,
             nb_errors_left,
             options,
         )
@@ -505,6 +527,8 @@ impl Symbols {
         identifiers: &Identifiers,
         definition: Span,
         body: NormalSpan,
+        active_section: Option<&ActiveSection>,
+        macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
@@ -514,6 +538,8 @@ impl Symbols {
             definition,
             SymbolKind::Macro(body),
             false,
+            active_section,
+            macro_args,
             nb_errors_left,
             options,
         )
@@ -524,6 +550,8 @@ impl Symbols {
         name: Identifier,
         identifiers: &Identifiers,
         ref_span: Span,
+        active_section: Option<&ActiveSection>,
+        macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
@@ -533,6 +561,8 @@ impl Symbols {
             ref_span,
             SymbolKind::Ref,
             false,
+            active_section,
+            macro_args,
             nb_errors_left,
             options,
         )
@@ -705,6 +735,21 @@ impl SymbolData {
         match self {
             Self::User { definition, .. } => definition,
             _ => &Span::Builtin,
+        }
+    }
+
+    pub fn exists(
+        &self,
+        scope: Option<&Identifier>,
+        active_section: Option<&ActiveSection>,
+        macro_args: Option<&MacroArgs>,
+    ) -> bool {
+        match self {
+            SymbolData::User { .. } | SymbolData::Builtin(..) => true,
+            SymbolData::Deleted(..) => false,
+            SymbolData::Pc => active_section.is_some(),
+            SymbolData::Narg => macro_args.is_some(),
+            SymbolData::Dot | SymbolData::DotDot => scope.is_some(),
         }
     }
 

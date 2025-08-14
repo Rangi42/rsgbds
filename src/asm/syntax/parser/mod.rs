@@ -196,6 +196,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
                         parse_ctx.identifiers,
                         first_token.span,
                         false,
+                        parse_ctx.macro_args.last(),
                         parse_ctx.nb_errors_remaining,
                         parse_ctx.options
                     );
@@ -216,6 +217,7 @@ fn parse_line(mut first_token: Token, parse_ctx: &mut parse_ctx!()) -> Option<()
                         parse_ctx.identifiers,
                         first_token.span,
                         true,
+                        parse_ctx.macro_args.last(),
                         parse_ctx.nb_errors_remaining,
                         parse_ctx.options
                     );

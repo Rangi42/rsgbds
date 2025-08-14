@@ -27,7 +27,20 @@ pub(in super::super) fn parse_def_or_redef(
             let (value, lookahead) = string::expect_string_expr(parse_ctx.next_token(), parse_ctx);
 
             if let Some((string, _span)) = value {
-                parse_ctx.symbols.define_string(ident, parse_ctx.identifiers, keyword.span, string, parse_ctx.nb_errors_remaining, parse_ctx.options);
+                parse_ctx.symbols.define_string(
+                    ident,
+                    parse_ctx.identifiers,
+                    keyword.span,
+                    string,
+                    parse_ctx
+                        .sections
+                        .active_section
+                        .as_ref()
+                        .map(|(_data_sect, sym_sect)| sym_sect),
+                    parse_ctx.macro_args.last(),
+                    parse_ctx.nb_errors_remaining,
+                    parse_ctx.options,
+                );
             }
 
             if let Some(span) = exported {
@@ -51,6 +64,12 @@ pub(in super::super) fn parse_def_or_redef(
                     value,
                     matches_tok!(kind_token, "="),
                     exported.is_some(),
+                    parse_ctx
+                        .sections
+                        .active_section
+                        .as_ref()
+                        .map(|(_data_sect, sym_sect)| sym_sect),
+                    parse_ctx.macro_args.last(),
                     parse_ctx.nb_errors_remaining,
                     parse_ctx.options,
                 ),
@@ -87,6 +106,12 @@ pub(in super::super) fn parse_def_or_redef(
                         value,
                         true,
                         exported.is_some(),
+                        parse_ctx
+                            .sections
+                            .active_section
+                            .as_ref()
+                            .map(|(_data_sect, sym_sect)| sym_sect),
+                        parse_ctx.macro_args.last(),
                         parse_ctx.nb_errors_remaining,
                         parse_ctx.options,
                     );
@@ -118,6 +143,12 @@ pub(in super::super) fn parse_def_or_redef(
                         constant_value,
                         false,
                         exported.is_some(),
+                        parse_ctx
+                            .sections
+                            .active_section
+                            .as_ref()
+                            .map(|(_data_sect, sym_sect)| sym_sect),
+                        parse_ctx.macro_args.last(),
                         parse_ctx.nb_errors_remaining,
                         parse_ctx.options,
                     );
