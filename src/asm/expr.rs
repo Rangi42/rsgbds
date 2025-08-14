@@ -1,6 +1,7 @@
 use std::cell::Cell;
 
 use compact_str::CompactString;
+use either::Either;
 
 use crate::{
     common::section::MemRegion,
@@ -8,7 +9,7 @@ use crate::{
     macro_args::MacroArgs,
     section::{SectionKind, Sections},
     sources::Span,
-    symbols::{SymbolData, Symbols},
+    symbols::{SymbolData, SymbolError, Symbols},
     syntax::tokens::{tok, TokenPayload},
     Identifier, Identifiers, Options,
 };
@@ -58,6 +59,8 @@ pub struct Error {
 enum ErrKind {
     SymNotFound(Identifier),
     SymDeleted(Identifier, Span),
+    NonNumericSym(Identifier, &'static str),
+    SymError(SymbolError<'static, 'static>),
     // The boolean indicates whether the expression contains just the symbol,
     //   or if the error has bubbled up at least once.
     // This is used to resolve non-constant symbols in some constant ways,
@@ -234,13 +237,21 @@ impl Expr {
                         kind: ErrKind::SymDeleted(name, span.clone()),
                     }),
                     Some(sym) => match sym.get_number(macro_args, sections) {
-                        Some(value) => Ok((value, op.span.clone())),
-                        None => Err(Error {
+                        Some(Ok(Some(value))) => Ok((value, op.span.clone())),
+                        Some(Ok(None)) => Err(Error {
                             span: op.span.clone(),
                             kind: ErrKind::SymNotConst {
                                 name,
                                 just_the_sym: true,
                             },
+                        }),
+                        Some(Err(err)) => Err(Error {
+                            span: op.span.clone(),
+                            kind: ErrKind::SymError(err),
+                        }),
+                        None => Err(Error {
+                            span: op.span.clone(),
+                            kind: ErrKind::NonNumericSym(name, sym.kind_name()),
                         }),
                     },
                 },
@@ -409,40 +420,57 @@ impl Expr {
         symbols: &mut Symbols,
         macro_args: Option<&MacroArgs>,
         sections: &Sections,
-    ) -> Result<(i32, Span), Result<Self, Error>> {
+    ) -> Result<Either<(i32, Span), Self>, Error> {
         debug_assert_ne!(self.payload.len(), 0);
 
         match self.try_const_eval(symbols, macro_args, sections) {
-            Ok((value, span)) => Ok((value, span)),
+            Ok((value, span)) => Ok(Either::Left((value, span))),
             Err(Error {
                 kind:
                     ErrKind::SymNotFound(..) | ErrKind::SymDeleted(..) | ErrKind::SymNotConst { .. },
                 ..
             }) => {
-                Err(Ok(Self {
+                Ok(Either::Right(Self {
                     payload: self
                         .payload
                         .iter()
-                        .map(|op| Op {
-                            span: op.span.clone(),
-                            kind: match &op.kind {
-                                // Eagerly evaluate symbols that can be.
-                                OpKind::Symbol(name) => match symbols
-                                    .find(name)
-                                    .and_then(|sym| sym.get_number(macro_args, sections))
-                                {
-                                    Some(value) => OpKind::Number(value),
-                                    // TODO: we might want to create a `Ref` here;
-                                    // but we'd need to also ensure it doesn't get deleted, even after it gets replaced...
-                                    None => OpKind::Symbol(*name),
+                        .map(|op| {
+                            Ok(Op {
+                                span: op.span.clone(),
+                                kind: match &op.kind {
+                                    // Eagerly evaluate symbols that can be.
+                                    OpKind::Symbol(name) => match symbols.find(name) {
+                                        Some(sym) => match sym.get_number(macro_args, sections) {
+                                            None => {
+                                                return Err(Error {
+                                                    span: op.span.clone(),
+                                                    kind: ErrKind::NonNumericSym(
+                                                        *name,
+                                                        sym.kind_name(),
+                                                    ),
+                                                })
+                                            }
+                                            Some(Err(err)) => {
+                                                return Err(Error {
+                                                    span: op.span.clone(),
+                                                    kind: ErrKind::SymError(err),
+                                                })
+                                            }
+                                            Some(Ok(Some(value))) => OpKind::Number(value),
+                                            Some(Ok(None)) => OpKind::Symbol(*name),
+                                        },
+                                        // TODO: we might want to create a `Ref` here;
+                                        // but we'd need to also ensure it doesn't get deleted, even after it gets replaced...
+                                        None => OpKind::Symbol(*name),
+                                    },
+                                    kind => kind.clone(),
                                 },
-                                kind => kind.clone(),
-                            },
+                            })
                         })
-                        .collect(),
+                        .collect::<Result<_, _>>()?,
                 }))
             }
-            Err(err) => Err(Err(err)),
+            Err(err) => Err(err),
         }
     }
 
@@ -771,6 +799,15 @@ impl ErrKind {
                 ),
                 "no symbol by this name exists at this point".into(),
             ),
+            // TODO: highlight its definition point
+            Self::NonNumericSym(ident, kind_name) => (
+                format!(
+                    "the symbol `{}` isn't numeric",
+                    identifiers.resolve(*ident).unwrap(),
+                ),
+                format!("defined as {kind_name} here"),
+            ),
+            Self::SymError(err) => (format!("{err}"), "this symbol is invalid".into()),
             // TODO: suggest that difference between symbols and/or alignment can be constant?
             Self::SymNotConst { name, .. } => (
                 format!("`{}` is not constant", identifiers.resolve(*name).unwrap()),

@@ -1,3 +1,8 @@
-error: assert@-no-sect.asm(1):
-    PC has no value outside of a section
-Assembly aborted with 1 error!
+error: PC doesn't have a value outside of a section
+   ╭─[ test.asm:1:9 ]
+   │
+ 1 │ assert (@) || 1
+   │         ┬  
+   │         ╰── this symbol is invalid
+───╯
+1 error generated.

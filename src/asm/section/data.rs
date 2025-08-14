@@ -1,5 +1,7 @@
 use std::cell::Cell;
 
+use either::Either;
+
 use crate::{
     diagnostics::{self, warning},
     expr::Expr,
@@ -213,7 +215,7 @@ impl Sections {
                 if let Some((eval_res, patch)) = patch_res {
                     let offset = offset + usize::from(patch.offset);
                     match eval_res {
-                        Ok((value, _span)) => match patch.kind {
+                        Ok(Either::Left((value, _span))) => match patch.kind {
                             PatchKind::Byte => ctx.data[offset] = value as u8,
                             PatchKind::Word => {
                                 ctx.data[offset..].copy_from_slice(&(value as i16).to_le_bytes())
@@ -224,7 +226,7 @@ impl Sections {
                             PatchKind::Jr => todo!(),
                         },
 
-                        Err(Ok(expr)) => ctx.patches.push(Patch {
+                        Ok(Either::Right(expr)) => ctx.patches.push(Patch {
                             kind: patch.kind,
                             rest: LinkTimeExpr {
                                 span: instruction.span.clone(),
@@ -234,7 +236,7 @@ impl Sections {
                             },
                         }),
 
-                        Err(Err(error)) => error.report(identifiers, nb_errors_left, options),
+                        Err(error) => error.report(identifiers, nb_errors_left, options),
                     }
                 }
             },
@@ -362,12 +364,12 @@ impl Sections {
 /// Internal, per-kind data emission functions.
 impl Sections {
     fn push_byte(
-        res: &Result<(i32, Span), Result<Expr, crate::expr::Error>>,
+        res: &Result<Either<(i32, Span), Expr>, crate::expr::Error>,
         offset: usize,
         ctx: &mut EmissionContext,
     ) {
         match res {
-            Ok((value, span)) => {
+            Ok(Either::Left((value, span))) => {
                 if *value < -256 || *value > 255 {
                     diagnostics::warn(
                         warning!("truncation=1"),
@@ -401,7 +403,7 @@ impl Sections {
                 ctx.data.push(*value as u8);
             }
 
-            Err(Ok(expr)) => {
+            Ok(Either::Right(expr)) => {
                 ctx.patches.push(Patch {
                     kind: PatchKind::Byte,
                     rest: LinkTimeExpr {
@@ -415,7 +417,7 @@ impl Sections {
                 ctx.data.push(Default::default());
             }
 
-            Err(Err(error)) => {
+            Err(error) => {
                 error.report(ctx.identifiers, ctx.nb_errors_left, ctx.options);
 
                 ctx.data.push(Default::default());
@@ -424,12 +426,12 @@ impl Sections {
     }
 
     fn push_word(
-        res: &Result<(i32, Span), Result<Expr, crate::expr::Error>>,
+        res: &Result<Either<(i32, Span), Expr>, crate::expr::Error>,
         offset: usize,
         ctx: &mut EmissionContext,
     ) {
         match res {
-            Ok((value, span)) => {
+            Ok(Either::Left((value, span))) => {
                 if *value < -65536 || *value > 65535 {
                     diagnostics::warn(
                         warning!("truncation=1"),
@@ -458,7 +460,7 @@ impl Sections {
                 ctx.data.extend_from_slice(&(*value as i16).to_le_bytes());
             }
 
-            Err(Ok(expr)) => {
+            Ok(Either::Right(expr)) => {
                 ctx.patches.push(Patch {
                     kind: PatchKind::Word,
                     rest: LinkTimeExpr {
@@ -473,7 +475,7 @@ impl Sections {
                     .extend_from_slice(&[Default::default(), Default::default()]);
             }
 
-            Err(Err(error)) => {
+            Err(error) => {
                 error.report(ctx.identifiers, ctx.nb_errors_left, ctx.options);
 
                 ctx.data
@@ -483,17 +485,17 @@ impl Sections {
     }
 
     fn push_long(
-        res: &Result<(i32, Span), Result<Expr, crate::expr::Error>>,
+        res: &Result<Either<(i32, Span), Expr>, crate::expr::Error>,
         offset: usize,
         ctx: &mut EmissionContext,
     ) {
         match res {
-            Ok((value, _span)) => {
+            Ok(Either::Left((value, _span))) => {
                 // No truncation checks here, since we are working with 32-bit values already.
                 ctx.data.extend_from_slice(&value.to_le_bytes());
             }
 
-            Err(Ok(expr)) => {
+            Ok(Either::Right(expr)) => {
                 ctx.patches.push(Patch {
                     kind: PatchKind::Long,
                     rest: LinkTimeExpr {
@@ -512,7 +514,7 @@ impl Sections {
                 ]);
             }
 
-            Err(Err(error)) => {
+            Err(error) => {
                 error.report(ctx.identifiers, ctx.nb_errors_left, ctx.options);
 
                 ctx.data.extend_from_slice(&[

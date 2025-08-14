@@ -246,7 +246,11 @@ impl Symbols {
             .ok_or(SymbolError::NotFound(name_str))?;
 
         if let Some(value) = sym.get_number(macro_args, sections) {
-            fmt.write_number(value as u32, buf, sym.kind_name())?;
+            fmt.write_number(
+                value?.ok_or(SymbolError::NotConst(name_str))? as u32,
+                buf,
+                sym.kind_name(),
+            )?;
             Ok(())
         } else if let Some(s) = sym.get_string() {
             fmt.write_str(&s, buf, sym.kind_name())?;
@@ -673,15 +677,27 @@ impl Symbols {
     }
 }
 
-#[derive(Debug, displaydoc::Display, derive_more::From)]
+#[derive(Debug, displaydoc::Display)]
 pub enum SymbolError<'name, 'sym> {
     /// the symbol `{0}` doesn't exist
     NotFound(&'name str),
     /// the symbol `{0}` was deleted
-    #[from(ignore)]
     Deleted(&'name str, &'sym Span),
     /// {0}
     FormatError(FormatError),
+    /// `{0}` is not constant
+    NotConst(&'name str),
+    /// `{0}` is not a numeric symbol
+    NotNumeric(&'name str),
+    /// PC doesn't have a {0} outside of a section
+    PcOutsideSect(&'static str),
+    /// _NARG doesn't have a value outside of a macro
+    NargOutsideMacro,
+}
+impl From<FormatError> for SymbolError<'_, '_> {
+    fn from(value: FormatError) -> Self {
+        Self::FormatError(value)
+    }
 }
 
 impl SymbolData {
@@ -731,27 +747,37 @@ impl SymbolData {
         }
     }
 
-    pub fn get_number(&self, macro_args: Option<&MacroArgs>, sections: &Sections) -> Option<i32> {
+    /// # Returns
+    ///
+    /// - `None` for non-numeric symbols;
+    /// - `Some(Err())` if the symbol's value is an error (e.g. PC outside of a section);
+    /// - `Some(Ok(None))` if the symbol doesn't have a constant value.
+    pub fn get_number(
+        &self,
+        macro_args: Option<&MacroArgs>,
+        sections: &Sections,
+    ) -> Option<Result<Option<i32>, SymbolError<'static, 'static>>> {
         match self {
             Self::User { kind, .. } | Self::Builtin(kind) => match kind {
-                SymbolKind::Numeric { value, .. } => Some(*value),
+                SymbolKind::Numeric { value, .. } => Some(Ok(Some(*value))),
                 SymbolKind::String(..) => None,
                 SymbolKind::Macro(_) => None,
-                SymbolKind::Label { section_id, offset } => sections
+                SymbolKind::Label { section_id, offset } => Some(Ok(sections
                     .find(*section_id)
                     .address()
-                    .map(|base_addr| base_addr as i32 + *offset as i32),
+                    .map(|base_addr| base_addr as i32 + *offset as i32))),
                 SymbolKind::Ref => None,
             },
-            Self::Pc => sections
-                .active_section
-                .as_ref()
-                .and_then(|(_data_sect, sym_sect)| {
-                    sections.sections[sym_sect.id]
-                        .address()
-                        .map(|addr| i32::from(addr) + sym_sect.offset as i32)
-                }),
-            Self::Narg => macro_args.map(|args| args.max_valid() as i32),
+            Self::Pc => Some(match sections.active_section.as_ref() {
+                Some((_data_sect, sym_sect)) => Ok(sections.sections[sym_sect.id]
+                    .address()
+                    .map(|addr| i32::from(addr) + sym_sect.offset as i32)),
+                None => Err(SymbolError::PcOutsideSect("value")),
+            }),
+            Self::Narg => Some(match macro_args {
+                Some(args) => Ok(Some(args.max_valid() as i32)),
+                None => Err(SymbolError::NargOutsideMacro),
+            }),
             Self::Dot => None,
             Self::DotDot => None,
             Self::Deleted(..) => None,

@@ -26,7 +26,7 @@ use crate::{
     macro_args::{MacroArgs, UniqueId},
     section::Sections,
     sources::{FileNode, NormalSpan, Source, Span, SpanKind},
-    symbols::{SymbolData, Symbols},
+    symbols::{SymbolData, SymbolError, Symbols},
     Identifier, Identifiers, Options,
 };
 
@@ -663,13 +663,21 @@ impl Lexer {
                             return Some(Err(MacroArgError::EmptyBracketed));
                         }
                         match identifiers.get(name).and_then(|ident| symbols.find(&ident)) {
-                            None => return Some(Err(MacroArgError::NoSuchSym(name, None))),
+                            None => return Some(Err(SymbolError::NotFound(name).into())),
                             Some(SymbolData::Deleted(span)) => {
-                                return Some(Err(MacroArgError::NoSuchSym(name, Some(span))))
+                                return Some(Err(SymbolError::Deleted(name, span).into()))
                             }
                             Some(sym) => match sym.get_number(macro_args.as_deref(), sections) {
-                                None => return Some(Err(MacroArgError::SymNotConst(name))),
-                                Some(idx) => idx as usize,
+                                None => {
+                                    return Some(Err(
+                                        SymbolError::NotNumeric(sym.kind_name()).into()
+                                    ))
+                                }
+                                Some(Err(err)) => return Some(Err(err.into())),
+                                Some(Ok(None)) => {
+                                    return Some(Err(SymbolError::NotConst(name).into()))
+                                }
+                                Some(Ok(Some(idx))) => idx as usize,
                             },
                         }
                     }
@@ -2552,10 +2560,8 @@ enum MacroArgError<'text> {
     EmptyBracketed,
     /// invalid character in bracketed macro argument
     InvalidBracketedChar,
-    /// no such symbol `{0}`
-    NoSuchSym(&'text str, Option<&'text Span>),
-    /// the symbol `{0}` is not constant
-    SymNotConst(&'text str),
+    /// {0}
+    SymErr(SymbolError<'text, 'text>),
 }
 impl MacroArgError<'_> {
     fn label_msg(&self) -> String {
@@ -2571,13 +2577,8 @@ impl MacroArgError<'_> {
                 "expected a number or symbol name between the angle brackets".into()
             }
             Self::InvalidBracketedChar => "this bracketed macro argument is invalid".into(),
-            // TODO: highlight the deletion point
-            Self::NoSuchSym(_name, _opt_del_span) => {
-                "no symbol by this name is defined at this point".into()
-            }
-            Self::SymNotConst(_name) => {
-                "a symbol by this name exists, but is not a constant".into()
-            }
+            // TODO: more specific label messages
+            Self::SymErr(_err) => "this symbol is invalid".into(),
         }
     }
     fn help_msg(&self) -> Option<String> {
@@ -2591,6 +2592,11 @@ impl MacroArgError<'_> {
             Self::EmptyBracketed => Some("it kind of looks like a fish, doesn't it?".into()),
             _ => None,
         }
+    }
+}
+impl<'text> From<SymbolError<'text, 'text>> for MacroArgError<'text> {
+    fn from(value: SymbolError<'text, 'text>) -> Self {
+        Self::SymErr(value)
     }
 }
 

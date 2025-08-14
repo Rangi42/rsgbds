@@ -1,4 +1,5 @@
 use compact_str::CompactString;
+use either::Either;
 
 use crate::{
     diagnostics,
@@ -130,13 +131,13 @@ pub(in super::super) fn parse_assert(
         parse_ctx.macro_args.last(),
         parse_ctx.sections,
     ) {
-        Ok((0, span)) => assert_failure(level, msg.as_ref(), &span, parse_ctx),
-        Ok(_) => Some(()), // OK
-        Err(Err(error)) => {
+        Ok(Either::Left((0, span))) => assert_failure(level, msg.as_ref(), &span, parse_ctx),
+        Ok(Either::Left(_)) => Some(()), // OK
+        Err(error) => {
             parse_ctx.report_expr_error(error);
             Some(())
         }
-        Err(Ok(expr)) => {
+        Ok(Either::Right(expr)) => {
             parse_ctx.sections.assertions.push(Assertion {
                 level,
                 rest: LinkTimeExpr {
