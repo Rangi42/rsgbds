@@ -1,3 +1,8 @@
-error: assert-nosect-bank.asm(1):
-    PC has no bank outside of a section
-Assembly aborted with 1 error!
+error: PC doesn't have a bank outside of a section
+   ╭─[ test.asm:1:8 ]
+   │
+ 1 │ assert BANK(@) == 1
+   │        ───┬───  
+   │           ╰───── this symbol is invalid
+───╯
+1 error generated.

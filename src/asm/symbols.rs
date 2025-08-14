@@ -784,19 +784,26 @@ impl SymbolData {
         }
     }
 
-    pub fn get_section_and_offset(&self, sections: &Sections) -> Option<(usize, usize)> {
+    /// # Returns
+    ///
+    /// - `None` for non-label symbols;
+    /// - `Some(Err())` if the symbol's bank is an error (e.g. PC outside of a section);
+    pub fn get_section_and_offset(
+        &self,
+        sections: &Sections,
+    ) -> Option<Result<(usize, usize), SymbolError<'static, 'static>>> {
         match self {
             SymbolData::User { kind, .. } | SymbolData::Builtin(kind) => match kind {
-                SymbolKind::Label { section_id, offset } => Some((*section_id, *offset)),
+                SymbolKind::Label { section_id, offset } => Some(Ok((*section_id, *offset))),
                 SymbolKind::Numeric { .. } => None,
                 SymbolKind::String(_) => None,
                 SymbolKind::Macro(_) => None,
                 SymbolKind::Ref => None,
             },
-            SymbolData::Pc => sections
-                .active_section
-                .as_ref()
-                .map(|(_data_sect, sym_sect)| (sym_sect.id, sym_sect.offset)),
+            SymbolData::Pc => match sections.active_section.as_ref() {
+                Some((_data_sect, sym_sect)) => Some(Ok((sym_sect.id, sym_sect.offset))),
+                None => Some(Err(SymbolError::PcOutsideSect("bank"))),
+            },
             SymbolData::Narg => None,
             SymbolData::Dot => None,
             SymbolData::DotDot => None,

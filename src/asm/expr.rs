@@ -265,13 +265,17 @@ impl Expr {
                         kind: ErrKind::SymDeleted(name, span.clone()),
                     }),
                     Some(sym) => match sym.get_section_and_offset(sections) {
-                        Some((sect_id, _ofs)) => match sections.sections[sect_id].bank() {
+                        Some(Ok((sect_id, _ofs))) => match sections.sections[sect_id].bank() {
                             Some(value) => Ok((value as i32, op.span.clone())),
                             None => Err(Error {
                                 span: op.span.clone(),
                                 kind: ErrKind::SymBankNotConst(name),
                             }),
                         },
+                        Some(Err(err)) => Err(Error {
+                            span: op.span.clone(),
+                            kind: ErrKind::SymError(err),
+                        }),
                         None => Err(Error {
                             span: op.span.clone(),
                             kind: ErrKind::BankOfNonLabel(name, sym.kind_name()),
@@ -878,7 +882,7 @@ impl ErrKind {
             } => symbols
                 .symbols
                 .get(name)
-                .and_then(|sym| sym.get_section_and_offset(sections)),
+                .and_then(|sym| sym.get_section_and_offset(sections).transpose().unwrap()),
             Self::SectAddrNotConst {
                 name,
                 just_the_sect: true,
