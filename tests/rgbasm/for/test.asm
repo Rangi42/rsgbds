@@ -49,7 +49,7 @@ for v, 10
 	println "{d:v}"
 if v == 3
 purge v
-def v equ 42 ; causes a fatal error
+def v equ 42
 endc
 endr
 	println "-> {d:v}"

@@ -1,13 +1,356 @@
-warning: for.asm(12): [-Wbackwards-for]
-    FOR goes backwards from 2 to 1 by 1
-error: for.asm(16):
-    FOR cannot have a step value of 0
-warning: for.asm(20): [-Wbackwards-for]
-    FOR goes backwards from 1 to 2 by -1
-error: for.asm(46):
-    's' already defined as constant at for.asm(39)
-    (should it be {interpolated} to define its contents "x"?)
-error: for.asm(48) -> for.asm::REPT~4(54):
-    'v' already defined as constant at for.asm(48) -> for.asm::REPT~4(52)
-FATAL: for.asm(48) -> for.asm::REPT~4(54):
-    Failed to update FOR symbol value
+[-Wbackwards-for] warning: `for` loop is backwards
+    ╭─[ test.asm:10:1 ]
+    │
+ 10 │ for v, 2, 1
+    │ ─┬─  
+    │  ╰─── this loop wants to go from 2 to 1 in increments of 1
+────╯
+error: `for` loops cannot have a step value of 0
+    ╭─[ test.asm:14:14 ]
+    │
+ 14 │ for v, 1, 2, 0
+    │              ┬  
+    │              ╰── this step is invalid
+────╯
+[-Wbackwards-for] warning: `for` loop is backwards
+    ╭─[ test.asm:18:1 ]
+    │
+ 18 │ for v, 1, 2, -1
+    │ ─┬─  
+    │  ╰─── this loop wants to go from 1 to 2 in increments of -1
+────╯
+error: A symbol called "s" already exists
+    ╭─[ test.asm:44:5 ]
+    │
+ 39 │ DEF s EQUS "x"
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+ 44 │ for s, 10
+    │     ┬  
+    │     ╰── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: a string symbol cannot be formatted as signed number
+    ╭─[ test.asm:45:13 ]
+    │
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 45 │     println "{d:s}"
+    │                ─┬  
+    │                 ╰── this interpolation is invalid
+────╯
+error: A symbol called "s" already exists
+    ╭─[ test.asm:44:1 ]
+    │
+ 39 │ DEF s EQUS "x"
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: a string symbol cannot be formatted as signed number
+    ╭─[ test.asm:45:13 ]
+    │
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 45 │     println "{d:s}"
+    │                ─┬  
+    │                 ╰── this interpolation is invalid
+────╯
+error: A symbol called "s" already exists
+    ╭─[ test.asm:44:1 ]
+    │
+ 39 │ DEF s EQUS "x"
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: a string symbol cannot be formatted as signed number
+    ╭─[ test.asm:45:13 ]
+    │
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 45 │     println "{d:s}"
+    │                ─┬  
+    │                 ╰── this interpolation is invalid
+────╯
+error: A symbol called "s" already exists
+    ╭─[ test.asm:44:1 ]
+    │
+ 39 │ DEF s EQUS "x"
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: a string symbol cannot be formatted as signed number
+    ╭─[ test.asm:45:13 ]
+    │
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 45 │     println "{d:s}"
+    │                ─┬  
+    │                 ╰── this interpolation is invalid
+────╯
+error: A symbol called "s" already exists
+    ╭─[ test.asm:44:1 ]
+    │
+ 39 │ DEF s EQUS "x"
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: a string symbol cannot be formatted as signed number
+    ╭─[ test.asm:45:13 ]
+    │
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 45 │     println "{d:s}"
+    │                ─┬  
+    │                 ╰── this interpolation is invalid
+────╯
+error: A symbol called "s" already exists
+    ╭─[ test.asm:44:1 ]
+    │
+ 39 │ DEF s EQUS "x"
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: a string symbol cannot be formatted as signed number
+    ╭─[ test.asm:45:13 ]
+    │
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 45 │     println "{d:s}"
+    │                ─┬  
+    │                 ╰── this interpolation is invalid
+────╯
+error: A symbol called "s" already exists
+    ╭─[ test.asm:44:1 ]
+    │
+ 39 │ DEF s EQUS "x"
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: a string symbol cannot be formatted as signed number
+    ╭─[ test.asm:45:13 ]
+    │
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 45 │     println "{d:s}"
+    │                ─┬  
+    │                 ╰── this interpolation is invalid
+────╯
+error: A symbol called "s" already exists
+    ╭─[ test.asm:44:1 ]
+    │
+ 39 │ DEF s EQUS "x"
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: a string symbol cannot be formatted as signed number
+    ╭─[ test.asm:45:13 ]
+    │
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 45 │     println "{d:s}"
+    │                ─┬  
+    │                 ╰── this interpolation is invalid
+────╯
+error: A symbol called "s" already exists
+    ╭─[ test.asm:44:1 ]
+    │
+ 39 │ DEF s EQUS "x"
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: a string symbol cannot be formatted as signed number
+    ╭─[ test.asm:45:13 ]
+    │
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 45 │     println "{d:s}"
+    │                ─┬  
+    │                 ╰── this interpolation is invalid
+────╯
+error: A symbol called "s" already exists
+    ╭─[ test.asm:44:1 ]
+    │
+ 39 │ DEF s EQUS "x"
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: a string symbol cannot be formatted as signed number
+    ╭─[ test.asm:45:13 ]
+    │
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 45 │     println "{d:s}"
+    │                ─┬  
+    │                 ╰── this interpolation is invalid
+────╯
+error: A symbol called "s" already exists
+    ╭─[ test.asm:44:1 ]
+    │
+ 39 │ DEF s EQUS "x"
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "v" already exists
+    ╭─[ test.asm:48:1 ]
+    │
+ 48 │ for v, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 52 │ def v equ 42
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "v" already exists
+    ╭─[ test.asm:48:1 ]
+    │
+ 48 │ for v, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 52 │ def v equ 42
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "v" already exists
+    ╭─[ test.asm:48:1 ]
+    │
+ 48 │ for v, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 52 │ def v equ 42
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "v" already exists
+    ╭─[ test.asm:48:1 ]
+    │
+ 48 │ for v, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 52 │ def v equ 42
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "v" already exists
+    ╭─[ test.asm:48:1 ]
+    │
+ 48 │ for v, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 52 │ def v equ 42
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "v" already exists
+    ╭─[ test.asm:48:1 ]
+    │
+ 48 │ for v, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 52 │ def v equ 42
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "v" already exists
+    ╭─[ test.asm:48:1 ]
+    │
+ 48 │ for v, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+ 52 │ def v equ 42
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+29 errors generated.

@@ -1,3 +1,10 @@
-error: invalid-empty-macro-arg.asm(1):
-    Empty bracketed macro argument
-Assembly aborted with 1 error!
+error: empty bracketed macro argument
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ \<>
+   │ ─┬─  
+   │  ╰─── expected a number or symbol name between the angle brackets
+   │ 
+   │ Help: it kind of looks like a fish, doesn't it?
+───╯
+1 error generated.

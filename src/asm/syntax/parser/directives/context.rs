@@ -359,6 +359,35 @@ impl parse_ctx!() {
             SpanKind::Loop(nth) => {
                 self.unique_id.exit_unique_ctx();
                 let loop_state = &mut ctx.loop_state;
+
+                if let Some(ident) = loop_state.for_var {
+                    loop_state.for_value = loop_state.for_value.wrapping_add(loop_state.for_step);
+
+                    let span = ctx
+                        .span
+                        .node
+                        .parent
+                        .as_deref()
+                        .expect("Loop context should have a parent")
+                        .clone();
+                    self.symbols.define_constant(
+                        ident,
+                        self.identifiers,
+                        Span::Normal(span),
+                        loop_state.for_value,
+                        true,  // Mutable.
+                        false, // Unexported.
+                        false, // Not redefining.
+                        self.sections
+                            .active_section
+                            .as_ref()
+                            .map(|(_data_sect, sym_sect)| sym_sect),
+                        self.macro_args.last(),
+                        self.nb_errors_remaining,
+                        self.options,
+                    );
+                }
+
                 if *nth == loop_state.nb_iters - 1 {
                     let has_more = self
                         .lexer
@@ -367,34 +396,6 @@ impl parse_ctx!() {
                     has_more
                 } else {
                     *nth += 1;
-                    if let Some(ident) = loop_state.for_var {
-                        loop_state.for_value =
-                            loop_state.for_value.wrapping_add(loop_state.for_step);
-
-                        let span = ctx
-                            .span
-                            .node
-                            .parent
-                            .as_deref()
-                            .expect("Loop context should have a parent")
-                            .clone();
-                        self.symbols.define_constant(
-                            ident,
-                            self.identifiers,
-                            Span::Normal(span),
-                            loop_state.for_value,
-                            true,  // Mutable.
-                            false, // Unexported.
-                            false, // Not redefining.
-                            self.sections
-                                .active_section
-                                .as_ref()
-                                .map(|(_data_sect, sym_sect)| sym_sect),
-                            self.macro_args.last(),
-                            self.nb_errors_remaining,
-                            self.options,
-                        );
-                    }
                     self.lexer
                         .reset_loop_context(self.nb_errors_remaining, self.options);
                     self.unique_id.enter_unique_ctx();
