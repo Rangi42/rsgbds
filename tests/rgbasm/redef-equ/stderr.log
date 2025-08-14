@@ -1,4 +1,13 @@
-error: redef-equ.asm(25):
-    'N' already defined as non-EQU at redef-equ.asm(24)
-    (should it be {interpolated} to define its contents "X"?)
-Assembly aborted with 1 error!
+error: A symbol called "N" already exists
+    ╭─[ test.asm:25:1 ]
+    │
+ 24 │ DEF N EQUS "X"
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+ 25 │ REDEF N EQU 42
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+1 error generated.

@@ -1,3 +1,13 @@
-error: redef-equs.asm(25):
-    'N' already defined as non-EQUS at redef-equs.asm(24)
-Assembly aborted with 1 error!
+error: A symbol called "N" already exists
+    ╭─[ test.asm:25:1 ]
+    │
+ 24 │ DEF N EQU 42
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+ 25 │ REDEF N EQUS "X"
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+1 error generated.

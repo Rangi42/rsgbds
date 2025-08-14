@@ -1,3 +1,14 @@
-error: label-redefinition.asm(7):
-    'Sym' already defined at label-redefinition.asm(6) -> label-redefinition.asm::m(4)
-Assembly aborted with 1 error!
+error: A symbol called "Sym" already exists
+   ╭─[ test.asm:7:1 ]
+   │
+ 4 │ Sym::
+   │ ─┬─  
+   │  ╰─── the name is defined here...
+   │ 
+ 7 │ Sym::
+   │ ─┬─  
+   │  ╰─── ...so it's not available for this definition
+   │ 
+   │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+───╯
+1 error generated.

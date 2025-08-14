@@ -21,6 +21,8 @@ pub(in super::super) fn parse_def_or_redef(
         return unexpected;
     }}
 
+    let redefining = matches_tok!(&keyword, "redef");
+
     let kind_token = parse_ctx.next_token();
     expect_one_of! { kind_token => {
         |"equs"| => {
@@ -32,6 +34,7 @@ pub(in super::super) fn parse_def_or_redef(
                     parse_ctx.identifiers,
                     keyword.span,
                     string,
+                    redefining,
                     parse_ctx
                         .sections
                         .active_section
@@ -64,6 +67,7 @@ pub(in super::super) fn parse_def_or_redef(
                     value,
                     matches_tok!(kind_token, "="),
                     exported.is_some(),
+                    redefining,
                     parse_ctx
                         .sections
                         .active_section
@@ -106,6 +110,7 @@ pub(in super::super) fn parse_def_or_redef(
                         value,
                         true,
                         exported.is_some(),
+                        redefining,
                         parse_ctx
                             .sections
                             .active_section
@@ -147,6 +152,7 @@ pub(in super::super) fn parse_def_or_redef(
                         constant_value,
                         false,
                         exported.is_some(),
+                        redefining,
                         parse_ctx
                             .sections
                             .active_section

@@ -197,6 +197,7 @@ impl Symbols {
                 identifiers,
                 Span::CommandLine,
                 value.into(),
+                false, // Not redefining.
                 None,
                 None,
                 nb_errors_left,
@@ -273,6 +274,7 @@ impl Symbols {
         definition: Span,
         kind: SymbolKind,
         exported: bool,
+        redef: bool,
     ) -> Result<(), (&mut SymbolData, Span)> {
         match symbols.entry(name) {
             Entry::Vacant(entry) => {
@@ -311,6 +313,16 @@ impl Symbols {
                             kind,
                             exported: exported || *previously_exported,
                         };
+                        Ok(())
+                    }
+                    SymbolData::User {
+                        definition: cur_definition,
+                        kind: cur_kind,
+                        exported: cur_exported,
+                    } if redef && kind.is_same_kind(cur_kind) => {
+                        *cur_definition = definition;
+                        *cur_kind = kind;
+                        *cur_exported |= exported;
                         Ok(())
                     }
                     SymbolData::User {
@@ -409,14 +421,20 @@ impl Symbols {
         definition: Span,
         payload: SymbolKind,
         exported: bool,
+        redef: bool,
         active_section: Option<&ActiveSection>,
         macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
-        if let Err((existing, definition)) =
-            Self::try_define_symbol(&mut self.symbols, name, definition, payload, exported)
-        {
+        if let Err((existing, definition)) = Self::try_define_symbol(
+            &mut self.symbols,
+            name,
+            definition,
+            payload,
+            exported,
+            redef,
+        ) {
             diagnostics::error(
                 &definition,
                 |error| {
@@ -450,6 +468,7 @@ impl Symbols {
         identifiers: &Identifiers,
         definition: Span,
         string: CompactString,
+        redef: bool,
         active_section: Option<&ActiveSection>,
         macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
@@ -460,7 +479,8 @@ impl Symbols {
             identifiers,
             definition,
             SymbolKind::String(string),
-            false,
+            false, // Not exported.
+            redef,
             active_section,
             macro_args,
             nb_errors_left,
@@ -488,6 +508,7 @@ impl Symbols {
             definition,
             SymbolKind::Label { section_id, offset },
             exported || options.export_all,
+            false, // Not redefining.
             active_section,
             macro_args,
             nb_errors_left,
@@ -503,6 +524,7 @@ impl Symbols {
         value: i32,
         mutable: bool,
         exported: bool,
+        redef: bool,
         active_section: Option<&ActiveSection>,
         macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
@@ -514,6 +536,7 @@ impl Symbols {
             definition,
             SymbolKind::Numeric { value, mutable },
             exported,
+            redef,
             active_section,
             macro_args,
             nb_errors_left,
@@ -537,7 +560,8 @@ impl Symbols {
             identifiers,
             definition,
             SymbolKind::Macro(body),
-            false,
+            false, // Not exported.
+            false, // Not redefining.
             active_section,
             macro_args,
             nb_errors_left,
@@ -560,7 +584,8 @@ impl Symbols {
             identifiers,
             ref_span,
             SymbolKind::Ref,
-            false,
+            false, // Not exported.
+            false, // Not redefining.
             active_section,
             macro_args,
             nb_errors_left,
@@ -727,6 +752,25 @@ pub enum SymbolError<'name, 'sym> {
 impl From<FormatError> for SymbolError<'_, '_> {
     fn from(value: FormatError) -> Self {
         Self::FormatError(value)
+    }
+}
+
+impl SymbolKind {
+    fn is_same_kind(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                SymbolKind::Numeric { mutable, .. },
+                SymbolKind::Numeric {
+                    mutable: other_mutable,
+                    ..
+                },
+            ) => *mutable == *other_mutable,
+            (SymbolKind::String(_), SymbolKind::String(_))
+            | (SymbolKind::Macro(_), SymbolKind::Macro(_))
+            | (SymbolKind::Label { .. }, SymbolKind::Label { .. })
+            | (SymbolKind::Ref, SymbolKind::Ref) => true,
+            (_, _) => false,
+        }
     }
 }
 

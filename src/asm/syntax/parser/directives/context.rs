@@ -211,6 +211,7 @@ pub(in super::super) fn parse_for(keyword: Token, parse_ctx: &mut parse_ctx!()) 
             start,
             true,  // Mutable.
             false, // Unexported.
+            false, // Not redefining.
             parse_ctx
                 .sections
                 .active_section
@@ -384,6 +385,7 @@ impl parse_ctx!() {
                             loop_state.for_value,
                             true,  // Mutable.
                             false, // Unexported.
+                            false, // Not redefining.
                             self.sections
                                 .active_section
                                 .as_ref()
