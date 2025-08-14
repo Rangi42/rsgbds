@@ -1,3 +1,148 @@
-error: for-loop-variable.asm(12):
-    'y' already defined as constant at for-loop-variable.asm(8)
-Assembly aborted with 1 error!
+error: A symbol called "y" already exists
+   ╭─[ test.asm:9:5 ]
+   │
+ 8 │ def y equ 5
+   │ ─┬─  
+   │  ╰─── the name is defined here...
+ 9 │ for y, y
+   │     ┬  
+   │     ╰── ...so it's not available for this definition
+   │ 
+   │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+───╯
+error: A symbol called "y" already exists
+    ╭─[ test.asm:10:3 ]
+    │
+  8 │ def y equ 5
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+  9 │ for y, y
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 10 │   def y *= 3
+    │   ─┬─  
+    │    ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "y" already exists
+   ╭─[ test.asm:9:1 ]
+   │
+ 8 │ def y equ 5
+   │ ─┬─  
+   │  ╰─── the name is defined here...
+ 9 │ for y, y
+   │ ─┬─  
+   │  ╰─── ...so it's not available for this definition
+   │ 
+   │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+───╯
+error: A symbol called "y" already exists
+    ╭─[ test.asm:10:3 ]
+    │
+  8 │ def y equ 5
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+  9 │ for y, y
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 10 │   def y *= 3
+    │   ─┬─  
+    │    ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "y" already exists
+   ╭─[ test.asm:9:1 ]
+   │
+ 8 │ def y equ 5
+   │ ─┬─  
+   │  ╰─── the name is defined here...
+ 9 │ for y, y
+   │ ─┬─  
+   │  ╰─── ...so it's not available for this definition
+   │ 
+   │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+───╯
+error: A symbol called "y" already exists
+    ╭─[ test.asm:10:3 ]
+    │
+  8 │ def y equ 5
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+  9 │ for y, y
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 10 │   def y *= 3
+    │   ─┬─  
+    │    ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "y" already exists
+   ╭─[ test.asm:9:1 ]
+   │
+ 8 │ def y equ 5
+   │ ─┬─  
+   │  ╰─── the name is defined here...
+ 9 │ for y, y
+   │ ─┬─  
+   │  ╰─── ...so it's not available for this definition
+   │ 
+   │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+───╯
+error: A symbol called "y" already exists
+    ╭─[ test.asm:10:3 ]
+    │
+  8 │ def y equ 5
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+  9 │ for y, y
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 10 │   def y *= 3
+    │   ─┬─  
+    │    ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "y" already exists
+   ╭─[ test.asm:9:1 ]
+   │
+ 8 │ def y equ 5
+   │ ─┬─  
+   │  ╰─── the name is defined here...
+ 9 │ for y, y
+   │ ─┬─  
+   │  ╰─── ...so it's not available for this definition
+   │ 
+   │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+───╯
+error: A symbol called "y" already exists
+    ╭─[ test.asm:10:3 ]
+    │
+  8 │ def y equ 5
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+  9 │ for y, y
+    │ ─┬─  
+    │  ╰─── loop beginning here
+ 10 │   def y *= 3
+    │   ─┬─  
+    │    ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "y" already exists
+   ╭─[ test.asm:9:1 ]
+   │
+ 8 │ def y equ 5
+   │ ─┬─  
+   │  ╰─── the name is defined here...
+ 9 │ for y, y
+   │ ─┬─  
+   │  ╰─── ...so it's not available for this definition
+   │ 
+   │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+───╯
+11 errors generated.
