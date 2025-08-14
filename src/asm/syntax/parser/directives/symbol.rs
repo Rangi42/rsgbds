@@ -123,10 +123,14 @@ pub(in super::super) fn parse_def_or_redef(
         },
 
         |"rb" / "rw" / "rl"| => {
-            let (expr, lookahead) = expr::expect_numeric_expr(parse_ctx.next_token(), parse_ctx);
+            let (maybe_expr, lookahead) = expr::parse_numeric_expr(parse_ctx.next_token(), parse_ctx);
 
-            match parse_ctx.try_const_eval(&expr) {
-                Ok((value, _span)) => {
+            let offset = match maybe_expr {
+                Some(expr) => parse_ctx.try_const_eval(&expr).map(|(value, _span)| value),
+                None => Ok(1),
+            };
+            match offset {
+                Ok(value) => {
                     let rs = parse_ctx.symbols.rs();
                     let stride = match &kind_token.payload {
                         tok!("rb") => value,
