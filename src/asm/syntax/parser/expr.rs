@@ -11,12 +11,7 @@ use crate::{
     Options,
 };
 
-use super::{
-    directives::section,
-    expect_one_of, matches_tok,
-    misc::{self, StrOrNum},
-    parse_ctx, string,
-};
+use super::{directives::section, expect_one_of, matches_tok, misc, parse_ctx, string};
 
 // The implementation strategy is a Pratt parser.
 //
@@ -97,6 +92,31 @@ fn parse_subexpr(
                 Some(Either::Right(ident)) => Expr::bank_of_symbol(ident, span),
             };
             (expr, lookahead)
+        },
+        Token { span } @ |"def"| => {
+            let (ident, _opening_span, closing_span, lookahead) = misc::parse_parens_pair(
+                parse_ctx.next_token(),
+                parse_ctx,
+                |lookahead, parse_ctx| {
+                    expect_one_of! { lookahead => {
+                        |"identifier"(ident, _has_colon)| => (Some(ident), parse_ctx.next_token()),
+                        else |unexpected| => {
+                            parse_ctx.report_syntax_error(&unexpected, |error, span| {
+                                error.add_label(diagnostics::error_label(span).with_message("expected an identifier between the parentheses"));
+                            });
+                            (None, unexpected)
+                        }
+                    }}
+                },
+            );
+
+            let value = match ident.and_then(|name| parse_ctx.symbols.find(&name)){
+                Some(sym) if sym.exists(parse_ctx.symbols.scope.as_ref(), parse_ctx.sections.active_section.as_ref().map(|(_data_sect, sym_sect)| sym_sect), parse_ctx.macro_args.last()) => 1,
+                _ => 0,
+            };
+
+            let span = span.merged_with(&closing_span);
+            (Expr::number(value, span), lookahead)
         },
         Token { span } @ |"sizeof"| => {
             let (res, _opening_span, closing_span, lookahead) = misc::parse_parens_pair(
