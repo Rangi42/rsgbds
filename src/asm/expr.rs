@@ -692,7 +692,7 @@ fn div_floor(lhs: i32, rhs: i32) -> i32 {
     }
 }
 fn modulo(lhs: i32, rhs: i32) -> i32 {
-    let remainder = lhs / rhs;
+    let remainder = lhs % rhs;
     // Adjust module to have the sign of the divisor, not the sign of the dividend.
     remainder + rhs * from_bool((remainder < 0) != (rhs < 0))
 }
