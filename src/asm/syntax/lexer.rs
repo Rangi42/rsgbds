@@ -2333,6 +2333,22 @@ impl Lexer {
                             todo!();
                         }
                     }
+                    '{' => {
+                        let _ = Self::read_interpolation(
+                            &mut chars,
+                            text,
+                            ctx,
+                            &mut string,
+                            params.identifiers,
+                            params.symbols,
+                            &mut params.macro_args,
+                            params.unique_id,
+                            params.sections,
+                            depth,
+                            params.nb_errors_left,
+                            params.options,
+                        );
+                    }
 
                     _ => string.push(ch),
                 }
