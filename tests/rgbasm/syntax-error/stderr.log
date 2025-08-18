@@ -1,3 +1,15 @@
-error: syntax-error.asm(2):
-    syntax error, unexpected a
-Assembly aborted with 1 error!
+error: syntax error: unexpected a
+   ╭─[ test.asm:2:7 ]
+   │
+ 2 │ print a
+   │       ┬  
+   │       ╰── expected a numeric or string expression
+───╯
+error: syntax error: unexpected a
+   ╭─[ test.asm:2:7 ]
+   │
+ 2 │ print a
+   │       ┬  
+   │       ╰── expected nothing else on this line
+───╯
+2 errors generated.

@@ -1,3 +1,40 @@
-error: syntax-error-eof-newline.asm(5) -> syntax-error-eof-newline.inc(1):
-    syntax error, unexpected end of line
-Assembly aborted with 1 error!
+error: syntax error: unexpected end of line
+   ╭─[ syntax-error-eof-newline.inc:1:9 ]
+   │
+ 1 │     SECTION
+   │            ┬  
+   │            ╰── expected a string expression here
+   │
+   ├─[ test.asm:5:2 ]
+   │
+ 5 │     INCLUDE "syntax-error-eof-newline.inc"
+   │     ───┬───  
+   │        ╰───── file included from here
+───╯
+error: syntax error: unexpected end of line
+   ╭─[ syntax-error-eof-newline.inc:1:9 ]
+   │
+ 1 │     SECTION
+   │            ┬  
+   │            ╰── expected a comma here
+   │
+   ├─[ test.asm:5:2 ]
+   │
+ 5 │     INCLUDE "syntax-error-eof-newline.inc"
+   │     ───┬───  
+   │        ╰───── file included from here
+───╯
+error: syntax error: unexpected end of line
+   ╭─[ syntax-error-eof-newline.inc:1:9 ]
+   │
+ 1 │     SECTION
+   │            ┬  
+   │            ╰── expected a memory region name
+   │
+   ├─[ test.asm:5:2 ]
+   │
+ 5 │     INCLUDE "syntax-error-eof-newline.inc"
+   │     ───┬───  
+   │        ╰───── file included from here
+───╯
+3 errors generated.

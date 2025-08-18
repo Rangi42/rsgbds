@@ -1,5 +1,29 @@
-error: syntax-error-lexer-mode.asm(7):
-    syntax error, unexpected af
-error: syntax-error-lexer-mode.asm(11):
-    syntax error, unexpected af, expecting symbol
-Assembly aborted with 2 errors!
+error: syntax error: unexpected af
+   ╭─[ test.asm:7:9 ]
+   │
+ 7 │ def m = AF {newline} def n = 2
+   │         ─┬  
+   │          ╰── expected a number or an expression here
+───╯
+error: syntax error: unexpected af
+   ╭─[ test.asm:7:9 ]
+   │
+ 7 │ def m = AF {newline} def n = 2
+   │         ─┬  
+   │          ╰── expected nothing else on this line
+───╯
+error: syntax error: unexpected af
+    ╭─[ test.asm:11:5 ]
+    │
+ 11 │ def AF = 1 {newline} def q = 2
+    │     ─┬  
+    │      ╰── expected an identifier
+────╯
+error: syntax error: unexpected af
+    ╭─[ test.asm:11:5 ]
+    │
+ 11 │ def AF = 1 {newline} def q = 2
+    │     ─┬  
+    │      ╰── expected nothing else on this line
+────╯
+4 errors generated.

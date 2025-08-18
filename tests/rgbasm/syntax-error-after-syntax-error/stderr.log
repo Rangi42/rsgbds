@@ -1,11 +1,57 @@
-error: syntax-error-after-syntax-error.asm(2):
-    syntax error, unexpected *
-error: syntax-error-after-syntax-error.asm(3):
-    Unterminated string
-error: syntax-error-after-syntax-error.asm(6):
-    syntax error, unexpected xor
-error: syntax-error-after-syntax-error.asm(9):
-    syntax error, unexpected :
-error: syntax-error-after-syntax-error.asm(10):
-    syntax error, unexpected stop, expecting end of line or end of buffer or end of fragment literal or ::
-Assembly aborted with 5 errors!
+error: syntax error: unexpected *
+   ╭─[ test.asm:2:15 ]
+   │
+ 2 │ def n equ 2 + * / ^ 3 ; oops
+   │               ┬  
+   │               ╰── expected a number or an expression here
+───╯
+error: syntax error: unexpected /
+   ╭─[ test.asm:2:17 ]
+   │
+ 2 │ def n equ 2 + * / ^ 3 ; oops
+   │                 ┬  
+   │                 ╰── expected a number or an expression here
+───╯
+error: syntax error: unexpected ^
+   ╭─[ test.asm:2:19 ]
+   │
+ 2 │ def n equ 2 + * / ^ 3 ; oops
+   │                   ┬  
+   │                   ╰── expected a number or an expression here
+───╯
+error: unterminated string literal
+   ╭─[ test.asm:3:12 ]
+   │
+ 3 │ def s equs "no closing quote, lol
+   │            ───────────┬──────────  
+   │                       ╰──────────── no closing quote before the end of the line
+───╯
+error: syntax error: unexpected xor
+   ╭─[ test.asm:6:4 ]
+   │
+ 6 │ ld xor, ret ; oh no :(
+   │    ─┬─  
+   │     ╰─── expected a register or an expression
+───╯
+error: syntax error: unexpected xor
+   ╭─[ test.asm:6:4 ]
+   │
+ 6 │ ld xor, ret ; oh no :(
+   │    ─┬─  
+   │     ╰─── expected nothing else on this line
+───╯
+error: syntax error: unexpected :
+   ╭─[ test.asm:9:9 ]
+   │
+ 9 │ label3::: ; no!
+   │         ┬  
+   │         ╰── expected an instruction or a directive here
+───╯
+error: syntax error: unexpected stop
+    ╭─[ test.asm:10:6 ]
+    │
+ 10 │ halt stop abort ; please
+    │      ──┬─  
+    │        ╰─── expected nothing else on this line
+────╯
+8 errors generated.

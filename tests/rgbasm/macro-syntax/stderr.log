@@ -1,11 +1,45 @@
-error: macro-syntax.asm(7):
-    Label "old" created outside of a SECTION
-error: macro-syntax.asm(7):
-    syntax error, unexpected MACRO
-error: macro-syntax.asm(8):
-    '\1' cannot be used outside of a macro
-error: macro-syntax.asm(9):
-    syntax error, unexpected ENDM
-error: macro-syntax.asm(11):
-    "old" is not a macro
-Assembly aborted with 5 errors!
+error: label defined outside of a section
+   ╭─[ test.asm:7:2 ]
+   │
+ 7 │     old: MACRO ; comment
+   │     ─┬─  
+   │      ╰─── no section is active at this point
+───╯
+error: a label is not allowed here
+   ╭─[ test.asm:7:2 ]
+   │
+ 7 │     old: MACRO ; comment
+   │     ─┬─  ──┬──  
+   │      ╰────────── this label cannot be on the same line...
+   │            │    
+   │            ╰──── ...as a `macro` directive
+───╯
+error: syntax error: unexpected end of line
+   ╭─[ test.asm:7:12 ]
+   │
+ 7 │     old: MACRO ; comment
+   │               ┬  
+   │               ╰── expected the macro's name
+───╯
+error: a macro argument was used outside of a macro
+   ╭─[ test.asm:8:28 ]
+   │
+ 8 │        println "out with the ", \1
+   │                                 ─┬  
+   │                                  ╰── cannot use a macro argument here
+───╯
+error: syntax error: unexpected endm
+   ╭─[ test.asm:9:2 ]
+   │
+ 9 │     ENDM ; comment
+   │     ──┬─  
+   │       ╰─── this `ENDM` is outside of a macro
+───╯
+error: macro `old` does not exist
+    ╭─[ test.asm:11:2 ]
+    │
+ 11 │     old 1
+    │     ─┬─  
+    │      ╰─── attempting to call the macro here
+────╯
+6 errors generated.
