@@ -185,14 +185,14 @@ fn add_backtrace_labels_and_print(diag: ReportBuilder<'_>, span: &Span, options:
                 Some(depth) => {
                     let diag_span = Span::Normal((**parent).clone());
                     diag.add_label(note_label(&diag_span).with_message(match span.node.kind {
-                        SpanKind::File => "file included from here",
-                        SpanKind::Macro(_) => "macro called here",
-                        SpanKind::Loop(_) => "loop beginning here",
-                        SpanKind::Expansion(_) => "interpolated here",
+                        SpanKind::File => "file included from here".into(),
+                        SpanKind::Macro(_) => "macro called here".into(),
+                        SpanKind::Loop(i) => format!("in the {i}th iteration of this loop"),
+                        SpanKind::Expansion(_) => "interpolated here".into(),
                         SpanKind::MacroArg(_)
                         | SpanKind::CombinedMacroArgs
                         | SpanKind::UniqueId
-                        | SpanKind::Invalid => "expanded here",
+                        | SpanKind::Invalid => "expanded here".into(),
                     }));
                     add_level(diag, parent, depth);
                 }

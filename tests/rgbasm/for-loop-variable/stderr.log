@@ -18,7 +18,7 @@ error: A symbol called "y" already exists
     │  ╰─── the name is defined here...
   9 │ for y, y
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 0th iteration of this loop
  10 │   def y *= 3
     │   ─┬─  
     │    ╰─── ...so it's not available for this definition
@@ -45,7 +45,7 @@ error: A symbol called "y" already exists
     │  ╰─── the name is defined here...
   9 │ for y, y
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 1th iteration of this loop
  10 │   def y *= 3
     │   ─┬─  
     │    ╰─── ...so it's not available for this definition
@@ -72,7 +72,7 @@ error: A symbol called "y" already exists
     │  ╰─── the name is defined here...
   9 │ for y, y
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 2th iteration of this loop
  10 │   def y *= 3
     │   ─┬─  
     │    ╰─── ...so it's not available for this definition
@@ -99,7 +99,7 @@ error: A symbol called "y" already exists
     │  ╰─── the name is defined here...
   9 │ for y, y
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 3th iteration of this loop
  10 │   def y *= 3
     │   ─┬─  
     │    ╰─── ...so it's not available for this definition
@@ -126,7 +126,7 @@ error: A symbol called "y" already exists
     │  ╰─── the name is defined here...
   9 │ for y, y
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 4th iteration of this loop
  10 │   def y *= 3
     │   ─┬─  
     │    ╰─── ...so it's not available for this definition

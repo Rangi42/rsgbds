@@ -37,7 +37,7 @@ error: a string symbol cannot be formatted as signed number
     │
  44 │ for s, 10
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 0th iteration of this loop
  45 │     println "{d:s}"
     │                ─┬  
     │                 ╰── this interpolation is invalid
@@ -60,7 +60,7 @@ error: a string symbol cannot be formatted as signed number
     │
  44 │ for s, 10
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 1th iteration of this loop
  45 │     println "{d:s}"
     │                ─┬  
     │                 ╰── this interpolation is invalid
@@ -83,7 +83,7 @@ error: a string symbol cannot be formatted as signed number
     │
  44 │ for s, 10
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 2th iteration of this loop
  45 │     println "{d:s}"
     │                ─┬  
     │                 ╰── this interpolation is invalid
@@ -106,7 +106,7 @@ error: a string symbol cannot be formatted as signed number
     │
  44 │ for s, 10
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 3th iteration of this loop
  45 │     println "{d:s}"
     │                ─┬  
     │                 ╰── this interpolation is invalid
@@ -129,7 +129,7 @@ error: a string symbol cannot be formatted as signed number
     │
  44 │ for s, 10
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 4th iteration of this loop
  45 │     println "{d:s}"
     │                ─┬  
     │                 ╰── this interpolation is invalid
@@ -152,7 +152,7 @@ error: a string symbol cannot be formatted as signed number
     │
  44 │ for s, 10
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 5th iteration of this loop
  45 │     println "{d:s}"
     │                ─┬  
     │                 ╰── this interpolation is invalid
@@ -175,7 +175,7 @@ error: a string symbol cannot be formatted as signed number
     │
  44 │ for s, 10
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 6th iteration of this loop
  45 │     println "{d:s}"
     │                ─┬  
     │                 ╰── this interpolation is invalid
@@ -198,7 +198,7 @@ error: a string symbol cannot be formatted as signed number
     │
  44 │ for s, 10
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 7th iteration of this loop
  45 │     println "{d:s}"
     │                ─┬  
     │                 ╰── this interpolation is invalid
@@ -221,7 +221,7 @@ error: a string symbol cannot be formatted as signed number
     │
  44 │ for s, 10
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 8th iteration of this loop
  45 │     println "{d:s}"
     │                ─┬  
     │                 ╰── this interpolation is invalid
@@ -244,7 +244,7 @@ error: a string symbol cannot be formatted as signed number
     │
  44 │ for s, 10
     │ ─┬─  
-    │  ╰─── loop beginning here
+    │  ╰─── in the 9th iteration of this loop
  45 │     println "{d:s}"
     │                ─┬  
     │                 ╰── this interpolation is invalid
