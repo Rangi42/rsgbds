@@ -2002,7 +2002,13 @@ impl Lexer {
                         params.sections,
                     ) {
                         match res {
-                            Ok((_kind, src)) => string.push_str(src.contents.text()),
+                            Ok((_kind, src)) => {
+                                for ch in src.contents.text().chars() {
+                                    for escaped in Self::escape_character_for_string(&ch) {
+                                        string.push(*escaped)
+                                    }
+                                }
+                            }
                             Err(err) => {
                                 let macro_arg_len = match macro_chars.peek() {
                                     Some(&(ofs, _ch)) => ofs,
@@ -2032,11 +2038,13 @@ impl Lexer {
                     }
                 }
                 '{' if !raw => {
+                    let mut expanded = CompactString::default();
+                    // We don't care for the ident.
                     let _ = Self::read_interpolation(
                         chars,
                         text,
                         ctx,
-                        string,
+                        &mut expanded,
                         params.identifiers,
                         params.symbols,
                         &mut params.macro_args,
@@ -2046,6 +2054,11 @@ impl Lexer {
                         params.nb_errors_left,
                         params.options,
                     );
+                    for ch in expanded.chars() {
+                        for escaped in Self::escape_character_for_string(&ch) {
+                            string.push(*escaped)
+                        }
+                    }
                 }
                 '}' if !raw => {
                     let mut span = ctx.new_span();
@@ -2079,6 +2092,20 @@ impl Lexer {
         });
 
         end_ofs
+    }
+
+    fn escape_character_for_string(ch: &char) -> &[char] {
+        match ch {
+            // Not `"`, since it is implicitly escaped in a string.
+            '\\' => &['\\', '\\'],
+            '{' => &['\\', '{'],
+            '}' => &['\\', '}'],
+            '\n' => &['\\', 'n'],
+            '\r' => &['\\', 'r'],
+            '\t' => &['\\', 't'],
+            '\0' => &['\\', '0'],
+            _ => std::array::from_ref(ch),
+        }
     }
 
     fn get_char_escape(
