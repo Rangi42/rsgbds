@@ -9,7 +9,12 @@ use std::{
 
 use compact_str::CompactString;
 
-use crate::{common::Captures, diagnostics, sources::Span, Options};
+use crate::{
+    common::Captures,
+    diagnostics::{self, warning},
+    sources::Span,
+    Options,
+};
 
 #[derive(Debug)]
 pub struct Charmaps {
@@ -105,6 +110,23 @@ impl Charmaps {
     pub fn pop_active_charmap(&mut self) -> Option<()> {
         self.active_charmap_id = self.stack.pop()?;
         Some(())
+    }
+
+    pub fn warn_if_stack_not_empty(&self, nb_errors_left: &Cell<usize>, options: &Options) {
+        if !self.stack.is_empty() {
+            diagnostics::warn(
+                warning!("unmatched-directive"),
+                &Span::TopLevel,
+                |warning| {
+                    warning.set_message("`pushc` without corresponding `popc`");
+                    if self.stack.len() != 1 {
+                        warning.set_note(format!("{} unclosed `pushc`s", self.stack.len()));
+                    }
+                },
+                nb_errors_left,
+                options,
+            )
+        }
     }
 }
 impl Charmap {

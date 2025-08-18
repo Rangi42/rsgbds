@@ -11,7 +11,7 @@ use cli::Cli;
 mod common;
 mod cond;
 mod diagnostics;
-use diagnostics::{WarningState, NB_META_WARNINGS, NB_WARNINGS};
+use diagnostics::{warning, WarningState, NB_META_WARNINGS, NB_WARNINGS};
 mod expr;
 mod format;
 mod instructions;
@@ -97,8 +97,8 @@ fn main() -> ExitCode {
     // TODO: unclosed UNION
     sections.warn_if_unclosed_load_block(&nb_errors_left, &options);
     sections.check_section_sizes(&nb_errors_left, &options);
-    // TODO: unclosed PUSHO
-    // TODO: unclosed PUSHC
+    warn_if_opt_stack_not_empty(&nb_errors_left, &options);
+    charmaps.warn_if_stack_not_empty(&nb_errors_left, &options);
     sections.warn_if_stack_not_empty(&nb_errors_left, &options);
 
     let nb_errors = options.max_errors - nb_errors_left.get();
@@ -124,4 +124,24 @@ fn main() -> ExitCode {
     }
 
     ExitCode::Ok
+}
+
+fn warn_if_opt_stack_not_empty(nb_errors_left: &Cell<usize>, options: &Options) {
+    if !options.runtime_opt_stack.is_empty() {
+        diagnostics::warn(
+            warning!("unmatched-directive"),
+            &sources::Span::TopLevel,
+            |warning| {
+                warning.set_message("`pusho` without corresponding `popo`");
+                if options.runtime_opt_stack.len() != 1 {
+                    warning.set_note(format!(
+                        "{} unclosed `pusho`s",
+                        options.runtime_opt_stack.len()
+                    ));
+                }
+            },
+            nb_errors_left,
+            options,
+        );
+    }
 }
