@@ -1,21 +1,56 @@
-error: nested-bad-interpolation.asm(1):
-    Interpolated symbol "a" is a reserved keyword; add a '#' prefix to use it as a raw symbol
-error: nested-bad-interpolation.asm(1):
-    Interpolated symbol "" does not exist
-error: nested-bad-interpolation.asm(1):
-    syntax error, unexpected end of line
-error: nested-bad-interpolation.asm(2):
-    Interpolated symbol "b" is a reserved keyword; add a '#' prefix to use it as a raw symbol
-warning: nested-bad-interpolation.asm(2): [-Wobsolete]
-    Treating strings as numbers is deprecated
-error: nested-bad-interpolation.asm(2):
-    Strings as numbers must be a single charmap unit
-error: nested-bad-interpolation.asm(3):
-    Interpolated symbol "c" is a reserved keyword; add a '#' prefix to use it as a raw symbol
-error: nested-bad-interpolation.asm(3):
-    Interpolated symbol "" does not exist
-warning: nested-bad-interpolation.asm(3): [-Wobsolete]
-    Treating strings as numbers is deprecated
-error: nested-bad-interpolation.asm(3):
-    Strings as numbers must be a single charmap unit
-Assembly aborted with 8 errors!
+error: interpolated symbol is a reserved keyword
+   ╭─[ test.asm:1:11 ]
+   │
+ 1 │ def p = {{a}}
+   │           ┬  
+   │           ╰── attempting to interpolate `a` here
+   │ 
+   │ Help: add a `#` prefix to use the name as a symbol anyway
+───╯
+error: unexpected character '}'
+   ╭─[ test.asm:1:9 ]
+   │
+ 1 │ def p = {{a}}
+   │         ──┬──  
+   │           ╰──── this character was not expected at this point
+───╯
+error: syntax error: unexpected end of line
+   ╭─[ test.asm:1:14 ]
+   │
+ 1 │ def p = {{a}}
+   │              │ 
+   │              ╰─ expected a number or an expression here
+───╯
+error: interpolated symbol is a reserved keyword
+   ╭─[ test.asm:2:11 ]
+   │
+ 2 │ def q = "{b}"
+   │           ┬  
+   │           ╰── attempting to interpolate `b` here
+   │ 
+   │ Help: add a `#` prefix to use the name as a symbol anyway
+───╯
+error: invalid string-to-number conversion
+   ╭─[ test.asm:2:9 ]
+   │
+ 2 │ def q = "{b}"
+   │         ──┬──  
+   │           ╰──── this string encodes to 0 charmap units instead of 1
+───╯
+error: interpolated symbol is a reserved keyword
+   ╭─[ test.asm:3:12 ]
+   │
+ 3 │ def r = "{{c}}"
+   │            ┬  
+   │            ╰── attempting to interpolate `c` here
+   │ 
+   │ Help: add a `#` prefix to use the name as a symbol anyway
+───╯
+[-Wunescaped-brace] warning: unescaped closing brace
+   ╭─[ test.asm:3:14 ]
+   │
+ 3 │ def r = "{{c}}"
+   │              ┬  
+   │              ╰── this isn't part of an interpolation
+───╯
+6 errors generated.

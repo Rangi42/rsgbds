@@ -811,6 +811,7 @@ impl Lexer {
                         );
                         return Err(());
                     } else {
+                        // TODO: consume the rest of the interpolation even if `Err`
                         Self::read_interpolation(
                             chars,
                             text,
@@ -874,7 +875,31 @@ impl Lexer {
                     first_ofs = Some(ofs);
                 }
                 '}' => {
-                    let ident = identifiers.get(&name);
+                    let ident = if let Some(raw_name) = name.strip_prefix('#') {
+                        identifiers.get(raw_name)
+                    } else if KEYWORDS.contains_key(&UniCase::ascii(&name)) {
+                        let mut span = ctx.new_span();
+                        span.bytes.start += first_ofs.unwrap();
+                        span.bytes.end += ofs;
+                        let span = Span::Normal(span);
+                        diagnostics::error(
+                            &span,
+                            |error| {
+                                error.set_message("interpolated symbol is a reserved keyword");
+                                error.add_label(diagnostics::error_label(&span).with_message(
+                                    format!("attempting to interpolate `{name}` here"),
+                                ));
+                                error.set_help(
+                                    "add a `#` prefix to use the name as a symbol anyway",
+                                );
+                            },
+                            nb_errors_left,
+                            options,
+                        );
+                        return Err(());
+                    } else {
+                        identifiers.get(&name)
+                    };
                     if let Err(err) = symbols.format_as(
                         ident,
                         &name,
