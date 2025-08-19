@@ -1,3 +1,8 @@
-error: nested-brackets.asm(5):
-    Missing }
-Assembly aborted with 1 error!
+error: unterminated interpolation
+   ╭─[ test.asm:5:11 ]
+   │
+ 5 │     PRINTLN "{S{WRAPPER}G"
+   │              ┬  
+   │              ╰── no closing brace matches this one
+───╯
+1 error generated.

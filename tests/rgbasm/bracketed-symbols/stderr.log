@@ -5,14 +5,14 @@ error: a string symbol cannot be formatted as upper-hex number
     │            ─┬  
     │             ╰── this interpolation is invalid
 ────╯
-error: a label symbol cannot be formatted as lower-hex number
+error: `Label` is not constant
     ╭─[ test.asm:20:12 ]
     │
  20 │ PRINTLN "{x:Label}"
     │            ───┬──  
     │               ╰──── this interpolation is invalid
 ────╯
-error: a label symbol cannot be formatted as lower-hex number
+error: `@` is not constant
     ╭─[ test.asm:21:12 ]
     │
  21 │ PRINTLN "{x:@}"

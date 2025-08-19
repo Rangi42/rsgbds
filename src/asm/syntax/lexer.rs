@@ -738,10 +738,10 @@ impl Lexer {
         let mut fmt = None;
         let mut first_ofs = chars.peek().map(|(ofs, _ch)| *ofs);
 
-        while let Some((ofs, ch)) = chars.next() {
+        while let Some((ofs, ch)) =
+            chars.next_if(|&(_ofs, ch)| !matches!(ch, chars!(newline) | '"'))
+        {
             match ch {
-                chars!(newline) => break,
-
                 '\\' => {
                     let mut macro_chars = chars.clone();
                     if let Some(res) = Self::read_macro_arg(
@@ -909,15 +909,16 @@ impl Lexer {
         }
 
         let mut span = ctx.new_span();
-        span.bytes.start += first_ofs.unwrap_or(text.len());
-        span.bytes.end = span.bytes.start;
+        span.bytes.end += first_ofs.unwrap_or(text.len());
+        span.bytes.start = span.bytes.end - '{'.len_utf8();
         let span = Span::Normal(span);
         diagnostics::error(
             &span,
             |error| {
                 error.set_message("unterminated interpolation");
                 error.add_label(
-                    diagnostics::error_label(&span).with_message("no closing brace before this"),
+                    diagnostics::error_label(&span)
+                        .with_message("no closing brace matches this one"),
                 );
             },
             nb_errors_left,
