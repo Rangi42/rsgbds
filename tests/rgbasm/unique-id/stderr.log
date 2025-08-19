@@ -48,7 +48,7 @@ error: a unique identifier is not available in this context
     │
   5 │     REPT 2
     │     ──┬─  
-    │       ╰─── in the 0th iteration of this loop
+    │       ╰─── in the 1st iteration of this loop
   6 │        {warn_unique}
     │        ──────┬──────  
     │              ╰──────── interpolated here
@@ -66,7 +66,7 @@ error: a unique identifier is not available in this context
     │
   5 │     REPT 2
     │     ──┬─  
-    │       ╰─── in the 1th iteration of this loop
+    │       ╰─── in the 2nd iteration of this loop
   6 │        {warn_unique}
     │        ──────┬──────  
     │              ╰──────── interpolated here
@@ -140,7 +140,7 @@ error: a unique identifier is not available in this context
     │
   5 │     REPT 2
     │     ──┬─  
-    │       ╰─── in the 0th iteration of this loop
+    │       ╰─── in the 1st iteration of this loop
   6 │        {warn_unique}
     │        ──────┬──────  
     │              ╰──────── interpolated here
@@ -158,7 +158,7 @@ error: a unique identifier is not available in this context
     │
   5 │     REPT 2
     │     ──┬─  
-    │       ╰─── in the 1th iteration of this loop
+    │       ╰─── in the 2nd iteration of this loop
   6 │        {warn_unique}
     │        ──────┬──────  
     │              ╰──────── interpolated here

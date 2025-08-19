@@ -37,7 +37,7 @@ error: a string symbol cannot be formatted as signed number
     │
  44 │ for s, 10
     │ ─┬─  
-    │  ╰─── in the 0th iteration of this loop
+    │  ╰─── in the 1st iteration of this loop
  45 │     println "{d:s}"
     │                ─┬  
     │                 ╰── this interpolation is invalid
@@ -60,7 +60,7 @@ error: a string symbol cannot be formatted as signed number
     │
  44 │ for s, 10
     │ ─┬─  
-    │  ╰─── in the 1th iteration of this loop
+    │  ╰─── in the 2nd iteration of this loop
  45 │     println "{d:s}"
     │                ─┬  
     │                 ╰── this interpolation is invalid
@@ -83,30 +83,7 @@ error: a string symbol cannot be formatted as signed number
     │
  44 │ for s, 10
     │ ─┬─  
-    │  ╰─── in the 2th iteration of this loop
- 45 │     println "{d:s}"
-    │                ─┬  
-    │                 ╰── this interpolation is invalid
-────╯
-error: A symbol called "s" already exists
-    ╭─[ test.asm:44:1 ]
-    │
- 39 │ DEF s EQUS "x"
-    │ ─┬─  
-    │  ╰─── the name is defined here...
-    │ 
- 44 │ for s, 10
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
-────╯
-error: a string symbol cannot be formatted as signed number
-    ╭─[ test.asm:45:13 ]
-    │
- 44 │ for s, 10
-    │ ─┬─  
-    │  ╰─── in the 3th iteration of this loop
+    │  ╰─── in the 3rd iteration of this loop
  45 │     println "{d:s}"
     │                ─┬  
     │                 ╰── this interpolation is invalid
@@ -245,6 +222,29 @@ error: a string symbol cannot be formatted as signed number
  44 │ for s, 10
     │ ─┬─  
     │  ╰─── in the 9th iteration of this loop
+ 45 │     println "{d:s}"
+    │                ─┬  
+    │                 ╰── this interpolation is invalid
+────╯
+error: A symbol called "s" already exists
+    ╭─[ test.asm:44:1 ]
+    │
+ 39 │ DEF s EQUS "x"
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+    │ 
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: a string symbol cannot be formatted as signed number
+    ╭─[ test.asm:45:13 ]
+    │
+ 44 │ for s, 10
+    │ ─┬─  
+    │  ╰─── in the 10th iteration of this loop
  45 │     println "{d:s}"
     │                ─┬  
     │                 ╰── this interpolation is invalid

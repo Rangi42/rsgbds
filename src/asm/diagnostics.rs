@@ -2,6 +2,7 @@ use std::{cell::Cell, sync::OnceLock};
 
 use ariadne::{Config, IndexType, Label, ReportKind};
 use compact_str::CompactString;
+use ordinal::ToOrdinal;
 use yansi::Color;
 
 use crate::{
@@ -187,7 +188,9 @@ fn add_backtrace_labels_and_print(diag: ReportBuilder<'_>, span: &Span, options:
                     diag.add_label(note_label(&diag_span).with_message(match span.node.kind {
                         SpanKind::File => "file included from here".into(),
                         SpanKind::Macro(_) => "macro called here".into(),
-                        SpanKind::Loop(i) => format!("in the {i}th iteration of this loop"),
+                        SpanKind::Loop(i) => {
+                            format!("in the {} iteration of this loop", (i + 1).to_ordinal())
+                        }
                         SpanKind::Expansion(_) => "interpolated here".into(),
                         SpanKind::MacroArg(_)
                         | SpanKind::CombinedMacroArgs

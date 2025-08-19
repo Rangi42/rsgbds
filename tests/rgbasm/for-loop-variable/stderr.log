@@ -18,7 +18,7 @@ error: A symbol called "y" already exists
     │  ╰─── the name is defined here...
   9 │ for y, y
     │ ─┬─  
-    │  ╰─── in the 0th iteration of this loop
+    │  ╰─── in the 1st iteration of this loop
  10 │   def y *= 3
     │   ─┬─  
     │    ╰─── ...so it's not available for this definition
@@ -45,7 +45,7 @@ error: A symbol called "y" already exists
     │  ╰─── the name is defined here...
   9 │ for y, y
     │ ─┬─  
-    │  ╰─── in the 1th iteration of this loop
+    │  ╰─── in the 2nd iteration of this loop
  10 │   def y *= 3
     │   ─┬─  
     │    ╰─── ...so it's not available for this definition
@@ -72,34 +72,7 @@ error: A symbol called "y" already exists
     │  ╰─── the name is defined here...
   9 │ for y, y
     │ ─┬─  
-    │  ╰─── in the 2th iteration of this loop
- 10 │   def y *= 3
-    │   ─┬─  
-    │    ╰─── ...so it's not available for this definition
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
-────╯
-error: A symbol called "y" already exists
-   ╭─[ test.asm:9:1 ]
-   │
- 8 │ def y equ 5
-   │ ─┬─  
-   │  ╰─── the name is defined here...
- 9 │ for y, y
-   │ ─┬─  
-   │  ╰─── ...so it's not available for this definition
-   │ 
-   │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
-───╯
-error: A symbol called "y" already exists
-    ╭─[ test.asm:10:3 ]
-    │
-  8 │ def y equ 5
-    │ ─┬─  
-    │  ╰─── the name is defined here...
-  9 │ for y, y
-    │ ─┬─  
-    │  ╰─── in the 3th iteration of this loop
+    │  ╰─── in the 3rd iteration of this loop
  10 │   def y *= 3
     │   ─┬─  
     │    ╰─── ...so it's not available for this definition
@@ -127,6 +100,33 @@ error: A symbol called "y" already exists
   9 │ for y, y
     │ ─┬─  
     │  ╰─── in the 4th iteration of this loop
+ 10 │   def y *= 3
+    │   ─┬─  
+    │    ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "y" already exists
+   ╭─[ test.asm:9:1 ]
+   │
+ 8 │ def y equ 5
+   │ ─┬─  
+   │  ╰─── the name is defined here...
+ 9 │ for y, y
+   │ ─┬─  
+   │  ╰─── ...so it's not available for this definition
+   │ 
+   │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+───╯
+error: A symbol called "y" already exists
+    ╭─[ test.asm:10:3 ]
+    │
+  8 │ def y equ 5
+    │ ─┬─  
+    │  ╰─── the name is defined here...
+  9 │ for y, y
+    │ ─┬─  
+    │  ╰─── in the 5th iteration of this loop
  10 │   def y *= 3
     │   ─┬─  
     │    ╰─── ...so it's not available for this definition
