@@ -1,16 +1,16 @@
-$0
-?
 
 ?
 
 ?
-$0
+
+?
+
 ?
 $42
 $42!
-$42
+GlobalScope
 GlobalScope!
-$42
+GlobalScope.localScope
 GlobalScope.localScope!
 $3
 $3!

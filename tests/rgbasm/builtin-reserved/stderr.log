@@ -1,33 +1,197 @@
-error: builtin-reserved.asm(3):
-    '_NARG' not defined
-error: builtin-reserved.asm(5):
-    '_NARG' is reserved for a built-in symbol
-error: builtin-reserved.asm(6):
-    '_NARG' is reserved for a built-in symbol
-error: builtin-reserved.asm(8):
-    '_NARG' is reserved for a built-in symbol
-error: builtin-reserved.asm(9):
-    '_NARG' is reserved for a built-in symbol
-error: builtin-reserved.asm(11):
-    '_NARG' is reserved for a built-in symbol
-error: builtin-reserved.asm(12):
-    '_NARG' is reserved for a built-in symbol
-error: builtin-reserved.asm(15):
-    '_NARG' is reserved for a built-in symbol
-error: builtin-reserved.asm(20):
-    '.' not defined
-error: builtin-reserved.asm(22):
-    '.' is reserved for a built-in symbol
-error: builtin-reserved.asm(23):
-    '.' is reserved for a built-in symbol
-error: builtin-reserved.asm(25):
-    '.' is reserved for a built-in symbol
-error: builtin-reserved.asm(26):
-    '.' is reserved for a built-in symbol
-error: builtin-reserved.asm(28):
-    '.' is reserved for a built-in symbol
-error: builtin-reserved.asm(29):
-    '.' is reserved for a built-in symbol
-error: builtin-reserved.asm(32):
-    "." has no value outside of a label scope
-Assembly aborted with 16 errors!
+error: cannot delete built-in symbol `_NARG`
+   ╭─[ test.asm:3:7 ]
+   │
+ 3 │ PURGE _NARG
+   │       ──┬──  
+   │         ╰──── cannot perform this deletion
+───╯
+error: A symbol called "_NARG" already exists
+   ╭─[ <built-in>:1:1 ]
+   │
+ 1 │ 
+   │ │ 
+   │ ╰─ the name is reserved here...
+   │
+   ├─[ test.asm:5:1 ]
+   │
+ 5 │ DEF _NARG EQU 12
+   │ ─┬─  
+   │  ╰─── ...so it's not available for this definition
+───╯
+error: A symbol called "_NARG" already exists
+   ╭─[ <built-in>:1:1 ]
+   │
+ 1 │ 
+   │ │ 
+   │ ╰─ the name is reserved here...
+   │
+   ├─[ test.asm:6:1 ]
+   │
+ 6 │ REDEF _NARG EQU 34
+   │ ──┬──  
+   │   ╰──── ...so it's not available for this definition
+───╯
+error: A symbol called "_NARG" already exists
+   ╭─[ <built-in>:1:1 ]
+   │
+ 1 │ 
+   │ │ 
+   │ ╰─ the name is reserved here...
+   │
+   ├─[ test.asm:8:1 ]
+   │
+ 8 │ DEF _NARG = 56
+   │ ─┬─  
+   │  ╰─── ...so it's not available for this definition
+───╯
+error: A symbol called "_NARG" already exists
+   ╭─[ <built-in>:1:1 ]
+   │
+ 1 │ 
+   │ │ 
+   │ ╰─ the name is reserved here...
+   │
+   ├─[ test.asm:9:1 ]
+   │
+ 9 │ REDEF _NARG = 78
+   │ ──┬──  
+   │   ╰──── ...so it's not available for this definition
+───╯
+error: A symbol called "_NARG" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is reserved here...
+    │
+    ├─[ test.asm:11:1 ]
+    │
+ 11 │ DEF _NARG EQUS "hello"
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+────╯
+error: A symbol called "_NARG" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is reserved here...
+    │
+    ├─[ test.asm:12:1 ]
+    │
+ 12 │ REDEF _NARG EQUS "world"
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+────╯
+error: A symbol called "_NARG" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is reserved here...
+    │
+    ├─[ test.asm:15:1 ]
+    │
+ 15 │ _NARG:
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+────╯
+error: cannot delete built-in symbol `.`
+    ╭─[ test.asm:20:7 ]
+    │
+ 20 │ PURGE .
+    │       ┬  
+    │       ╰── cannot perform this deletion
+────╯
+error: A symbol called "." already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is reserved here...
+    │
+    ├─[ test.asm:22:1 ]
+    │
+ 22 │ DEF . EQU 12
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+────╯
+error: A symbol called "." already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is reserved here...
+    │
+    ├─[ test.asm:23:1 ]
+    │
+ 23 │ REDEF . EQU 34
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+────╯
+error: A symbol called "." already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is reserved here...
+    │
+    ├─[ test.asm:25:1 ]
+    │
+ 25 │ DEF . = 56
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+────╯
+error: A symbol called "." already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is reserved here...
+    │
+    ├─[ test.asm:26:1 ]
+    │
+ 26 │ REDEF . = 78
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+────╯
+error: A symbol called "." already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is reserved here...
+    │
+    ├─[ test.asm:28:1 ]
+    │
+ 28 │ DEF . EQUS "hello"
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+────╯
+error: A symbol called "." already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is reserved here...
+    │
+    ├─[ test.asm:29:1 ]
+    │
+ 29 │ REDEF . EQUS "world"
+    │ ──┬──  
+    │   ╰──── ...so it's not available for this definition
+────╯
+error: A symbol called "." already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is reserved here...
+    │
+    ├─[ test.asm:32:1 ]
+    │
+ 32 │ .:
+    │ ┬  
+    │ ╰── ...so it's not available for this definition
+────╯
+16 errors generated.

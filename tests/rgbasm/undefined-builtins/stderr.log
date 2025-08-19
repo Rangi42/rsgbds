@@ -1,17 +1,57 @@
-error: undefined-builtins.asm(3):
-    PC has no value outside of a section
-error: undefined-builtins.asm(4):
-    Interpolated symbol "@" does not exist
-error: undefined-builtins.asm(8):
-    "." has no value outside of a label scope
-error: undefined-builtins.asm(9):
-    Interpolated symbol "." does not exist
-error: undefined-builtins.asm(13):
-    ".." has no value outside of a local label scope
-error: undefined-builtins.asm(14):
-    Interpolated symbol ".." does not exist
-error: undefined-builtins.asm(18):
-    _NARG has no value outside of a macro
-error: undefined-builtins.asm(19):
-    Interpolated symbol "_NARG" does not exist
-Assembly aborted with 8 errors!
+error: PC doesn't have a value outside of a section
+   ╭─[ test.asm:3:9 ]
+   │
+ 3 │ println @
+   │         ┬  
+   │         ╰── this symbol is invalid
+───╯
+error: PC doesn't have a value outside of a section
+   ╭─[ test.asm:4:11 ]
+   │
+ 4 │ println "{@}?"
+   │           ┬  
+   │           ╰── this interpolation is invalid
+───╯
+error: `.` doesn't have a value outside of a label scope
+   ╭─[ test.asm:8:9 ]
+   │
+ 8 │ println .
+   │         ┬  
+   │         ╰── error evaluating this symbol
+───╯
+error: `.` doesn't have a value outside of a label scope
+   ╭─[ test.asm:9:11 ]
+   │
+ 9 │ println "{.}?"
+   │           ┬  
+   │           ╰── this interpolation is invalid
+───╯
+error: `..` doesn't have a value outside of a local label scope
+    ╭─[ test.asm:13:9 ]
+    │
+ 13 │ println ..
+    │         ─┬  
+    │          ╰── error evaluating this symbol
+────╯
+error: `..` doesn't have a value outside of a local label scope
+    ╭─[ test.asm:14:11 ]
+    │
+ 14 │ println "{..}?"
+    │           ─┬  
+    │            ╰── this interpolation is invalid
+────╯
+error: `_NARG` doesn't have a value outside of a macro
+    ╭─[ test.asm:18:9 ]
+    │
+ 18 │ println _NARG
+    │         ──┬──  
+    │           ╰──── this symbol is invalid
+────╯
+error: `_NARG` doesn't have a value outside of a macro
+    ╭─[ test.asm:19:11 ]
+    │
+ 19 │ println "{_NARG}?"
+    │           ──┬──  
+    │             ╰──── this interpolation is invalid
+────╯
+8 errors generated.

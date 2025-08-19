@@ -48,8 +48,6 @@ error: A symbol called "__UTC_YEAR__" already exists
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__UTC_YEAR__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -67,8 +65,6 @@ error: A symbol called "__UTC_YEAR__" already exists
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__UTC_YEAR__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -86,8 +82,6 @@ error: A symbol called "__UTC_YEAR__" already exists
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__UTC_YEAR__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -105,8 +99,6 @@ error: A symbol called "__UTC_YEAR__" already exists
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__UTC_YEAR__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -124,8 +116,6 @@ error: A symbol called "__UTC_YEAR__" already exists
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__UTC_YEAR__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -143,8 +133,6 @@ error: A symbol called "__UTC_YEAR__" already exists
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__UTC_YEAR__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -162,8 +150,6 @@ error: A symbol called "__UTC_YEAR__" already exists
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__UTC_YEAR__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -181,8 +167,6 @@ error: A symbol called "__UTC_YEAR__" already exists
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__UTC_YEAR__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -200,8 +184,6 @@ error: A symbol called "__UTC_YEAR__" already exists
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__UTC_YEAR__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -219,8 +201,6 @@ error: A symbol called "__UTC_YEAR__" already exists
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__UTC_YEAR__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -238,8 +218,6 @@ error: A symbol called "__UTC_YEAR__" already exists
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__UTC_YEAR__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -257,8 +235,6 @@ error: A symbol called "__UTC_YEAR__" already exists
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: cannot delete built-in symbol `__ISO_8601_UTC__`
     ╭─[ <macro argument #1>:1:1 ]
@@ -310,8 +286,6 @@ error: A symbol called "__ISO_8601_UTC__" already exists
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__ISO_8601_UTC__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -329,8 +303,6 @@ error: A symbol called "__ISO_8601_UTC__" already exists
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__ISO_8601_UTC__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -348,8 +320,6 @@ error: A symbol called "__ISO_8601_UTC__" already exists
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__ISO_8601_UTC__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -367,8 +337,6 @@ error: A symbol called "__ISO_8601_UTC__" already exists
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__ISO_8601_UTC__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -386,8 +354,6 @@ error: A symbol called "__ISO_8601_UTC__" already exists
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__ISO_8601_UTC__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -405,8 +371,6 @@ error: A symbol called "__ISO_8601_UTC__" already exists
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__ISO_8601_UTC__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -424,8 +388,6 @@ error: A symbol called "__ISO_8601_UTC__" already exists
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__ISO_8601_UTC__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -443,8 +405,6 @@ error: A symbol called "__ISO_8601_UTC__" already exists
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__ISO_8601_UTC__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -462,8 +422,6 @@ error: A symbol called "__ISO_8601_UTC__" already exists
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__ISO_8601_UTC__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -481,8 +439,6 @@ error: A symbol called "__ISO_8601_UTC__" already exists
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__ISO_8601_UTC__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -500,8 +456,6 @@ error: A symbol called "__ISO_8601_UTC__" already exists
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 error: A symbol called "__ISO_8601_UTC__" already exists
     ╭─[ <built-in>:1:1 ]
@@ -519,7 +473,5 @@ error: A symbol called "__ISO_8601_UTC__" already exists
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
-    │ 
-    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
 28 errors generated.
