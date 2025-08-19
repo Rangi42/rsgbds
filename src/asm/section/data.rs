@@ -39,7 +39,7 @@ impl Sections {
                     if self
                         .section_stack
                         .iter()
-                        .any(|(_span, entry)| entry.is_some())
+                        .any(|entry| entry.active_section.is_some())
                     {
                         error.set_help("consider popping a section with `pops` before this");
                     } else {
@@ -277,7 +277,7 @@ impl Sections {
                     if self
                         .section_stack
                         .iter()
-                        .any(|(_span, entry)| entry.is_some())
+                        .any(|entry| entry.active_section.is_some())
                     {
                         error.set_help("consider popping a section with `pops` before this");
                     } else {

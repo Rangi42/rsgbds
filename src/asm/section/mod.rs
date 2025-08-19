@@ -22,7 +22,7 @@ pub struct Sections {
     pub sections: IndexMap<CompactString, Section, FxBuildHasher>,
     /// The first is the “data” section, the second is the “symbol” section.
     pub active_section: Option<(ActiveSection, ActiveSection)>,
-    section_stack: Vec<(Span, Option<(ActiveSection, ActiveSection)>)>,
+    section_stack: Vec<SectionStackEntry>,
     pub assertions: Vec<Assertion>,
 }
 type SectionId = usize; // Index into the `IndexMap`.
@@ -100,6 +100,14 @@ pub enum AssertLevel {
     Warn,
     Error,
     Fatal,
+}
+
+#[derive(Debug)]
+pub struct SectionStackEntry {
+    pushs_span: Span,
+    active_section: Option<(ActiveSection, ActiveSection)>,
+    global_scope: Option<Identifier>,
+    local_scope: Option<Identifier>,
 }
 
 impl Sections {
@@ -256,14 +264,22 @@ impl Sections {
             || self
                 .section_stack
                 .iter()
-                .any(|(_span, opt)| refs_section(opt))
+                .any(|entry| refs_section(&entry.active_section))
     }
-    pub fn push_active_section(&mut self, pushs_span: Span) {
-        self.section_stack
-            .push((pushs_span, self.active_section.take()));
+    pub fn push_active_section(&mut self, pushs_span: Span, symbols: &mut Symbols) {
+        let entry = SectionStackEntry {
+            pushs_span,
+            active_section: self.active_section.take(),
+            global_scope: symbols.global_scope.take(),
+            local_scope: symbols.local_scope.take(),
+        };
+        self.section_stack.push(entry);
     }
-    pub fn pop_active_section(&mut self) -> Option<()> {
-        self.active_section = self.section_stack.pop()?.1;
+    pub fn pop_active_section(&mut self, symbols: &mut Symbols) -> Option<()> {
+        let entry = self.section_stack.pop()?;
+        self.active_section = entry.active_section;
+        symbols.global_scope = entry.global_scope;
+        symbols.local_scope = entry.local_scope;
         Some(())
     }
 
@@ -274,8 +290,9 @@ impl Sections {
                 &Span::Builtin,
                 |warning| {
                     warning.set_message("`pushs` without matching `pops`");
-                    warning.add_labels(self.section_stack.iter().map(|(span, _entry)| {
-                        diagnostics::warning_label(span).with_message("no `pops` matches this")
+                    warning.add_labels(self.section_stack.iter().map(|entry| {
+                        diagnostics::warning_label(&entry.pushs_span)
+                            .with_message("no `pops` matches this")
                     }));
                 },
                 nb_errors_left,

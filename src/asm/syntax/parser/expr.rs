@@ -111,7 +111,7 @@ fn parse_subexpr(
             );
 
             let value = match ident.and_then(|name| parse_ctx.symbols.find(&name)){
-                Some(sym) if sym.exists(parse_ctx.symbols.scope.as_ref(), parse_ctx.sections.active_section.as_ref().map(|(_data_sect, sym_sect)| sym_sect), parse_ctx.macro_args.last()) => 1,
+                Some(sym) if sym.exists(parse_ctx.symbols.global_scope.as_ref(), parse_ctx.sections.active_section.as_ref().map(|(_data_sect, sym_sect)| sym_sect), parse_ctx.macro_args.last()) => 1,
                 _ => 0,
             };
 

@@ -20,7 +20,8 @@ type SymMap = FxHashMap<Identifier, SymbolData>;
 #[derive(Debug)]
 pub struct Symbols {
     pub symbols: SymMap,
-    pub scope: Option<Identifier>,
+    pub global_scope: Option<Identifier>,
+    pub local_scope: Option<Identifier>,
 }
 
 #[derive(Debug)]
@@ -61,7 +62,8 @@ impl Symbols {
     ) -> Self {
         let mut this = Self {
             symbols: FxHashMap::with_hasher(FxBuildHasher),
-            scope: None,
+            global_scope: None,
+            local_scope: None,
         };
 
         let mut def_builtin = |name, kind| {
@@ -242,6 +244,7 @@ impl Symbols {
         fmt: &FormatSpec,
         buf: &mut CompactString,
         macro_args: Option<&MacroArgs>,
+        identifiers: &Identifiers,
         sections: &Sections,
     ) -> Result<(), SymbolError<'name, 'sym>> {
         let sym = name
@@ -255,8 +258,8 @@ impl Symbols {
                 sym.kind_name(),
             )?;
             Ok(())
-        } else if let Some(s) = sym.get_string() {
-            fmt.write_str(&s, buf, sym.kind_name())?;
+        } else if let Some(res) = sym.get_string(self.global_scope, self.local_scope, identifiers) {
+            fmt.write_str(&res?, buf, sym.kind_name())?;
             Ok(())
         } else if let SymbolData::Deleted(span) = sym {
             Err(SymbolError::Deleted(name_str, span))
@@ -445,7 +448,11 @@ impl Symbols {
                     error.add_labels([
                         diagnostics::note_label(existing.def_span()).with_message(format!(
                             "the name is {} here...",
-                            if existing.exists(self.scope.as_ref(), active_section, macro_args) {
+                            if existing.exists(
+                                self.global_scope.as_ref(),
+                                active_section,
+                                macro_args
+                            ) {
                                 "defined"
                             } else {
                                 "reserved"
@@ -503,7 +510,9 @@ impl Symbols {
         options: &Options,
     ) {
         if !identifiers.resolve(name).unwrap().contains('.') {
-            self.scope = Some(name);
+            self.global_scope = Some(name);
+        } else {
+            self.local_scope = Some(name);
         }
 
         self.define_symbol(
@@ -609,7 +618,7 @@ impl Symbols {
     }
 
     pub fn end_scope(&mut self) {
-        self.scope = None;
+        self.global_scope = None;
     }
 
     pub fn delete(
@@ -754,8 +763,12 @@ pub enum SymbolError<'name, 'sym> {
     NotNumeric(&'name str),
     /// PC doesn't have a {0} outside of a section
     PcOutsideSect(&'static str),
-    /// _NARG doesn't have a value outside of a macro
+    /// `_NARG` doesn't have a value outside of a macro
     NargOutsideMacro,
+    /// `.` doesn't have a value outside of a label scope
+    DotOutsideMacro,
+    /// `..` doesn't have a value outside of a local label scope
+    DotDotOutsideMacro,
 }
 impl From<FormatError> for SymbolError<'_, '_> {
     fn from(value: FormatError) -> Self {
@@ -827,19 +840,30 @@ impl SymbolData {
         }
     }
 
-    pub fn get_string(&self) -> Option<CompactString> {
+    pub fn get_string(
+        &self,
+        global_scope: Option<Identifier>,
+        local_scope: Option<Identifier>,
+        identifiers: &Identifiers,
+    ) -> Option<Result<CompactString, SymbolError<'static, 'static>>> {
         match self {
             Self::User { kind, .. } | Self::Builtin(kind) => match kind {
                 SymbolKind::Numeric { .. } => None,
-                SymbolKind::String(string) => Some(string.clone()),
+                SymbolKind::String(string) => Some(Ok(string.clone())),
                 SymbolKind::Macro(_) => None,
                 SymbolKind::Label { .. } => None,
                 SymbolKind::Ref => None,
             },
             Self::Pc => None,
             Self::Narg => None,
-            Self::Dot => todo!(),
-            Self::DotDot => todo!(),
+            Self::Dot => Some(match global_scope {
+                Some(ident) => Ok(identifiers.resolve(ident).unwrap().into()),
+                None => Err(SymbolError::DotOutsideMacro),
+            }),
+            Self::DotDot => Some(match local_scope {
+                Some(ident) => Ok(identifiers.resolve(ident).unwrap().into()),
+                None => Err(SymbolError::DotDotOutsideMacro),
+            }),
             Self::Deleted(..) => None,
         }
     }

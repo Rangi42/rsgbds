@@ -906,6 +906,7 @@ impl Lexer {
                         &fmt.unwrap_or_default(),
                         output,
                         macro_args.as_deref(),
+                        identifiers,
                         sections,
                     ) {
                         let mut span = ctx.new_span();
@@ -1913,7 +1914,7 @@ impl Lexer {
         };
 
         if first_char == '.' && name.contains(|ch| ch != '.') {
-            if let Some(scope) = params.symbols.scope {
+            if let Some(scope) = params.symbols.global_scope {
                 let scope_name = params.identifiers.resolve(scope).unwrap();
                 debug_assert!(!scope_name.contains('.'), "scope = {scope_name:?}");
                 name.insert_str(0, scope_name);

@@ -49,8 +49,17 @@ pub(super) fn parse_string_expr(
             Token { span } @ |"identifier"(ident, has_colon)| => {
                 // If the identifier resolves to a string symbol, then it expands to its value.
                 if let Some(sym) = parse_ctx.symbols.find(&ident) {
-                    if let Some(string) = sym.get_string() {
-                        return (Some((string, span)), parse_ctx.next_token())
+                    if let Some(res) = sym.get_string(parse_ctx.symbols.global_scope, parse_ctx.symbols.local_scope, parse_ctx.identifiers) {
+                        match res {
+                            Ok(string) => return (Some((string, span)), parse_ctx.next_token()),
+                            Err(err) => {
+                                parse_ctx.error(&span, |error| {
+                                    error.set_message(err);
+                                    error.add_label(diagnostics::error_label(&span).with_message("error evaluating this symbol"));
+                                });
+                                return (Some(("".into(), span)), parse_ctx.next_token());
+                            }
+                        }
                     }
                 }
                 (None, Token { payload: tok!("identifier")(ident, has_colon), span })

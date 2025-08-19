@@ -393,7 +393,9 @@ pub(in super::super) fn parse_endl(keyword: Token, parse_ctx: &mut parse_ctx!())
 }
 
 pub(in super::super) fn parse_pushs(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    parse_ctx.sections.push_active_section(keyword.span);
+    parse_ctx
+        .sections
+        .push_active_section(keyword.span, parse_ctx.symbols);
 
     let lookahead = parse_ctx.next_token();
     if matches_tok!(lookahead, "end of line") {
@@ -416,7 +418,11 @@ pub(in super::super) fn parse_pushs(keyword: Token, parse_ctx: &mut parse_ctx!()
 }
 
 pub(in super::super) fn parse_pops(keyword: Token, parse_ctx: &mut parse_ctx!()) -> Token {
-    if parse_ctx.sections.pop_active_section().is_none() {
+    if parse_ctx
+        .sections
+        .pop_active_section(parse_ctx.symbols)
+        .is_none()
+    {
         parse_ctx.error(&keyword.span, |error| {
             error.set_message("no entries in the section stack");
             error.add_label(diagnostics::error_label(&keyword.span).with_message("cannot pop"));
