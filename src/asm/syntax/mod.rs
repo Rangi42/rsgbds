@@ -194,6 +194,10 @@ pub fn parse_file(
             break;
         }
     }
+
+    parse_ctx.lexer.debug_check_done();
+    parse_ctx.unique_id.debug_check_empty();
+    debug_assert!(parse_ctx.macro_args.is_empty());
 }
 
 struct ExpectedTokens(Vec<String>);
