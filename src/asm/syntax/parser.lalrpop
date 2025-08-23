@@ -142,9 +142,24 @@ Directive: () = {
 	<span_idx:@L> "pushs" <attrs:SectionAttrs?> => ctx.push_section(attrs, span_idx),
 	<span_idx:@L> "pops" => ctx.pop_section(span_idx),
 	"section" <SectionAttrs> => ctx.create_section(<>),
+	// `symbol.rs`
+	<export:(<@L> "export")?> <redef:Def> <name:"identifier"> <span_idx:@L> "equs" <value:StringExpr> => {
+		ctx.define_string(export, redef, name, value, span_idx)
+	},
+	<export:(<@L> "export")?> <redef:Def> <name:"identifier"> <span_idx:@L> <mutable:NumDefKeyword> <value:Expr> => {
+		ctx.define_numeric(export, redef, name, mutable, value, span_idx)
+	},
+	<export:(<@L> "export")?> <redef:Def> <name_span_idx:@L> <name:"identifier"> <op_span_idx:@L> <op:CompoundAssignOp> <value:Expr> => {
+		ctx.compound_assignment(export, redef, name, op, value, op_span_idx, name_span_idx)
+	},
+	<export:(<@L> "export")?> <redef:Def> <name:"identifier"> <span_idx:@L> <stride:RsKindKeyword> <value:Expr?> => {
+		ctx.define_rs(export, redef, name, stride, value, span_idx)
+	},
 };
 PrintArg: () = StringOrExpr => ctx.print(<>);
 Option: () = <span_idx:@L> <string:"string"> => ctx.process_option(&string, span_idx);
+Def: bool = { "def" => false, "redef" => true };
+NumDefKeyword: bool = { "equ" => false, "=" => true };
 
 Pusho: () = {
 	"pusho" => ctx.push_options(),
@@ -154,11 +169,7 @@ Pusho: () = {
 AssertParams: (AssertLevel, Expr, Option<(CompactString, Span)>) = {
 	<level:AssertLevel?> <expr:Expr> <msg:("," <StringExpr>)?> => (level.unwrap_or(AssertLevel::Error), expr, msg)
 };
-AssertLevel: AssertLevel = {
-	"warn" => AssertLevel::Warn,
-	"fail" => AssertLevel::Error,
-	"fatal" => AssertLevel::Fatal,
-};
+AssertLevel: AssertLevel = { "warn" => AssertLevel::Warn, "fail" => AssertLevel::Error, "fatal" => AssertLevel::Fatal };
 
 SectionAttrs: (SectionAttrs, (CompactString, Span)) = {
 	<kind:SectionKind?> <name:StringExpr> "," <mem_region:MemRegion> <addr:("[" <Expr> "]")?> => {
@@ -167,10 +178,7 @@ SectionAttrs: (SectionAttrs, (CompactString, Span)) = {
 	<attrs:SectionAttrs> ","               "bank"  "[" <bank:Expr>       "]" => ctx.set_bank_of(attrs, bank),
 	<attrs:SectionAttrs> "," <span_idx:@L> "align" "[" <align:AlignArgs> "]" => ctx.set_align_of(attrs, align, span_idx),
 };
-SectionKind: SectionKind = {
-	"union" => SectionKind::Union,
-	"fragment" => SectionKind::Fragment,
-};
+SectionKind: SectionKind = { "union" => SectionKind::Union, "fragment" => SectionKind::Fragment };
 MemRegion: MemRegion = {
 	"rom0"  => MemRegion::Rom0,
 	"romx"  => MemRegion::Romx,
@@ -182,6 +190,21 @@ MemRegion: MemRegion = {
 	"hram"  => MemRegion::Hram,
 };
 AlignArgs: (u8, u16) = <align:Expr> <ofs:("," <Expr?>)?> => ctx.align_args(align, ofs.flatten());
+
+CompoundAssignOp: BinOp = {
+	"+=" => BinOp::Add,
+	"-=" => BinOp::Subtract,
+	"*=" => BinOp::Multiply,
+	"/=" => BinOp::Divide,
+	"%=" => BinOp::Modulo,
+	"^=" => BinOp::Xor,
+	"|=" => BinOp::Or,
+	"&=" => BinOp::And,
+	"<<=" => BinOp::LeftShift,
+	">>=" => BinOp::RightShift,
+	">>>=" => BinOp::UnsignedRightShift,
+};
+RsKindKeyword: i32 = { "rb" => 1, "rw" => 2, "rl" => 4 };
 
 // TODO: accept invalid forms of instructions, to report better error messages for them
 Instruction: Option<Instruction> = {
