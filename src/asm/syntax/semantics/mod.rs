@@ -12,6 +12,7 @@ mod data;
 mod error;
 mod instructions;
 mod macros;
+mod opt;
 mod print;
 mod section;
 mod symbols;

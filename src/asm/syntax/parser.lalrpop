@@ -123,6 +123,10 @@ Directive: () = {
 // TODO: `incbin`...
 	// `macros.rs`
 	<span_idx:@L> "shift" <amount:Expr?> => ctx.shift_macro_args(amount, span_idx),
+	// `opt.rs`
+	"opt" Option+ => (),
+	Pusho,
+	<span_idx:@L> "popo" => ctx.pop_options(span_idx),
 	// `print.rs`
 	"print"   CommaList<PrintArg> => (),
 	"println" CommaList<PrintArg> => println!(),
@@ -140,6 +144,12 @@ Directive: () = {
 	"section" <SectionAttrs> => ctx.create_section(<>),
 };
 PrintArg: () = StringOrExpr => ctx.print(<>);
+Option: () = <span_idx:@L> <string:"string"> => ctx.process_option(&string, span_idx);
+
+Pusho: () = {
+	"pusho" => ctx.push_options(),
+	Pusho <Option>
+};
 
 AssertParams: (AssertLevel, Expr, Option<(CompactString, Span)>) = {
 	<level:AssertLevel?> <expr:Expr> <msg:("," <StringExpr>)?> => (level.unwrap_or(AssertLevel::Error), expr, msg)
