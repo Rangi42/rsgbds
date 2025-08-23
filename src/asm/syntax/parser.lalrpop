@@ -86,10 +86,13 @@ SpecialDirective: () = {
 	<span_idx:@L> "endm" => ctx.report_stray(span_idx, "`endm` found outside of a macro"),
 	<span_idx:@L> "endr" => ctx.report_stray(span_idx, "`endr` found outside of a loop"),
 
-	"if" => todo!(),
-	"elif" => todo!(),
-	"else" => todo!(),
-	"endc" => todo!(),
+	<span_idx:@L> "if" <expr:Expr> => ctx.process_if(span_idx, expr),
+	// The "end of line" token is injected by the parser's caller if the `elif` was preceded by an executed block,
+	// so that its condition is skipped lexically. (See the comment there for an example of why that is useful.)
+	<span_idx:@L> "elif" "end of line" => ctx.process_elif(span_idx, None),
+	<span_idx:@L> "elif" <expr:Expr>   => ctx.process_elif(span_idx, Some(expr)),
+	<span_idx:@L> "else" => ctx.process_else(span_idx),
+	<span_idx:@L> "endc" => ctx.process_endc(span_idx),
 };
 ForParams: (Option<Expr>, Expr, Option<Expr>) = {
 	<span_idx:@L>                  <end:Expr>                      => (None, end, None),
@@ -98,9 +101,8 @@ ForParams: (Option<Expr>, Expr, Option<Expr>) = {
 
 Directive: () = {
 	<@L> "break" => ctx.break_loop(<>),
-	"print"   Comma<PrintArg> => (),
-	"println" Comma<PrintArg> => println!(),
-	// TODO: implement `db`, `dw`, `dl` as instructions, so they can be `::`'d and passed to `OPCODE`.
+	"print"   CommaList<PrintArg> => (),
+	"println" CommaList<PrintArg> => println!(),
 };
 PrintArg: () = StringOrExpr => ctx.print(<>);
 
@@ -381,7 +383,7 @@ StrcatArgs: CompactString = {
 Identifier = { "identifier", "local identifier" };
 
 // A list of comma-separated elements, optionally with a trailing comma.
-Comma<T>: Vec<T> = <mut list:(<T> ",")*> <last:T?> => match last {
+CommaList<T>: Vec<T> = <mut list:(<T> ",")*> <last:T?> => match last {
 	None => list,
 	Some(elem) => {
 		list.push(elem);
@@ -396,6 +398,8 @@ extern {
 	type Error = ();
 
 	enum TokenPayload {
+		"end of line" => TokenPayload::Newline,
+
 		"number" => TokenPayload::Number(<i32>),
 		"string" => TokenPayload::String(<CompactString>),
 		"identifier" => TokenPayload::Identifier(<Identifier>),

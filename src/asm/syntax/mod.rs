@@ -15,7 +15,7 @@ use crate::{
 };
 
 pub mod lexer;
-lalrpop_util::lalrpop_mod!(pub parser, "/asm/syntax/parser.rs");
+lalrpop_util::lalrpop_mod!(parser, "/asm/syntax/parser.rs");
 mod semantics;
 pub mod tokens;
 use tokens::tok;
@@ -98,14 +98,27 @@ pub fn parse_file(
                 }
             }
 
-            if !matches!(token.payload, tok!("end of line")) {
-                // We have the first token of this line's directive.
-                // Check if it requires “raw arguments”.
-                let raw_args = matches!(token.payload, tok!("identifier"(_)) | tok!("opt"));
-                parse_ctx.push_line_token(token, &mut line_tokens);
-
-                if raw_args {
+            match token.payload {
+                tok!("end of line") => {} // No more tokens on the line (but some may have been pushed earlier).
+                tok!("elif")
+                    if crate::cond::active_condition_mut(&mut parse_ctx.lexer)
+                        .is_some_and(|cond| cond.entered_block) =>
+                {
+                    // HACK: if we were executing the previous block, we need to not lex the remainder of the block!
+                    //       This enables code like:
+                    // ```
+                    // if _NARG < 1
+                    // ; ...
+                    // elif \1 == 0
+                    // ```
+                    parse_ctx.lexer.skip_to_eol();
+                    // The parser still expects to read something after the `elif`, so we push a token that normally doesn't occur: an end of line.
+                    let token = parse_ctx.next_token();
+                    parse_ctx.push_line_token(token, &mut line_tokens);
+                }
+                tok!("identifier"(_)) | tok!("opt") => {
                     // Raw line.
+                    parse_ctx.push_line_token(token, &mut line_tokens);
                     while let Some((string, span)) = parse_ctx.next_token_raw() {
                         parse_ctx.push_line_token(
                             tokens::Token {
@@ -115,14 +128,15 @@ pub fn parse_file(
                             &mut line_tokens,
                         );
                     }
-                } else {
+                }
+                _ => {
                     // Regular line.
                     loop {
-                        let token = parse_ctx.next_token();
+                        parse_ctx.push_line_token(token, &mut line_tokens);
+                        token = parse_ctx.next_token();
                         if matches!(token.payload, tok!("end of line")) {
                             break;
                         }
-                        parse_ctx.push_line_token(token, &mut line_tokens);
                     }
                 }
             }

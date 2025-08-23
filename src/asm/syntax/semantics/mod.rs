@@ -6,6 +6,7 @@ use crate::{
 
 use super::{parse_ctx, tokens::Token};
 
+mod condition;
 mod context;
 mod error;
 mod instructions;
