@@ -17,6 +17,7 @@ use crate::{
 	expr::{BinOp, Expr, UnOp},
 	instructions::{Condition, Instruction, Reg16Arith, Reg16Mem, Reg16Stack, Reg8},
 	macro_args::MacroArgs,
+	sources::Span,
 	Identifier,
 };
 
@@ -54,8 +55,22 @@ LabelDef: () = {
 };
 
 // Capturing `Instruction_Emit` as the "focus" of the repetition makes it return a `Vec<()>`, which does not allocate.
-Instructions = <Instruction_Emit> ("::" <Instruction_Emit>)*;
-Instruction_Emit: () = <Instruction> => ctx.emit_instruction(<>);
+Instructions = <Emittable> ("::" <Emittable>)*;
+Emittable: () = {
+	Instruction => ctx.emit_instruction(<>),
+	// For convenience, these directives are also allowed.
+	<span_idx:@L> "ds" <length:Expr>                     => ctx.allocate_space(Either::Left(Either::Left(length)), span_idx),
+	<span_idx:@L> "ds" "align" "[" <align:AlignArgs> "]" => ctx.allocate_space(Either::Right(align),               span_idx),
+	<span_idx:@L> "db" <bytes:CommaList<StringOrExpr>> => ctx.emit_bytes(bytes, span_idx),
+	<span_idx:@L> "dw" <words:CommaList<StringOrExpr>> => ctx.emit_words(words, span_idx),
+	<span_idx:@L> "dl" <longs:CommaList<StringOrExpr>> => ctx.emit_longs(longs, span_idx),
+	<span_idx:@L> "ds" <length:Expr>                     "," <bytes:CommaList<Expr>> => {
+		ctx.emit_padding(Either::Left(Either::Left(length)), bytes, span_idx)
+	},
+	<span_idx:@L> "ds" "align" "[" <align:AlignArgs> "]" "," <bytes:CommaList<Expr>> => {
+		ctx.emit_padding(Either::Right(align),               bytes, span_idx)
+	},
+};
 
 // LALRPOP doesn't support rules matching 0 tokens, so we have to have `MacroArgs` work around that.
 MacroCall: () = <span_idx:@L> <name:"identifier"> <args:MacroArgs?> => {
@@ -101,10 +116,14 @@ ForParams: (Option<Expr>, Expr, Option<Expr>) = {
 
 Directive: () = {
 	<@L> "break" => ctx.break_loop(<>),
+	// `db`, `dw`, `dl` and `ds` are `Emittable`s, instead.
 	"print"   CommaList<PrintArg> => (),
 	"println" CommaList<PrintArg> => println!(),
 };
 PrintArg: () = StringOrExpr => ctx.print(<>);
+
+// TODO: section attrs
+AlignArgs: (u8, u16) = <align:Expr> <ofs:("," <Expr?>)?> => ctx.align_args(align, ofs.flatten());
 
 // TODO: accept invalid forms of instructions, to report better error messages for them
 Instruction: Option<Instruction> = {
@@ -292,7 +311,7 @@ InstrCond: Condition = {
 };
 
 // Since a top-level identifier can be either a string or an expression, it must be handled specially.
-StringOrExpr: Either<Expr, CompactString> = {
+StringOrExpr: Either<Expr, (CompactString, Span)> = {
 	ExprLogicOr<ExprAtomNoIdent> => Either::Left(<>),
 	StringExprNoIdent => Either::Right(<>),
 	<span_idx:@L> <ident:"identifier"> => ctx.string_or_numeric_sym(ident, span_idx),
@@ -364,18 +383,20 @@ ExprAtomNoIdent: Expr = {
 	// TODO: builtin functions, character literals, and function calls
 };
 
-StringExpr: CompactString = {
+StringExpr: (CompactString, Span) = {
 	<ident:"identifier"> => todo!(),
 	StringExprNoIdent
 };
-StringExprNoIdent: CompactString = {
-	<"string">,
-	"strcat" "(" <(<StrcatArgs> ","?)?> ")" => <>.unwrap_or_default(),
+StringExprNoIdent: (CompactString, Span) = {
+	<span_idx:@L> <string:"string"> => (string, ctx.nth_span(span_idx)),
+	<l_span_idx:@L> "strcat" "(" <string:(<StrcatArgs> ","?)?> ")" <r_span_idx:@R> => {
+		(string.unwrap_or_default(), ctx.span_from_to(l_span_idx, r_span_idx))
+	},
 };
 StrcatArgs: CompactString = {
-	<StringExpr>,
+	<StringExpr> => <>.0,
 	<mut acc:StrcatArgs> "," <string:StringExpr> => {
-		acc.push_str(&string);
+		acc.push_str(&string.0);
 		acc
 	}
 };

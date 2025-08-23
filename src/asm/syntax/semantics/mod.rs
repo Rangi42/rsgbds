@@ -4,13 +4,15 @@ use crate::{
     sources::Span,
 };
 
-use super::{parse_ctx, tokens::Token};
+use super::parse_ctx;
 
 mod condition;
 mod context;
+mod data;
 mod error;
 mod instructions;
 mod print;
+mod section;
 mod symbols;
 
 /// Utilities used pervasively throughout semantic actions.
@@ -40,16 +42,6 @@ impl parse_ctx!() {
         callback: F,
     ) {
         diagnostics::error(span, callback, self.nb_errors_left, self.options);
-    }
-    pub(super) fn report_syntax_error<'span, F: FnOnce(&mut ReportBuilder<'span>, &'span Span)>(
-        &self,
-        token: &'span Token,
-        callback: F,
-    ) {
-        self.error(&token.span, |error| {
-            error.set_message(format!("syntax error: unexpected {}", &token.payload));
-            callback(error, &token.span);
-        })
     }
     pub(super) fn report_expr_error(&self, error: crate::expr::Error) {
         error.report(self.identifiers, self.nb_errors_left, self.options);

@@ -246,12 +246,40 @@ impl<'charmap> Iterator for Encoder<'charmap, '_> {
         }
     }
 }
+#[derive(Debug, Clone, Copy)]
 pub enum CharMapping<'charmap> {
     Mapped(&'charmap [i32]),
     Passthrough(char),
 }
-impl CharMapping<'_> {
-    pub fn len(&self) -> usize {
+impl<'charmap> IntoIterator for CharMapping<'charmap> {
+    type IntoIter = CharValues<'charmap>;
+    type Item = i32;
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            CharMapping::Mapped(slice) => CharValues::Mapped(slice.iter()),
+            CharMapping::Passthrough(ch) => CharValues::Passthrough(Some(ch)),
+        }
+    }
+}
+#[derive(Debug)]
+pub enum CharValues<'charmap> {
+    Mapped(std::slice::Iter<'charmap, i32>),
+    Passthrough(Option<char>),
+}
+impl Iterator for CharValues<'_> {
+    type Item = i32;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Mapped(iter) => iter.next().copied(),
+            Self::Passthrough(opt) => opt.take().map(|ch| ch as u32 as i32),
+        }
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.len(), Some(self.len()))
+    }
+}
+impl ExactSizeIterator for CharValues<'_> {
+    fn len(&self) -> usize {
         match self {
             Self::Mapped(values) => values.len(),
             Self::Passthrough(_) => 1,

@@ -3,6 +3,7 @@ use std::cell::Cell;
 use either::Either;
 
 use crate::{
+    charmap::Charmap,
     diagnostics::{self, warning},
     expr::Expr,
     instructions::Instruction,
@@ -143,6 +144,27 @@ impl Sections {
         );
     }
 
+    pub fn emit_byte_string(
+        &mut self,
+        string: &str,
+        str_span: &Span,
+        keyword_span: &Span,
+        identifiers: &Identifiers,
+        charmap: &Charmap,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        self.emit_data(
+            "byte",
+            1,
+            keyword_span,
+            identifiers,
+            nb_errors_left,
+            options,
+            |_offset, mut ctx| Self::push_byte_string(string, charmap, str_span, &mut ctx),
+        );
+    }
+
     pub fn emit_word(
         &mut self,
         word: &Expr,
@@ -166,6 +188,27 @@ impl Sections {
         );
     }
 
+    pub fn emit_word_string(
+        &mut self,
+        string: &str,
+        str_span: &Span,
+        keyword_span: &Span,
+        identifiers: &Identifiers,
+        charmap: &Charmap,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        self.emit_data(
+            "word",
+            2,
+            keyword_span,
+            identifiers,
+            nb_errors_left,
+            options,
+            |_offset, mut ctx| Self::push_word_string(string, charmap, str_span, &mut ctx),
+        );
+    }
+
     pub fn emit_long(
         &mut self,
         long: &Expr,
@@ -186,6 +229,26 @@ impl Sections {
             nb_errors_left,
             options,
             |offset, mut ctx| Self::push_long(&eval_res, offset, &mut ctx),
+        );
+    }
+
+    pub fn emit_long_string(
+        &mut self,
+        string: &str,
+        keyword_span: &Span,
+        identifiers: &Identifiers,
+        charmap: &Charmap,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        self.emit_data(
+            "long word",
+            4,
+            keyword_span,
+            identifiers,
+            nb_errors_left,
+            options,
+            |_offset, mut ctx| Self::push_long_string(string, charmap, &mut ctx),
         );
     }
 
@@ -370,35 +433,13 @@ impl Sections {
     ) {
         match res {
             Ok(Either::Left((value, span))) => {
-                if *value < -256 || *value > 255 {
-                    diagnostics::warn(
-                        warning!("truncation=1"),
-                        span,
-                        |warning| {
-                            warning.set_message("this expression's value is not 8-bit");
-                            warning.add_label(diagnostics::warning_label(span).with_message(format!("this expression evaluates to {value}, which is not between -256 and 255")));
-                            warning.set_help(
-                                "you can use the `low()` function to truncate an expression",
-                            );
-                        },
-                        ctx.nb_errors_left,
-                        ctx.options,
-                    );
-                } else if *value < -128 {
-                    diagnostics::warn(
-                        warning!("truncation=2"),
-                        span,
-                        |warning| {
-                            warning.set_message("this expression's value doesn't seem to be 8-bit");
-                            warning.add_label(diagnostics::warning_label(span).with_message(format!("this expression evaluates to {value}, which is not between -128 and 255")));
-                            warning.set_help(
-                                "you can use the `low()` function to truncate an expression",
-                            );
-                        },
-                        ctx.nb_errors_left,
-                        ctx.options,
-                    );
-                }
+                ctx.check_8_bit(
+                    *value,
+                    span,
+                    "expression's value",
+                    "expression evaluates to",
+                    Some("you can use the `low()` function to truncate an expression"),
+                );
 
                 ctx.data.push(*value as u8);
             }
@@ -432,30 +473,13 @@ impl Sections {
     ) {
         match res {
             Ok(Either::Left((value, span))) => {
-                if *value < -65536 || *value > 65535 {
-                    diagnostics::warn(
-                        warning!("truncation=1"),
-                        span,
-                        |warning| {
-                            warning.set_message("this expression's value is not 16-bit");
-                            warning.add_label(diagnostics::warning_label(span).with_message(format!("this expression evaluates to {value}, which is not between -65536 and 65535")));
-                        },
-                        ctx.nb_errors_left,
-                        ctx.options,
-                    );
-                } else if *value < -32767 {
-                    diagnostics::warn(
-                        warning!("truncation=2"),
-                        span,
-                        |warning| {
-                            warning
-                                .set_message("this expression's value doesn't seem to be 16-bit");
-                            warning.add_label(diagnostics::warning_label(span).with_message(format!("this expression evaluates to {value}, which is not between -32767 and 65535")));
-                        },
-                        ctx.nb_errors_left,
-                        ctx.options,
-                    );
-                }
+                ctx.check_16_bit(
+                    *value,
+                    span,
+                    "expression's value",
+                    "expression evaluates to",
+                    None,
+                );
 
                 ctx.data.extend_from_slice(&(*value as i16).to_le_bytes());
             }
@@ -524,6 +548,159 @@ impl Sections {
                     Default::default(),
                 ]);
             }
+        }
+    }
+
+    fn push_byte_string(
+        string: &str,
+        charmap: &Charmap,
+        str_span: &Span,
+        ctx: &mut EmissionContext,
+    ) {
+        let mut warned = false;
+        for mapping in charmap.encode(string) {
+            for value in mapping {
+                if !warned {
+                    warned = ctx.check_8_bit(
+                        value,
+                        str_span,
+                        "string's encoding",
+                        "string's encoding contains",
+                        Some("consider emitting the string using `dw` or `dl`"),
+                    );
+                }
+
+                ctx.data.push(value as u8);
+            }
+        }
+    }
+
+    fn push_word_string(
+        string: &str,
+        charmap: &Charmap,
+        str_span: &Span,
+        ctx: &mut EmissionContext,
+    ) {
+        let mut warned = false;
+        for mapping in charmap.encode(string) {
+            for value in mapping {
+                if !warned {
+                    warned = ctx.check_16_bit(
+                        value,
+                        str_span,
+                        "string's encoding",
+                        "string's encoding contains",
+                        Some("consider emitting the string using `dl`"),
+                    );
+                }
+
+                ctx.data.extend_from_slice(&(value as i16).to_le_bytes());
+            }
+        }
+    }
+
+    fn push_long_string(string: &str, charmap: &Charmap, ctx: &mut EmissionContext) {
+        for mapping in charmap.encode(string) {
+            for value in mapping {
+                // No truncation checks here, since we are working with 32-bit values already.
+                ctx.data.extend_from_slice(&value.to_le_bytes());
+            }
+        }
+    }
+}
+
+impl EmissionContext<'_, '_, '_, '_, '_, '_> {
+    fn check_8_bit(
+        &self,
+        value: i32,
+        span: &Span,
+        what: &'static str,
+        eval_msg: &'static str,
+        help_text: Option<&'static str>,
+    ) -> bool {
+        if (-256..=255).contains(&value) {
+            diagnostics::warn(
+                warning!("truncation=1"),
+                span,
+                |warning| {
+                    warning.set_message(format!("this {what} is not 8-bit"));
+                    warning.add_label(diagnostics::warning_label(span).with_message(format!(
+                        "this {eval_msg} {value}, which is not between -256 and 255",
+                    )));
+                    if let Some(help) = help_text {
+                        warning.set_help(help);
+                    }
+                },
+                self.nb_errors_left,
+                self.options,
+            );
+            true
+        } else if value < -128 {
+            diagnostics::warn(
+                warning!("truncation=2"),
+                span,
+                |warning| {
+                    warning.set_message(format!("this {what} doesn't seem to be 8-bit"));
+                    warning.add_label(diagnostics::warning_label(span).with_message(format!(
+                        "this {eval_msg} {value}, which is not between -128 and 255",
+                    )));
+                    if let Some(help) = help_text {
+                        warning.set_help(help);
+                    }
+                },
+                self.nb_errors_left,
+                self.options,
+            );
+            true
+        } else {
+            false
+        }
+    }
+
+    fn check_16_bit(
+        &self,
+        value: i32,
+        span: &Span,
+        what: &'static str,
+        eval_msg: &'static str,
+        help_text: Option<&'static str>,
+    ) -> bool {
+        if (-65536..=65535).contains(&value) {
+            diagnostics::warn(
+                warning!("truncation=1"),
+                span,
+                |warning| {
+                    warning.set_message(format!("this {what} is not 16-bit"));
+                    warning.add_label(diagnostics::warning_label(span).with_message(format!(
+                        "this {eval_msg} {value}, which is not between -65536 and 65535",
+                    )));
+                    if let Some(help) = help_text {
+                        warning.set_help(help);
+                    }
+                },
+                self.nb_errors_left,
+                self.options,
+            );
+            true
+        } else if value < -32767 {
+            diagnostics::warn(
+                warning!("truncation=2"),
+                span,
+                |warning| {
+                    warning.set_message(format!("this {what} doesn't seem to be 16-bit"));
+                    warning.add_label(diagnostics::warning_label(span).with_message(format!(
+                        "this {eval_msg} {value}, which is not between -32767 and 65535",
+                    )));
+                    if let Some(help) = help_text {
+                        warning.set_help(help);
+                    }
+                },
+                self.nb_errors_left,
+                self.options,
+            );
+            true
+        } else {
+            false
         }
     }
 }

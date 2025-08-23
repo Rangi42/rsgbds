@@ -1,7 +1,7 @@
 use compact_str::CompactString;
 use either::Either;
 
-use crate::{diagnostics, expr::Expr, Identifier};
+use crate::{diagnostics, expr::Expr, sources::Span, Identifier};
 
 use super::parse_ctx;
 
@@ -35,7 +35,7 @@ impl parse_ctx!() {
         &mut self,
         name: Identifier,
         span_idx: usize,
-    ) -> Either<Expr, CompactString> {
+    ) -> Either<Expr, (CompactString, Span)> {
         let span = self.nth_span(span_idx);
 
         let Some(sym) = self.symbols.find(&name) else {
@@ -58,7 +58,7 @@ impl parse_ctx!() {
                 });
                 Default::default()
             });
-            Either::Right(string)
+            Either::Right((string, span))
         } else {
             // Likewise, assume treat anything else as a symbol expression; non-numeric symbols will get filtered out at evaluation time.
             Either::Left(Expr::symbol(name, span))
