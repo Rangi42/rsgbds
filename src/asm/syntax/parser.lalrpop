@@ -117,6 +117,7 @@ ForParams: (Option<Expr>, Expr, Option<Expr>) = {
 Directive: () = {
 	// `context.rs`
 	<@L> "break" => ctx.break_loop(<>),
+	"include" <StringExpr> => ctx.include_file(<>),
 	// `data.rs`
 	// `db`, `dw`, `dl` and `ds` are `Emittable`s, instead.
 // TODO: `incbin`...

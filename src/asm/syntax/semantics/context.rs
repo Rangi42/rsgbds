@@ -1,5 +1,7 @@
 use std::{cmp::Ordering, rc::Rc};
 
+use compact_str::CompactString;
+
 use crate::{
     diagnostics::{self, warning},
     expr::Expr,
@@ -179,6 +181,16 @@ impl parse_ctx!() {
                     for_step: step,
                 },
             );
+        }
+    }
+
+    pub fn include_file(&mut self, (path, span): (CompactString, Span)) {
+        match Source::load_file(&path) {
+            Ok(source) => push_file(self, source, Some(Rc::new(span.extract_normal()))),
+            Err(err) => self.error(&span, |error| {
+                error.set_message("unable to read the file at \"{path}\"");
+                error.add_label(diagnostics::error_label(&span).with_message(err));
+            }),
         }
     }
 }
