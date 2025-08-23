@@ -18,7 +18,7 @@ use crate::{
 	expr::{BinOp, Expr, UnOp},
 	instructions::{Condition, Instruction, Reg16Arith, Reg16Mem, Reg16Stack, Reg8},
 	macro_args::MacroArgs,
-	section::{SectionAttrs, SectionKind},
+	section::{AssertLevel, SectionAttrs, SectionKind},
 	sources::Span,
 	Identifier,
 };
@@ -126,6 +126,10 @@ Directive: () = {
 	// `print.rs`
 	"print"   CommaList<PrintArg> => (),
 	"println" CommaList<PrintArg> => println!(),
+	<span_idx:@L> "fail" <msg:StringExpr> =>? ctx.do_fail(msg, span_idx),
+	<span_idx:@L> "warn" <msg:StringExpr> => ctx.do_warn(msg, span_idx),
+	<span_idx:@L> "assert" <params:AssertParams> =>? ctx.assert(params, span_idx),
+	       "static_assert" <params:AssertParams> =>? ctx.static_assert(params),
 	// `section.rs`
 	<span_idx:@L> "align" <align:AlignArgs> => ctx.align_section(align, span_idx),
 	<span_idx:@L> "endl" => ctx.end_load_block(span_idx),
@@ -136,6 +140,15 @@ Directive: () = {
 	"section" <SectionAttrs> => ctx.create_section(<>),
 };
 PrintArg: () = StringOrExpr => ctx.print(<>);
+
+AssertParams: (AssertLevel, Expr, Option<(CompactString, Span)>) = {
+	<level:AssertLevel?> <expr:Expr> <msg:("," <StringExpr>)?> => (level.unwrap_or(AssertLevel::Error), expr, msg)
+};
+AssertLevel: AssertLevel = {
+	"warn" => AssertLevel::Warn,
+	"fail" => AssertLevel::Error,
+	"fatal" => AssertLevel::Fatal,
+};
 
 SectionAttrs: (SectionAttrs, (CompactString, Span)) = {
 	<kind:SectionKind?> <name:StringExpr> "," <mem_region:MemRegion> <addr:("[" <Expr> "]")?> => {

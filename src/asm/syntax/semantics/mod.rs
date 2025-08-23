@@ -4,7 +4,7 @@ use crate::{
     sources::Span,
 };
 
-use super::parse_ctx;
+use super::{parse_ctx, tokens::TokenPayload};
 
 mod condition;
 mod context;
@@ -15,6 +15,8 @@ mod macros;
 mod print;
 mod section;
 mod symbols;
+
+type ParseError = lalrpop_util::ParseError<usize, TokenPayload, ()>;
 
 /// Utilities used pervasively throughout semantic actions.
 impl parse_ctx!() {
