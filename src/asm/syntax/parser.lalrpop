@@ -121,6 +121,8 @@ Directive: () = {
 	// `data.rs`
 	// `db`, `dw`, `dl` and `ds` are `Emittable`s, instead.
 // TODO: `incbin`...
+	// `macros.rs`
+	<span_idx:@L> "shift" <amount:Expr?> => ctx.shift_macro_args(amount, span_idx),
 	// `print.rs`
 	"print"   CommaList<PrintArg> => (),
 	"println" CommaList<PrintArg> => println!(),

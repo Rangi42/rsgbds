@@ -11,6 +11,7 @@ mod context;
 mod data;
 mod error;
 mod instructions;
+mod macros;
 mod print;
 mod section;
 mod symbols;
