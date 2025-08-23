@@ -180,7 +180,7 @@ pub fn is_newline(ch: char) -> bool {
 }
 
 impl Context {
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         debug_assert!(self.span.is_offset_valid(self.cur_byte));
         self.cur_byte == self.span.bytes.end
     }
@@ -353,6 +353,12 @@ impl Lexer {
             self.contexts.is_empty(),
             "Ending parse with lexer contexts active!?"
         );
+    }
+
+    pub fn next_char_is_a_colon(&mut self) -> bool {
+        // This is only meant to be used after lexing an identifier, which will have `peek`ed the next character;
+        // so we can rely on expansions having been triggered.
+        self.top_context().remaining_text().chars().next() == Some(':')
     }
 
     fn peek(&mut self, params: &mut LexerParams) -> Option<char> {
@@ -1112,7 +1118,7 @@ impl Lexer {
             return Token {
                 // Empty span pointing at EOF.
                 span: Span::Normal(span_before_whitespace),
-                payload: tok!("end of input"),
+                payload: tok!("end of line"),
             };
         };
         span_before_whitespace.bytes.end += ch.len_utf8();
@@ -1132,7 +1138,7 @@ impl Lexer {
         loop {
             match self.peek(&mut params) {
                 None => {
-                    break token!("end of input", span_before_whitespace);
+                    break token!("end of line", span_before_whitespace);
                 }
 
                 Some(ch @ chars!(newline)) => {
@@ -1208,7 +1214,7 @@ impl Lexer {
                 Some('@') => {
                     self.consume(&mut span);
                     // TODO(perf): this could be `.get("@").unwrap()`
-                    break token!("identifier"(identifiers.get_or_intern_static("@"), false));
+                    break token!("identifier"(identifiers.get_or_intern_static("@")));
                 }
                 Some('[') => {
                     self.consume(&mut span);
@@ -1897,7 +1903,7 @@ impl Lexer {
         let mut is_local = first_char == '.';
 
         name.push(first_char);
-        let followed_by_colon = loop {
+        loop {
             match self.peek(params) {
                 Some(ch @ chars!(ident)) => {
                     self.consume(span);
@@ -1908,10 +1914,9 @@ impl Lexer {
                     name.push('.');
                     is_local = true;
                 }
-                Some(':') => break true,
-                _ => break false,
+                _ => break,
             }
-        };
+        }
 
         if first_char == '.' && name.contains(|ch| ch != '.') {
             if let Some(scope) = params.symbols.global_scope {
@@ -1935,7 +1940,11 @@ impl Lexer {
             }
         }
         let identifier = params.identifiers.get_or_intern(&name);
-        tok!("identifier"(identifier, followed_by_colon || is_local))
+        if is_local {
+            tok!("local identifier"(identifier))
+        } else {
+            tok!("identifier"(identifier))
+        }
     }
 
     fn read_string_maybe(

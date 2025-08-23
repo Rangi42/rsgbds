@@ -27,22 +27,21 @@ pub struct UniqueId {
     next_id: u32,
 }
 
-impl FromIterator<CompactString> for MacroArgs {
-    fn from_iter<T: IntoIterator<Item = CompactString>>(iter: T) -> Self {
+impl MacroArgs {
+    pub fn new() -> Self {
         Self {
-            args: iter
-                .into_iter()
-                .enumerate()
-                .map(|(i, arg)| {
-                    Rc::new(Source {
-                        name: format_compact!("<macro argument #{}>", i + 1),
-                        contents: arg.into(),
-                    })
-                })
-                .collect(),
+            args: vec![],
             shift: 0,
             combined_args: None,
         }
+    }
+
+    pub fn push_arg(mut self, arg: CompactString) -> Self {
+        self.args.push(Rc::new(Source {
+            name: format_compact!("<macro argument #{}>", self.args.len() + 1),
+            contents: arg.into(),
+        }));
+        self
     }
 }
 

@@ -1,6 +1,9 @@
-use arrayvec::ArrayVec;
+use std::cell::Cell;
 
-use crate::{expr::Expr, section::PatchKind, sources::Span};
+use arrayvec::ArrayVec;
+use either::Either;
+
+use crate::{expr::Expr, section::PatchKind, sources::Span, Options};
 
 #[derive(Debug)]
 pub struct Instruction {
@@ -16,7 +19,7 @@ pub struct Patch {
     pub expr: Expr,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Reg8 {
     B,
     C,
@@ -28,18 +31,30 @@ pub enum Reg8 {
     A,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum Reg16 {
+// Note that order matters here: these enums get converted to their `u8` repr for encoding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Reg16Arith {
+    Bc,
+    De,
+    Hl,
+    Sp,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Reg16Stack {
     Bc,
     De,
     Hl,
     Af,
-    Sp,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Reg16Mem {
+    Bc,
+    De,
     Hli,
     Hld,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Condition {
     Nz,
     Z,
@@ -59,11 +74,21 @@ impl Condition {
 }
 
 impl Instruction {
-    pub fn ld_r8_r8(dest: Reg8, src: Reg8, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0x40 | dest.id() << 3 | src.id()].into_iter().collect(),
-            patch: None,
+    pub fn ld_r8_r8(
+        dest: Reg8,
+        src: Reg8,
+        span: Span,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) -> Option<Self> {
+        if src == Reg8::HlInd && dest == Reg8::HlInd {
+            None
+        } else {
+            Some(Self {
+                span,
+                bytes: [0x40 | dest.id() << 3 | src.id()].into_iter().collect(),
+                patch: None,
+            })
         }
     }
     pub fn ld_r8_imm(dest: Reg8, src: Expr, span: Span) -> Self {
@@ -79,41 +104,31 @@ impl Instruction {
             }),
         }
     }
-    pub fn ld_r16_imm(reg: Reg16, value: Expr, span: Span) -> Result<Self, Span> {
-        match reg {
-            Reg16::Bc => Ok((0, span)),
-            Reg16::De => Ok((1, span)),
-            Reg16::Hl => Ok((2, span)),
-            Reg16::Sp => Ok((3, span)),
-            Reg16::Af | Reg16::Hli | Reg16::Hld => Err(span),
-        }
-        .map(|(encoded, span)| Self {
+    pub fn ld_r16_imm(reg: Reg16Arith, value: Expr, span: Span) -> Self {
+        Self {
             span,
-            bytes: [0x01 | encoded << 4, Default::default(), Default::default()]
-                .into_iter()
-                .collect(),
+            bytes: [
+                0x01 | (reg as u8) << 4,
+                Default::default(),
+                Default::default(),
+            ]
+            .into_iter()
+            .collect(),
             patch: Some(Patch {
                 kind: PatchKind::Word,
                 offset: 1,
                 expr: value,
             }),
-        })
-    }
-    pub fn ld_a_r16_ind(is_write: bool, reg: Reg16, span: Span) -> Result<Self, Span> {
-        match reg {
-            Reg16::Bc => Ok((0, span)),
-            Reg16::De => Ok((1, span)),
-            Reg16::Hli => Ok((2, span)),
-            Reg16::Hld => Ok((3, span)),
-            Reg16::Hl | Reg16::Af | Reg16::Sp => Err(span),
         }
-        .map(|(encoded, span)| Self {
+    }
+    pub fn ld_a_r16_ind(is_write: bool, reg: Reg16Mem, span: Span) -> Self {
+        Self {
             span,
-            bytes: [if is_write { 0x02 } else { 0x0A } | encoded << 4]
+            bytes: [if is_write { 0x02 } else { 0x0A } | (reg as u8) << 4]
                 .into_iter()
                 .collect(),
             patch: None,
-        })
+        }
     }
     pub fn ld_a_addr(is_write: bool, address: Expr, span: Span) -> Self {
         Self {
@@ -185,21 +200,14 @@ impl Instruction {
         }
     }
 
-    pub fn add_r16(rhs: Reg16, span: Span) -> Result<Self, Span> {
-        match rhs {
-            Reg16::Bc => Ok((0x09, span)),
-            Reg16::De => Ok((0x19, span)),
-            Reg16::Hl => Ok((0x29, span)),
-            Reg16::Sp => Ok((0x39, span)),
-            Reg16::Af | Reg16::Hli | Reg16::Hld => Err(span),
-        }
-        .map(|(byte, span)| Self {
+    pub fn add_hl_r16(rhs: Reg16Arith, span: Span) -> Self {
+        Self {
             span,
-            bytes: [byte].into_iter().collect(),
+            bytes: [(rhs as u8) << 4 | 0x09].into_iter().collect(),
             patch: None,
-        })
+        }
     }
-    pub fn add_sp(ofs: Expr, span: Span) -> Self {
+    pub fn add_sp_imm(ofs: Expr, span: Span) -> Self {
         Self {
             span,
             bytes: [0xE8, Default::default()].into_iter().collect(),
@@ -210,155 +218,155 @@ impl Instruction {
             }),
         }
     }
-    pub fn add(rhs: Reg8, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0x80 | rhs.id()].into_iter().collect(),
-            patch: None,
-        }
-    }
-    pub fn add_imm(rhs: Expr, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0xC6, Default::default()].into_iter().collect(),
-            patch: Some(Patch {
-                kind: PatchKind::Byte,
-                offset: 1,
-                expr: rhs,
-            }),
-        }
-    }
-
-    pub fn adc(rhs: Reg8, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0x88 | rhs.id()].into_iter().collect(),
-            patch: None,
-        }
-    }
-    pub fn adc_imm(rhs: Expr, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0xCE, Default::default()].into_iter().collect(),
-            patch: Some(Patch {
-                kind: PatchKind::Byte,
-                offset: 1,
-                expr: rhs,
-            }),
+    pub fn add(rhs: Either<Reg8, Expr>, span: Span) -> Self {
+        match rhs {
+            Either::Left(reg) => Self {
+                span,
+                bytes: [0x80 | reg.id()].into_iter().collect(),
+                patch: None,
+            },
+            Either::Right(expr) => Self {
+                span,
+                bytes: [0xC6, Default::default()].into_iter().collect(),
+                patch: Some(Patch {
+                    kind: PatchKind::Byte,
+                    offset: 1,
+                    expr,
+                }),
+            },
         }
     }
 
-    pub fn sub(rhs: Reg8, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0x90 | rhs.id()].into_iter().collect(),
-            patch: None,
-        }
-    }
-    pub fn sub_imm(rhs: Expr, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0xD6, Default::default()].into_iter().collect(),
-            patch: Some(Patch {
-                kind: PatchKind::Byte,
-                offset: 1,
-                expr: rhs,
-            }),
-        }
-    }
-
-    pub fn sbc(rhs: Reg8, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0x98 | rhs.id()].into_iter().collect(),
-            patch: None,
-        }
-    }
-    pub fn sbc_imm(rhs: Expr, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0xDE, Default::default()].into_iter().collect(),
-            patch: Some(Patch {
-                kind: PatchKind::Byte,
-                offset: 1,
-                expr: rhs,
-            }),
+    pub fn adc(rhs: Either<Reg8, Expr>, span: Span) -> Self {
+        match rhs {
+            Either::Left(reg) => Self {
+                span,
+                bytes: [0x88 | reg.id()].into_iter().collect(),
+                patch: None,
+            },
+            Either::Right(expr) => Self {
+                span,
+                bytes: [0xCE, Default::default()].into_iter().collect(),
+                patch: Some(Patch {
+                    kind: PatchKind::Byte,
+                    offset: 1,
+                    expr,
+                }),
+            },
         }
     }
 
-    pub fn and(rhs: Reg8, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0xA0 | rhs.id()].into_iter().collect(),
-            patch: None,
-        }
-    }
-    pub fn and_imm(rhs: Expr, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0xE6, Default::default()].into_iter().collect(),
-            patch: Some(Patch {
-                kind: PatchKind::Byte,
-                offset: 1,
-                expr: rhs,
-            }),
-        }
-    }
-
-    pub fn xor(rhs: Reg8, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0xA8 | rhs.id()].into_iter().collect(),
-            patch: None,
-        }
-    }
-    pub fn xor_imm(rhs: Expr, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0xEE, Default::default()].into_iter().collect(),
-            patch: Some(Patch {
-                kind: PatchKind::Byte,
-                offset: 1,
-                expr: rhs,
-            }),
+    pub fn sub(rhs: Either<Reg8, Expr>, span: Span) -> Self {
+        match rhs {
+            Either::Left(reg) => Self {
+                span,
+                bytes: [0x90 | reg.id()].into_iter().collect(),
+                patch: None,
+            },
+            Either::Right(expr) => Self {
+                span,
+                bytes: [0xD6, Default::default()].into_iter().collect(),
+                patch: Some(Patch {
+                    kind: PatchKind::Byte,
+                    offset: 1,
+                    expr,
+                }),
+            },
         }
     }
 
-    pub fn or(rhs: Reg8, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0xB0 | rhs.id()].into_iter().collect(),
-            patch: None,
-        }
-    }
-    pub fn or_imm(rhs: Expr, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0xF6, Default::default()].into_iter().collect(),
-            patch: Some(Patch {
-                kind: PatchKind::Byte,
-                offset: 1,
-                expr: rhs,
-            }),
+    pub fn sbc(rhs: Either<Reg8, Expr>, span: Span) -> Self {
+        match rhs {
+            Either::Left(reg) => Self {
+                span,
+                bytes: [0x98 | reg.id()].into_iter().collect(),
+                patch: None,
+            },
+            Either::Right(expr) => Self {
+                span,
+                bytes: [0xDE, Default::default()].into_iter().collect(),
+                patch: Some(Patch {
+                    kind: PatchKind::Byte,
+                    offset: 1,
+                    expr,
+                }),
+            },
         }
     }
 
-    pub fn cp(rhs: Reg8, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0xB8 | rhs.id()].into_iter().collect(),
-            patch: None,
+    pub fn and(rhs: Either<Reg8, Expr>, span: Span) -> Self {
+        match rhs {
+            Either::Left(reg) => Self {
+                span,
+                bytes: [0xA0 | reg.id()].into_iter().collect(),
+                patch: None,
+            },
+            Either::Right(expr) => Self {
+                span,
+                bytes: [0xE6, Default::default()].into_iter().collect(),
+                patch: Some(Patch {
+                    kind: PatchKind::Byte,
+                    offset: 1,
+                    expr,
+                }),
+            },
         }
     }
-    pub fn cp_imm(rhs: Expr, span: Span) -> Self {
-        Self {
-            span,
-            bytes: [0xFE, Default::default()].into_iter().collect(),
-            patch: Some(Patch {
-                kind: PatchKind::Byte,
-                offset: 1,
-                expr: rhs,
-            }),
+
+    pub fn xor(rhs: Either<Reg8, Expr>, span: Span) -> Self {
+        match rhs {
+            Either::Left(reg) => Self {
+                span,
+                bytes: [0xA8 | reg.id()].into_iter().collect(),
+                patch: None,
+            },
+            Either::Right(expr) => Self {
+                span,
+                bytes: [0xEE, Default::default()].into_iter().collect(),
+                patch: Some(Patch {
+                    kind: PatchKind::Byte,
+                    offset: 1,
+                    expr,
+                }),
+            },
+        }
+    }
+
+    pub fn or(rhs: Either<Reg8, Expr>, span: Span) -> Self {
+        match rhs {
+            Either::Left(reg) => Self {
+                span,
+                bytes: [0xB0 | reg.id()].into_iter().collect(),
+                patch: None,
+            },
+            Either::Right(expr) => Self {
+                span,
+                bytes: [0xF6, Default::default()].into_iter().collect(),
+                patch: Some(Patch {
+                    kind: PatchKind::Byte,
+                    offset: 1,
+                    expr,
+                }),
+            },
+        }
+    }
+
+    pub fn cp(rhs: Either<Reg8, Expr>, span: Span) -> Self {
+        match rhs {
+            Either::Left(reg) => Self {
+                span,
+                bytes: [0xB8 | reg.id()].into_iter().collect(),
+                patch: None,
+            },
+            Either::Right(expr) => Self {
+                span,
+                bytes: [0xFE, Default::default()].into_iter().collect(),
+                patch: Some(Patch {
+                    kind: PatchKind::Byte,
+                    offset: 1,
+                    expr,
+                }),
+            },
         }
     }
 
@@ -376,36 +384,22 @@ impl Instruction {
             patch: None,
         }
     }
-    pub fn dec_r16(rhs: Reg16, span: Span) -> Result<Self, Span> {
-        match rhs {
-            Reg16::Bc => Ok((0x0B, span)),
-            Reg16::De => Ok((0x1B, span)),
-            Reg16::Hl => Ok((0x2B, span)),
-            Reg16::Sp => Ok((0x3B, span)),
-            _ => Err(span),
-        }
-        .map(|(byte, span)| Self {
+    pub fn dec_r16(rhs: Reg16Arith, span: Span) -> Self {
+        Self {
             span,
-            bytes: [byte].into_iter().collect(),
+            bytes: [(rhs as u8) << 4 | 0x03].into_iter().collect(),
             patch: None,
-        })
+        }
     }
-    pub fn inc_r16(rhs: Reg16, span: Span) -> Result<Self, Span> {
-        match rhs {
-            Reg16::Bc => Ok((0x0B, span)),
-            Reg16::De => Ok((0x1B, span)),
-            Reg16::Hl => Ok((0x2B, span)),
-            Reg16::Sp => Ok((0x3B, span)),
-            _ => Err(span),
-        }
-        .map(|(byte, span)| Self {
+    pub fn inc_r16(rhs: Reg16Arith, span: Span) -> Self {
+        Self {
             span,
-            bytes: [byte].into_iter().collect(),
+            bytes: [(rhs as u8) << 4 | 0x0B].into_iter().collect(),
             patch: None,
-        })
+        }
     }
 
-    pub fn bit(reg: Reg8, bit: Expr, span: Span, instr_span: Span) -> Self {
+    pub fn bit(bit: Expr, reg: Reg8, span: Span, instr_span: Span) -> Self {
         let second_byte = bit.bit_check(0x40 | reg.id() << 3, instr_span);
         Self {
             span,
@@ -417,7 +411,7 @@ impl Instruction {
             }),
         }
     }
-    pub fn res(reg: Reg8, bit: Expr, span: Span, instr_span: Span) -> Self {
+    pub fn res(bit: Expr, reg: Reg8, span: Span, instr_span: Span) -> Self {
         let second_byte = bit.bit_check(0x80 | reg.id() << 3, instr_span);
         Self {
             span,
@@ -429,7 +423,7 @@ impl Instruction {
             }),
         }
     }
-    pub fn set(reg: Reg8, bit: Expr, span: Span, instr_span: Span) -> Self {
+    pub fn set(bit: Expr, reg: Reg8, span: Span, instr_span: Span) -> Self {
         let second_byte = bit.bit_check(0xC0 | reg.id() << 3, instr_span);
         Self {
             span,
@@ -500,36 +494,22 @@ impl Instruction {
         }
     }
 
-    pub fn pop(reg: Reg16, span: Span) -> Result<Self, Span> {
-        match reg {
-            Reg16::Bc => Ok((0, span)),
-            Reg16::De => Ok((1, span)),
-            Reg16::Hl => Ok((2, span)),
-            Reg16::Af => Ok((3, span)),
-            _ => Err(span),
-        }
-        .map(|(reg, span)| Self {
+    pub fn pop(reg: Reg16Stack, span: Span) -> Self {
+        Self {
             span,
-            bytes: [0xC1 | reg << 4].into_iter().collect(),
+            bytes: [0xC1 | (reg as u8) << 4].into_iter().collect(),
             patch: None,
-        })
+        }
     }
-    pub fn push(reg: Reg16, span: Span) -> Result<Self, Span> {
-        match reg {
-            Reg16::Bc => Ok((0, span)),
-            Reg16::De => Ok((1, span)),
-            Reg16::Hl => Ok((2, span)),
-            Reg16::Af => Ok((3, span)),
-            _ => Err(span),
-        }
-        .map(|(reg, span)| Self {
+    pub fn push(reg: Reg16Stack, span: Span) -> Self {
+        Self {
             span,
-            bytes: [0xC5 | reg << 4].into_iter().collect(),
+            bytes: [0xC5 | (reg as u8) << 4].into_iter().collect(),
             patch: None,
-        })
+        }
     }
 
-    pub fn call(condition: Option<Condition>, span: Span, target: Expr) -> Self {
+    pub fn call(condition: Option<Condition>, target: Expr, span: Span) -> Self {
         let byte = match condition {
             Some(cond) => 0xC4 | cond.id() << 3,
             None => 0xCD,
@@ -546,7 +526,7 @@ impl Instruction {
             }),
         }
     }
-    pub fn jp(condition: Option<Condition>, span: Span, target: Expr) -> Self {
+    pub fn jp(condition: Option<Condition>, target: Expr, span: Span) -> Self {
         let byte = match condition {
             Some(cond) => 0xC2 | cond.id() << 3,
             None => 0xC3,
@@ -563,7 +543,7 @@ impl Instruction {
             }),
         }
     }
-    pub fn jr(condition: Option<Condition>, span: Span, target: Expr) -> Self {
+    pub fn jr(condition: Option<Condition>, target: Expr, span: Span) -> Self {
         let byte = match condition {
             Some(cond) => 0x20 | cond.id() << 3,
             None => 0x18,

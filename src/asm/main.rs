@@ -73,7 +73,7 @@ fn main() -> ExitCode {
     let mut symbols = Symbols::new(&mut identifiers, defines, &nb_errors_left, &options);
 
     if let Some(preinclude_path) = &options.preinclude {
-        syntax::parser::parse_file(
+        syntax::parse_file(
             &preinclude_path.clone(),
             &mut identifiers,
             &mut sections,
@@ -84,7 +84,7 @@ fn main() -> ExitCode {
         );
     }
 
-    syntax::parser::parse_file(
+    syntax::parse_file(
         &main_path,
         &mut identifiers,
         &mut sections,

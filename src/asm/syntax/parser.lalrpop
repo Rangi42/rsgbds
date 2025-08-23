@@ -1,0 +1,614 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ *
+ * SPDX-License-Identifier: MPL-2.0
+ */
+
+/*
+ * NB: the `ctx.*` functions used throughout this file are defined in the various files in the `semantics` directory.
+ */
+
+use compact_str::CompactString;
+use either::Either;
+
+use crate::{
+	expr::{BinOp, Expr, UnOp},
+	instructions::{Condition, Instruction, Reg16Arith, Reg16Mem, Reg16Stack, Reg8},
+	macro_args::MacroArgs,
+	Identifier,
+};
+
+use super::{ParseCtx, tokens::TokenPayload};
+
+grammar(ctx: &mut ParseCtx<'_, '_, '_, '_, '_, '_>);
+
+// TODO: try to improve syntax error recovery
+//       https://lalrpop.github.io/lalrpop/tutorial/008_error_recovery.html
+
+
+// The returned boolean indicates whether parsing should continue.
+// `false` is returned when parsing is aborted due to a fatal error, like `FAIL`.
+pub Line = DiffMarker? <LineContents>;
+LineContents = {
+	SpecialDirective, // TODO: accept labels before those, to produce a clearer error message
+	LabelDef? <Directive>,
+	LabelDef? <Instructions>,
+	LabelDef? <MacroCall>,
+	LabelDef // LALRPOP doesn't allow productions to match no tokens, so empty lines are simply not passed to the parser.
+};
+
+DiffMarker: () = {
+	// TODO: Git diff markers, too!
+	<@L> "+" => ctx.report_diff_marker(<>),
+	<@L> "-" => ctx.report_diff_marker(<>),
+};
+
+LabelDef: () = {
+	// Non-local labels require a colon so that they don't conflict with macro calls.
+	<span_idx:@L> <name:"local identifier"> ":"? => ctx.define_label(name, span_idx, false),
+	<span_idx:@L> <name:"identifier"> ":" => ctx.define_label(name, span_idx, false),
+	<span_idx:@L> <name:Identifier> "::" => ctx.define_label(name, span_idx, true),
+	<span_idx:@L> ":" => todo!(),
+};
+
+// Capturing `Instruction_Emit` as the "focus" of the repetition makes it return a `Vec<()>`, which does not allocate.
+Instructions = <Instruction_Emit> ("::" <Instruction_Emit>)*;
+Instruction_Emit: () = <Instruction> => ctx.emit_instruction(<>);
+
+// LALRPOP doesn't support rules matching 0 tokens, so we have to have `MacroArgs` work around that.
+MacroCall: () = <span_idx:@L> <name:"identifier"> <args:MacroArgs?> => {
+	ctx.call_macro(name, span_idx, args.unwrap_or_else(MacroArgs::new));
+};
+MacroArgs: MacroArgs = {
+	<"string"> => { let args = MacroArgs::new(); args.push_arg(<>) },
+	<args:MacroArgs> <arg:"string"> => args.push_arg(arg)
+};
+
+// All of these directives make calls to the lexer to process their “bodies”.
+// They are also special to the lexer, since they can introduce levels of nesting;
+// therefore, label definitions are not allowed before them.
+SpecialDirective: () = {
+	"macro" <span_idx:@L> <name:"identifier"> => ctx.capture_macro_def(name, span_idx),
+
+	<span_idx:@L> "rept" <nb_iters:Expr> => {
+		let span = ctx.nth_span(span_idx);
+		ctx.capture_loop(None, (None, nb_iters, None), span)
+	},
+	<span_idx:@L> "for" <var_span_idx:@L> <var:"identifier"> "," <params:ForParams> => {
+		let span = ctx.nth_span(span_idx);
+		let var_span = ctx.nth_span(var_span_idx);
+		ctx.capture_loop(Some((var, var_span)), params, span)
+	},
+
+	// These are consumed by the capturing functions; so if we see them here, they are not matched by a block opening.
+	<span_idx:@L> "endm" => ctx.report_stray(span_idx, "`endm` found outside of a macro"),
+	<span_idx:@L> "endr" => ctx.report_stray(span_idx, "`endr` found outside of a loop"),
+
+	"if" => todo!(),
+	"elif" => todo!(),
+	"else" => todo!(),
+	"endc" => todo!(),
+};
+ForParams: (Option<Expr>, Expr, Option<Expr>) = {
+	<span_idx:@L>                  <end:Expr>                      => (None, end, None),
+	<span_idx:@L> <start:Expr> "," <end:Expr> <step:("," <Expr>)?> => (Some(start), end, step)
+};
+
+Directive: () = {
+	<@L> "break" => ctx.break_loop(<>),
+	"print"   Comma<PrintArg> => (),
+	"println" Comma<PrintArg> => println!(),
+	// TODO: implement `db`, `dw`, `dl` as instructions, so they can be `::`'d and passed to `OPCODE`.
+};
+PrintArg: () = StringOrExpr => ctx.print(<>);
+
+// TODO: accept invalid forms of instructions, to report better error messages for them
+Instruction: Option<Instruction> = {
+	<l_span_idx:@L> "adc" <operands:ArithInstrOperands> <r_span_idx:@R> => {
+		Some(Instruction::adc(operands, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "add" <operands:ArithInstrOperands> <r_span_idx:@R> => {
+		Some(Instruction::add(operands, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "add" "hl" "," <operand:Reg16Arith> <r_span_idx:@R> => {
+		Some(Instruction::add_hl_r16(operand, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "add" "sp" "," <offset:Expr> <r_span_idx:@R> => {
+		Some(Instruction::add_sp_imm(offset, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "and" <operands:ArithInstrOperands> <r_span_idx:@R> => {
+		Some(Instruction::and(operands, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "bit" <bit:Expr> "," <reg:Reg8> <r_span_idx:@R> => {
+		Some(Instruction::bit(bit, reg, ctx.span_from_to(l_span_idx, r_span_idx), ctx.nth_span(l_span_idx)))
+	},
+	<l_span_idx:@L> "call" <cond:(<InstrCond> ",")?> <addr:Expr> <r_span_idx:@R> => {
+		Some(Instruction::call(cond, addr, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<span_idx:@L> "ccf" => Some(Instruction::ccf(ctx.nth_span(span_idx))),
+	<l_span_idx:@L> "cp" <operands:ArithInstrOperands> <r_span_idx:@R> => {
+		Some(Instruction::cp(operands, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "cpl" "a"? <r_span_idx:@R> => Some(Instruction::cpl(ctx.span_from_to(l_span_idx, r_span_idx))),
+	<span_idx:@L> "daa" => Some(Instruction::daa(ctx.nth_span(span_idx))),
+	<l_span_idx:@L> "dec" <reg:Reg8> <r_span_idx:@R> => {
+		Some(Instruction::dec_r8(reg, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "dec" <reg:Reg16Arith> <r_span_idx:@R> => {
+		Some(Instruction::dec_r16(reg, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<span_idx:@L> "di" => Some(Instruction::di(ctx.nth_span(span_idx))),
+	<span_idx:@L> "ei" => Some(Instruction::ei(ctx.nth_span(span_idx))),
+	<span_idx:@L> "halt" => Some(Instruction::halt(ctx.nth_span(span_idx))),
+	<l_span_idx:@L> "inc" <reg:Reg8> <r_span_idx:@R> => {
+		Some(Instruction::inc_r8(reg, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "inc" <reg:Reg16Arith> <r_span_idx:@R> => {
+		Some(Instruction::inc_r16(reg, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "jp" <cond:(<InstrCond> ",")?> <addr:Expr> <r_span_idx:@R> => {
+		Some(Instruction::jp(cond, addr, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "jp" "hl" <r_span_idx:@R> => Some(Instruction::jp_hl(ctx.span_from_to(l_span_idx, r_span_idx))),
+	<l_span_idx:@L> "jr" <cond:(<InstrCond> ",")?> <addr:Expr> <r_span_idx:@R> => {
+		Some(Instruction::jr(cond, addr, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	// `ld` and `ldh` are at the bottom, since they have so many forms.
+	<span_idx:@L> "nop" => Some(Instruction::nop(ctx.nth_span(span_idx))),
+	<l_span_idx:@L> "or" <operands:ArithInstrOperands> <r_span_idx:@R> => {
+		Some(Instruction::or(operands, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "pop" <operand:Reg16Stack> <r_span_idx:@R> => {
+		Some(Instruction::pop(operand, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "push" <operand:Reg16Stack> <r_span_idx:@R> => {
+		Some(Instruction::push(operand, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "res" <bit:Expr> "," <reg:Reg8> <r_span_idx:@R> => {
+		Some(Instruction::res(bit, reg, ctx.span_from_to(l_span_idx, r_span_idx), ctx.nth_span(l_span_idx)))
+	},
+	<span_idx:@L> "reti" => Some(Instruction::reti(ctx.nth_span(span_idx))),
+	<l_span_idx:@L> "ret" <cond:InstrCond?> <r_span_idx:@R> => {
+		Some(Instruction::ret(cond, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<span_idx:@L> "rla" => Some(Instruction::rla(ctx.nth_span(span_idx))),
+	<span_idx:@L> "rlca" => Some(Instruction::rlca(ctx.nth_span(span_idx))),
+	<l_span_idx:@L> "rlc" <operand:Reg8> <r_span_idx:@R> => {
+		Some(Instruction::rlc(operand, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "rl" <operand:Reg8> <r_span_idx:@R> => {
+		Some(Instruction::rl(operand, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<span_idx:@L> "rra" => Some(Instruction::rra(ctx.nth_span(span_idx))),
+	<span_idx:@L> "rrca" => Some(Instruction::rrca(ctx.nth_span(span_idx))),
+	<l_span_idx:@L> "rrc" <reg:Reg8> <r_span_idx:@R> => {
+		Some(Instruction::rrc(reg, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "rr" <reg:Reg8> <r_span_idx:@R> => {
+		Some(Instruction::rr(reg, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "rst" <addr:Expr> <r_span_idx:@R> => {
+		Some(Instruction::rst(addr, ctx.span_from_to(l_span_idx, r_span_idx), ctx.nth_span(l_span_idx)))
+	},
+	<l_span_idx:@L> "sbc" <operands:ArithInstrOperands> <r_span_idx:@R> => {
+		Some(Instruction::sbc(operands, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<span_idx:@L> "scf" => Some(Instruction::scf(ctx.nth_span(span_idx))),
+	<l_span_idx:@L> "set" <bit:Expr> "," <reg:Reg8> <r_span_idx:@R> => {
+		Some(Instruction::set(bit, reg, ctx.span_from_to(l_span_idx, r_span_idx), ctx.nth_span(l_span_idx)))
+	},
+	<l_span_idx:@L> "sla" <operand:Reg8> <r_span_idx:@R> => {
+		Some(Instruction::sla(operand, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "sra" <operand:Reg8> <r_span_idx:@R> => {
+		Some(Instruction::sra(operand, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "srl" <operand:Reg8> <r_span_idx:@R> => {
+		Some(Instruction::srl(operand, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "stop" <operand:Expr?> <r_span_idx:@R> => {
+		todo!()
+	},
+	<l_span_idx:@L> "sub" <operands:ArithInstrOperands> <r_span_idx:@R> => {
+		Some(Instruction::sub(operands, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "swap" <operand:Reg8> <r_span_idx:@R> => {
+		Some(Instruction::swap(operand, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "xor" <operands:ArithInstrOperands> <r_span_idx:@R> => {
+		Some(Instruction::xor(operands, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+
+	// TODO: `ldh [$ff00 + c]`
+	<l_span_idx:@L> "ldh" RegA "," "[" RegC "]" <r_span_idx:@R> => {
+		Some(Instruction::ldh_c(false, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "ldh" "[" RegC "]" "," RegA <r_span_idx:@R> => {
+		Some(Instruction::ldh_c(true, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "ldh" RegA "," "[" <addr:Expr> "]" <r_span_idx:@R> => {
+		Some(Instruction::ldh(false, addr, ctx.span_from_to(l_span_idx, r_span_idx), ctx.nth_span(l_span_idx)))
+	},
+	<l_span_idx:@L> "ldh" "[" <addr:Expr> "]" "," RegA <r_span_idx:@R> => {
+		Some(Instruction::ldh(true, addr, ctx.span_from_to(l_span_idx, r_span_idx), ctx.nth_span(l_span_idx)))
+	},
+
+	// TODO: other forms of `ld`
+	<l_span_idx:@L> "ld" <lhs:Reg8> "," <rhs:Reg8> <r_span_idx:@R> => {
+		Instruction::ld_r8_r8(lhs, rhs, ctx.span_from_to(l_span_idx, r_span_idx), ctx.nb_errors_left, ctx.options)
+	},
+};
+ArithInstrOperands = (RegA ",")? <Reg8OrImm8>;
+Reg8OrImm8: Either<Reg8, Expr> = {
+	Reg8 => Either::Left(<>),
+	Expr => Either::Right(<>),
+};
+Reg8: Reg8 = {
+	RegB => Reg8::B,
+	RegC => Reg8::C,
+	RegD => Reg8::D,
+	RegE => Reg8::E,
+	RegH => Reg8::H,
+	RegL => Reg8::L,
+	"[" "hl" "]" => Reg8::HlInd,
+	RegA => Reg8::A,
+};
+RegB = { "b", "high" "(" <"bc"> ")" };
+RegC = { "c", "low"  "(" <"bc"> ")" };
+RegD = { "d", "high" "(" <"de"> ")" };
+RegE = { "e", "low"  "(" <"de"> ")" };
+RegH = { "h", "high" "(" <"hl"> ")" };
+RegL = { "l", "low"  "(" <"hl"> ")" };
+RegA = { "a", "high" "(" <"af"> ")" };
+Reg16Arith: Reg16Arith = {
+	"bc" => Reg16Arith::Bc,
+	"de" => Reg16Arith::De,
+	"hl" => Reg16Arith::Hl,
+	"sp" => Reg16Arith::Sp,
+};
+Reg16Mem: Reg16Mem = {
+	"bc" => Reg16Mem::Bc,
+	"de" => Reg16Mem::De,
+	"hli" => Reg16Mem::Hli,
+	"hl" "+" => Reg16Mem::Hli,
+	"hld" => Reg16Mem::Hli,
+	"hl" "-" => Reg16Mem::Hli,
+};
+Reg16Stack: Reg16Stack = {
+	"bc" => Reg16Stack::Bc,
+	"de" => Reg16Stack::De,
+	"hl" => Reg16Stack::Hl,
+	"af" => Reg16Stack::Af,
+};
+InstrCond: Condition = {
+	"nz" => Condition::Nz,
+	"z" => Condition::Z,
+	"nc" => Condition::Nc,
+	"c" => Condition::C,
+};
+
+// Since a top-level identifier can be either a string or an expression, it must be handled specially.
+StringOrExpr: Either<Expr, CompactString> = {
+	ExprLogicOr<ExprAtomNoIdent> => Either::Left(<>),
+	StringExprNoIdent => Either::Right(<>),
+	<span_idx:@L> <ident:"identifier"> => ctx.string_or_numeric_sym(ident, span_idx),
+};
+
+// Places that don't handle strings and expressions together can use `Expr` directly.
+Expr = ExprLogicOr<ExprAtom>;
+// The point of all of these macros is to pass `Atom` as the expression's LHS all the way to `ExprExponent`,
+// so that leading identifiers can be excluded when they would be ambiguous with string expressions.
+ExprLogicOr<Atom>: Expr = {
+	<lhs:ExprLogicOr<Atom>> <span_idx:@L> "||" <rhs:ExprLogicAnd<ExprAtom>> => lhs.binary_op(BinOp::LogicalOr, rhs, ctx.nth_span(span_idx)),
+	ExprLogicAnd<Atom>
+};
+ExprLogicAnd<Atom>: Expr = {
+	<lhs:ExprLogicAnd<Atom>> <span_idx:@L> "&&" <rhs:ExprComparison<ExprAtom>> => lhs.binary_op(BinOp::LogicalAnd, rhs, ctx.nth_span(span_idx)),
+	ExprComparison<Atom>
+};
+ExprComparison<Atom>: Expr = {
+	<lhs:ExprComparison<Atom>> <span_idx:@L> "!=" <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::NotEqual,  rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprComparison<Atom>> <span_idx:@L> "==" <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::Equal,     rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprComparison<Atom>> <span_idx:@L> "<=" <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::LessEq,    rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprComparison<Atom>> <span_idx:@L> "<"  <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::Less,      rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprComparison<Atom>> <span_idx:@L> ">=" <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::GreaterEq, rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprComparison<Atom>> <span_idx:@L> ">"  <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::Greater,   rhs, ctx.nth_span(span_idx)),
+	ExprSum<Atom>
+};
+ExprSum<Atom>: Expr = {
+	<lhs:ExprSum<Atom>> <span_idx:@L> "+" <rhs:ExprBitOp<ExprAtom>> => lhs.binary_op(BinOp::Add,      rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprSum<Atom>> <span_idx:@L> "-" <rhs:ExprBitOp<ExprAtom>> => lhs.binary_op(BinOp::Subtract, rhs, ctx.nth_span(span_idx)),
+	ExprBitOp<Atom>
+};
+ExprBitOp<Atom>: Expr = {
+	<lhs:ExprBitOp<Atom>> <span_idx:@L> "&" <rhs:ExprShift<ExprAtom>> => lhs.binary_op(BinOp::And, rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprBitOp<Atom>> <span_idx:@L> "|" <rhs:ExprShift<ExprAtom>> => lhs.binary_op(BinOp::Or,  rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprBitOp<Atom>> <span_idx:@L> "^" <rhs:ExprShift<ExprAtom>> => lhs.binary_op(BinOp::Xor, rhs, ctx.nth_span(span_idx)),
+	ExprShift<Atom>
+};
+ExprShift<Atom>: Expr = {
+	<lhs:ExprShift<Atom>> <span_idx:@L> "<<"  <rhs:ExprFactor<ExprAtom>> => lhs.binary_op(BinOp::LeftShift,          rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprShift<Atom>> <span_idx:@L> ">>"  <rhs:ExprFactor<ExprAtom>> => lhs.binary_op(BinOp::RightShift,         rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprShift<Atom>> <span_idx:@L> ">>>" <rhs:ExprFactor<ExprAtom>> => lhs.binary_op(BinOp::UnsignedRightShift, rhs, ctx.nth_span(span_idx)),
+	ExprFactor<Atom>
+};
+ExprFactor<Atom>: Expr = {
+	<lhs:ExprFactor<Atom>> <span_idx:@L> "*" <rhs:ExprUnary<ExprAtom>> => lhs.binary_op(BinOp::Multiply, rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprFactor<Atom>> <span_idx:@L> "/" <rhs:ExprUnary<ExprAtom>> => lhs.binary_op(BinOp::Divide,   rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprFactor<Atom>> <span_idx:@L> "%" <rhs:ExprUnary<ExprAtom>> => lhs.binary_op(BinOp::Modulo,   rhs, ctx.nth_span(span_idx)),
+	ExprUnary<Atom>
+};
+ExprUnary<Atom>: Expr = {
+	<span_idx:@L> "~" <expr:ExprExponent<ExprAtom>> => expr.unary_op(UnOp::Complement, ctx.nth_span(span_idx)),
+	<span_idx:@L> "+" <expr:ExprExponent<ExprAtom>> => expr.unary_op(UnOp::Identity,   ctx.nth_span(span_idx)),
+	<span_idx:@L> "-" <expr:ExprExponent<ExprAtom>> => expr.unary_op(UnOp::Negation,   ctx.nth_span(span_idx)),
+	<span_idx:@L> "!" <expr:ExprExponent<ExprAtom>> => expr.unary_op(UnOp::Not,        ctx.nth_span(span_idx)),
+	ExprExponent<Atom>
+};
+ExprExponent<Atom>: Expr = { // Note the reversed expression tokens, which make `**` right-associative.
+	<lhs:Atom> <span_idx:@L> "**" <rhs:ExprExponent<ExprAtom>> => lhs.binary_op(BinOp::Exponent, rhs, ctx.nth_span(span_idx)),
+	Atom
+};
+ExprAtom: Expr = {
+	<span_idx:@L> <ident:"identifier"> => Expr::symbol(ident, ctx.nth_span(span_idx)),
+	ExprAtomNoIdent
+};
+ExprAtomNoIdent: Expr = {
+	"(" <Expr> ")",
+	<span_idx:@L> <ident:"local identifier"> => Expr::symbol(ident, ctx.nth_span(span_idx)),
+	<span_idx:@L> <number:"number"> => Expr::number(number, ctx.nth_span(span_idx)),
+	// TODO: builtin functions, character literals, and function calls
+};
+
+StringExpr: CompactString = {
+	<ident:"identifier"> => todo!(),
+	StringExprNoIdent
+};
+StringExprNoIdent: CompactString = {
+	<"string">,
+	"strcat" "(" <(<StrcatArgs> ","?)?> ")" => <>.unwrap_or_default(),
+};
+StrcatArgs: CompactString = {
+	<StringExpr>,
+	<mut acc:StrcatArgs> "," <string:StringExpr> => {
+		acc.push_str(&string);
+		acc
+	}
+};
+
+Identifier = { "identifier", "local identifier" };
+
+// A list of comma-separated elements, optionally with a trailing comma.
+Comma<T>: Vec<T> = <mut list:(<T> ",")*> <last:T?> => match last {
+	None => list,
+	Some(elem) => {
+		list.push(elem);
+		list
+	}
+};
+
+
+// Lexer interface.
+extern {
+	type Location = usize; // Really, indices into `ctx.line_spans`.
+	type Error = ();
+
+	enum TokenPayload {
+		"number" => TokenPayload::Number(<i32>),
+		"string" => TokenPayload::String(<CompactString>),
+		"identifier" => TokenPayload::Identifier(<Identifier>),
+		"local identifier" => TokenPayload::LocalIdentifier(<Identifier>),
+		"anonymous label reference" => TokenPayload::AnonLabelRef(<i32>),
+
+		"," => TokenPayload::Comma,
+		":" => TokenPayload::Colon,
+		"::" => TokenPayload::DblColon,
+		"[" => TokenPayload::LBrack,
+		"]" => TokenPayload::RBrack,
+		"(" => TokenPayload::LParen,
+		")" => TokenPayload::RParen,
+		"+" => TokenPayload::Plus,
+		"-" => TokenPayload::Minus,
+		"*" => TokenPayload::Asterisk,
+		"/" => TokenPayload::Slash,
+		"%" => TokenPayload::Percent,
+		"**" => TokenPayload::DblAsterisk,
+		"==" => TokenPayload::DblEqual,
+		"!=" => TokenPayload::NotEqu,
+		"<" => TokenPayload::Lt,
+		">" => TokenPayload::Gt,
+		"<=" => TokenPayload::Lte,
+		">=" => TokenPayload::Gte,
+		"&&" => TokenPayload::DblAmpersand,
+		"||" => TokenPayload::DlbPipe,
+		"!" => TokenPayload::Bang,
+		"&" => TokenPayload::Ampersand,
+		"|" => TokenPayload::Pipe,
+		"^" => TokenPayload::Caret,
+		"<<" => TokenPayload::Shl,
+		">>" => TokenPayload::Shr,
+		">>>" => TokenPayload::UShr,
+		"~" => TokenPayload::Complement,
+		"=" => TokenPayload::Equal,
+		"+=" => TokenPayload::AddEq,
+		"-=" => TokenPayload::SubEq,
+		"*=" => TokenPayload::MulEq,
+		"/=" => TokenPayload::DivEq,
+		"%=" => TokenPayload::ModEq,
+		"&=" => TokenPayload::BitAndEq,
+		"|=" => TokenPayload::BitOrEq,
+		"^=" => TokenPayload::BitXorEq,
+		"<<=" => TokenPayload::ShlEq,
+		">>=" => TokenPayload::ShrEq,
+		">>>=" => TokenPayload::UShrEq,
+
+		"b" => TokenPayload::B,
+		"c" => TokenPayload::C,
+		"d" => TokenPayload::D,
+		"e" => TokenPayload::E,
+		"h" => TokenPayload::H,
+		"l" => TokenPayload::L,
+		"a" => TokenPayload::A,
+		"af" => TokenPayload::Af,
+		"bc" => TokenPayload::Bc,
+		"de" => TokenPayload::De,
+		"hl" => TokenPayload::Hl,
+		"sp" => TokenPayload::Sp,
+		"hli" => TokenPayload::HlInc,
+		"hld" => TokenPayload::HlDec,
+
+		"z" => TokenPayload::Z,
+		"nz" => TokenPayload::Nz,
+		"nc" => TokenPayload::Nc,
+
+		"adc" => TokenPayload::Adc,
+		"add" => TokenPayload::Add,
+		"and" => TokenPayload::And,
+		"bit" => TokenPayload::Bit,
+		"call" => TokenPayload::Call,
+		"ccf" => TokenPayload::Ccf,
+		"cp" => TokenPayload::Cp,
+		"cpl" => TokenPayload::Cpl,
+		"daa" => TokenPayload::Daa,
+		"dec" => TokenPayload::Dec,
+		"di" => TokenPayload::Di,
+		"ei" => TokenPayload::Ei,
+		"halt" => TokenPayload::Halt,
+		"inc" => TokenPayload::Inc,
+		"jp" => TokenPayload::Jp,
+		"jr" => TokenPayload::Jr,
+		"ldh" => TokenPayload::Ldh,
+		"ld" => TokenPayload::Ld,
+		"nop" => TokenPayload::Nop,
+		"or" => TokenPayload::Or,
+		"pop" => TokenPayload::Pop,
+		"push" => TokenPayload::Push,
+		"res" => TokenPayload::Res,
+		"reti" => TokenPayload::Reti,
+		"ret" => TokenPayload::Ret,
+		"rla" => TokenPayload::Rla,
+		"rlca" => TokenPayload::Rlca,
+		"rlc" => TokenPayload::Rlc,
+		"rl" => TokenPayload::Rl,
+		"rra" => TokenPayload::Rra,
+		"rrca" => TokenPayload::Rrca,
+		"rrc" => TokenPayload::Rrc,
+		"rr" => TokenPayload::Rr,
+		"rst" => TokenPayload::Rst,
+		"sbc" => TokenPayload::Sbc,
+		"scf" => TokenPayload::Scf,
+		"set" => TokenPayload::Set,
+		"sla" => TokenPayload::Sla,
+		"sra" => TokenPayload::Sra,
+		"srl" => TokenPayload::Srl,
+		"stop" => TokenPayload::Stop,
+		"sub" => TokenPayload::Sub,
+		"swap" => TokenPayload::Swap,
+		"xor" => TokenPayload::Xor,
+
+		"align" => TokenPayload::Align,
+		"assert" => TokenPayload::Assert,
+		"break" => TokenPayload::Break,
+		"charmap" => TokenPayload::Charmap,
+		"db" => TokenPayload::Db,
+		"dl" => TokenPayload::Dl,
+		"ds" => TokenPayload::Ds,
+		"dw" => TokenPayload::Dw,
+		"elif" => TokenPayload::Elif,
+		"else" => TokenPayload::Else,
+		"endc" => TokenPayload::Endc,
+		"endl" => TokenPayload::Endl,
+		"endm" => TokenPayload::Endm,
+		"endr" => TokenPayload::Endr,
+		"endsection" => TokenPayload::Endsection,
+		"endu" => TokenPayload::Endu,
+		"equ" => TokenPayload::Equ,
+		"equs" => TokenPayload::Equs,
+		"export" => TokenPayload::Export,
+		"fail" => TokenPayload::Fail,
+		"fatal" => TokenPayload::Fatal,
+		"for" => TokenPayload::For,
+		"fragment" => TokenPayload::Fragment,
+		"if" => TokenPayload::If,
+		"incbin" => TokenPayload::Incbin,
+		"include" => TokenPayload::Include,
+		"load" => TokenPayload::Load,
+		"macro" => TokenPayload::Macro,
+		"newcharmap" => TokenPayload::Newcharmap,
+		"nextu" => TokenPayload::Nextu,
+		"opt" => TokenPayload::Opt,
+		"popc" => TokenPayload::Popc,
+		"popo" => TokenPayload::Popo,
+		"pops" => TokenPayload::Pops,
+		"println" => TokenPayload::Println,
+		"print" => TokenPayload::Print,
+		"purge" => TokenPayload::Purge,
+		"pushc" => TokenPayload::Pushc,
+		"pusho" => TokenPayload::Pusho,
+		"pushs" => TokenPayload::Pushs,
+		"rb" => TokenPayload::Rb,
+		"redef" => TokenPayload::Redef,
+		"rept" => TokenPayload::Rept,
+		"rsreset" => TokenPayload::Rsreset,
+		"rsset" => TokenPayload::Rsset,
+		"rw" => TokenPayload::Rw,
+		"section" => TokenPayload::Section,
+		"setcharmap" => TokenPayload::Setcharmap,
+		"shift" => TokenPayload::Shift,
+		"static_assert" => TokenPayload::StaticAssert,
+		"union" => TokenPayload::Union,
+		"warn" => TokenPayload::Warn,
+
+		"acos" => TokenPayload::Acos,
+		"asin" => TokenPayload::Asin,
+		"atan" => TokenPayload::Atan,
+		"atan2" => TokenPayload::Atan2,
+		"bank" => TokenPayload::Bank,
+		"bitwidth" => TokenPayload::Bitwidth,
+		"ceil" => TokenPayload::Ceil,
+		"charlen" => TokenPayload::Charlen,
+		"charsub" => TokenPayload::Charsub,
+		"cos" => TokenPayload::Cos,
+		"def" => TokenPayload::Def,
+		"fdiv" => TokenPayload::Fdiv,
+		"floor" => TokenPayload::Floor,
+		"fmod" => TokenPayload::Fmod,
+		"fmul" => TokenPayload::Fmul,
+		"high" => TokenPayload::High,
+		"incharmap" => TokenPayload::Incharmap,
+		"isconst" => TokenPayload::Isconst,
+		"log" => TokenPayload::Log,
+		"low" => TokenPayload::Low,
+		"pow" => TokenPayload::Pow,
+		"revchar" => TokenPayload::Revchar,
+		"round" => TokenPayload::Round,
+		"sin" => TokenPayload::Sin,
+		"sizeof" => TokenPayload::Sizeof,
+		"startof" => TokenPayload::Startof,
+		"strcat" => TokenPayload::Strcat,
+		"strchar" => TokenPayload::Strchar,
+		"strcmp" => TokenPayload::Strcmp,
+		"strfmt" => TokenPayload::Strfmt,
+		"strin" => TokenPayload::Strin,
+		"strlen" => TokenPayload::Strlen,
+		"strlwr" => TokenPayload::Strlwr,
+		"strrin" => TokenPayload::Strrin,
+		"strrpl" => TokenPayload::Strrpl,
+		"strslice" => TokenPayload::Strslice,
+		"strsub" => TokenPayload::Strsub,
+		"strupr" => TokenPayload::Strupr,
+		"tan" => TokenPayload::Tan,
+		"tzcount" => TokenPayload::Tzcount,
+
+		"hram" => TokenPayload::Hram,
+		"oam" => TokenPayload::Oam,
+		"rom0" => TokenPayload::Rom0,
+		"romx" => TokenPayload::Romx,
+		"sram" => TokenPayload::Sram,
+		"vram" => TokenPayload::Vram,
+		"wram0" => TokenPayload::Wram0,
+		"wramx" => TokenPayload::Wramx,
+	}
+}

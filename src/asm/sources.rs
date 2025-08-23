@@ -24,6 +24,8 @@ pub struct NormalSpan {
     pub bytes: Range<usize>,
 }
 /// A [`NormalSpan`], but without the byte range.
+///
+/// It is the information that gets serialised into the object file.
 #[derive(Debug, Clone)]
 pub struct FileNode {
     // TODO(perf): consider the `rclite` crate, since we don't need weak refs
@@ -126,6 +128,13 @@ impl std::hash::Hash for FileNode {
 }
 
 impl Span {
+    pub fn extract_normal(self) -> NormalSpan {
+        let Self::Normal(span) = self else {
+            unreachable!("Expected a normal span, got {self:?}")
+        };
+        span
+    }
+
     pub fn merged_with(&self, other: &Self) -> Self {
         let (Self::Normal(lhs), Self::Normal(rhs)) = (self, &other) else {
             panic!("Only normal spans can be merged, not {self:?} and {other:?}");

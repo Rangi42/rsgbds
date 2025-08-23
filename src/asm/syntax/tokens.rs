@@ -55,21 +55,19 @@ macro_rules! define_tokens {
 define_tokens! {
     #[derive(Debug, Clone)]
     pub enum TokenPayload {
-        #[name = "end of input"]
-        Eof,
+        #[name = "end of line"]
+        Newline,
 
         #[name = "number"]
         Number(i32),
         #[name = "string"]
         String(CompactString),
         #[name = "identifier"]
-        /// The boolean indicates whether the identifier is immediately followed by a colon, or is a local.
-        /// This is used to disambiguate labels and macro calls at the beginning of a line.
-        Identifier(Identifier, bool),
+        Identifier(Identifier),
+        #[name = "local identifier"]
+        LocalIdentifier(Identifier),
         #[name = "anonymous label reference"]
         AnonLabelRef(i32),
-        #[name = "end of line"]
-        Newline,
 
         // General punctuation.
         #[name = ","]

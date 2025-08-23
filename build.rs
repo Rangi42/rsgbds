@@ -12,17 +12,26 @@ use std::{
     path::{Path, PathBuf},
 };
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(any(
         feature = "rgbasm",
         feature = "rgblink",
         feature = "rgbfix",
         feature = "rgbgfx"
     ))]
-    shadow_rs::ShadowBuilder::builder().build().unwrap();
+    shadow_rs::ShadowBuilder::builder().build()?;
 
     #[cfg(feature = "rgbasm")]
     generate_warnings_mod();
+
+    #[cfg(feature = "rgbasm")]
+    lalrpop::Configuration::new()
+        .emit_rerun_directives(true)
+        .use_cargo_dir_conventions()
+        //.emit_whitespace(false)
+        .process_file("src/asm/syntax/parser.lalrpop")?;
+
+    Ok(())
 }
 
 #[derive(Debug)]
