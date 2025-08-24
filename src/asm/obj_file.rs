@@ -481,6 +481,8 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                 }
                 OpKind::Low => 1,
                 OpKind::High => 1,
+                OpKind::Bitwidth => 1,
+                OpKind::Tzcount => 1,
                 OpKind::Rst => 1,
                 OpKind::Ldh => 1,
                 OpKind::BitCheck(_) => 2,
@@ -567,8 +569,10 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                     UnOp::Negation => self.write_byte(0x05)?,
                     UnOp::Not => self.write_byte(0x23)?,
                 },
-                OpKind::Low => self.write_byte(0x71)?,
                 OpKind::High => self.write_byte(0x70)?,
+                OpKind::Low => self.write_byte(0x71)?,
+                OpKind::Bitwidth => self.write_byte(0x72)?,
+                OpKind::Tzcount => self.write_byte(0x73)?,
                 OpKind::Rst => self.write_byte(0x61)?,
                 OpKind::Ldh => self.write_byte(0x60)?,
                 &OpKind::BitCheck(mask) => {

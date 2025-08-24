@@ -41,6 +41,8 @@ pub enum OpKind {
     Unary(UnOp),
     Low,
     High,
+    Bitwidth,
+    Tzcount,
     Rst,
     Ldh,
     BitCheck(u8),
@@ -182,6 +184,42 @@ impl Expr {
         self
     }
 
+    pub fn high(mut self, span: Span) -> Self {
+        if !self.payload.is_empty() {
+            self.payload.push(Op {
+                span,
+                kind: OpKind::High,
+            });
+        }
+        self
+    }
+    pub fn low(mut self, span: Span) -> Self {
+        if !self.payload.is_empty() {
+            self.payload.push(Op {
+                span,
+                kind: OpKind::Low,
+            });
+        }
+        self
+    }
+    pub fn bitwidth(mut self, span: Span) -> Self {
+        if !self.payload.is_empty() {
+            self.payload.push(Op {
+                span,
+                kind: OpKind::Bitwidth,
+            });
+        }
+        self
+    }
+    pub fn tzcount(mut self, span: Span) -> Self {
+        if !self.payload.is_empty() {
+            self.payload.push(Op {
+                span,
+                kind: OpKind::Tzcount,
+            });
+        }
+        self
+    }
     pub fn ldh(mut self, span: Span) -> Self {
         if !self.payload.is_empty() {
             self.payload.push(Op {
@@ -356,6 +394,24 @@ impl Expr {
                         Err(err) => Err(err.bubble_up()),
                     }
                 }
+                OpKind::Bitwidth => {
+                    let value = eval_stack.pop().unwrap();
+                    match value {
+                        Ok((number, _span)) => {
+                            Ok((32 - number.leading_zeros() as i32, op.span.clone()))
+                        }
+                        Err(err) => Err(err.bubble_up()),
+                    }
+                }
+                OpKind::Tzcount => {
+                    let value = eval_stack.pop().unwrap();
+                    match value {
+                        Ok((number, _span)) => {
+                            Ok((number.trailing_zeros() as i32, op.span.clone()))
+                        }
+                        Err(err) => Err(err.bubble_up()),
+                    }
+                }
                 OpKind::Rst => {
                     let value = eval_stack.pop().unwrap();
                     match value {
@@ -507,6 +563,8 @@ impl Op {
             | OpKind::Unary(..)
             | OpKind::Low
             | OpKind::High
+            | OpKind::Bitwidth
+            | OpKind::Tzcount
             | OpKind::Rst
             | OpKind::Ldh
             | OpKind::BitCheck(..)

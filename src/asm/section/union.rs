@@ -2,7 +2,7 @@ use std::cell::Cell;
 
 use crate::{diagnostics, sources::Span, Options};
 
-use super::{ActiveSection, ActiveSections, Contents, Sections, UnionEntry};
+use super::{Contents, Sections, UnionEntry};
 
 impl Sections {
     pub fn enter_union(
