@@ -25,4 +25,17 @@ error: `union` used outside of a section
    │ 
    │ Help: consider opening a section with `section` before this
 ───╯
-3 errors generated.
+error: unclosed `union`
+   ╭─[ test.asm:6:1 ]
+   │
+ 6 │ UNION ; no ENDU
+   │ ──┬──  
+   │   ╰──── this `union doesn't have a matching `endu`...
+   │
+   ├─[ <at top level>:1:1 ]
+   │
+ 1 │ 
+   │ │ 
+   │ ╰─ ...before this
+───╯
+4 errors generated.

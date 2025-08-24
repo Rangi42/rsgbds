@@ -305,7 +305,11 @@ impl parse_ctx!() {
     pub fn pop_section(&mut self, span_idx: usize) {
         let span = &self.line_spans[span_idx];
 
-        if self.sections.pop_active_section(self.symbols).is_none() {
+        if self
+            .sections
+            .pop_active_section(self.symbols, span, self.nb_errors_left, self.options)
+            .is_none()
+        {
             self.error(span, |error| {
                 error.set_message("no entries in the section stack");
                 error.add_label(diagnostics::error_label(span).with_message("cannot pop"));
@@ -314,6 +318,9 @@ impl parse_ctx!() {
     }
 
     pub fn create_section(&mut self, (attrs, (name, span)): (SectionAttrs, (CompactString, Span))) {
+        self.sections
+            .reject_active_union(&span, self.nb_errors_left, self.options);
+
         let active_section = self.sections.create_if_not_exists(
             name,
             attrs,

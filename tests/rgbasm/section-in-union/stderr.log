@@ -1,2 +1,25 @@
-FATAL: section-in-union.asm(3):
-    Cannot change the section within a UNION
+error: unclosed `union`
+   ╭─[ test.asm:3:9 ]
+   │
+ 2 │ UNION
+   │ ──┬──  
+   │   ╰──── this `union doesn't have a matching `endu`...
+ 3 │ SECTION "inner", WRAM0
+   │         ───┬───  
+   │            ╰───── ...before this
+───╯
+error: `nextu` used outside of a union
+   ╭─[ test.asm:4:1 ]
+   │
+ 4 │ NEXTU
+   │ ──┬──  
+   │   ╰──── no `union` matches this
+───╯
+error: `endu` used outside of a union
+   ╭─[ test.asm:5:1 ]
+   │
+ 5 │ ENDU
+   │ ──┬─  
+   │   ╰─── no `union` matches this
+───╯
+3 errors generated.

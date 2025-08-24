@@ -284,6 +284,33 @@ impl Sections {
         }
     }
 
+    pub fn reject_active_union(
+        &self,
+        span: &Span,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        if let Some(union) = self
+            .active_section
+            .as_ref()
+            .and_then(|active| active.unions.last())
+        {
+            diagnostics::error(
+                span,
+                |error| {
+                    error.set_message("unclosed `union`");
+                    error.add_labels([
+                        diagnostics::note_label(&union.span)
+                            .with_message("this `union doesn't have a matching `endu`..."),
+                        diagnostics::error_label(span).with_message("...before this"),
+                    ]);
+                },
+                nb_errors_left,
+                options,
+            )
+        }
+    }
+
     pub fn is_active_or_in_stack(&self, section_id: usize) -> bool {
         let refs_section = |opt: &Option<ActiveSections>| {
             opt.as_ref()
@@ -304,7 +331,15 @@ impl Sections {
         };
         self.section_stack.push(entry);
     }
-    pub fn pop_active_section(&mut self, symbols: &mut Symbols) -> Option<()> {
+    pub fn pop_active_section(
+        &mut self,
+        symbols: &mut Symbols,
+        span: &Span,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) -> Option<()> {
+        self.reject_active_union(span, nb_errors_left, options);
+
         let entry = self.section_stack.pop()?;
         self.active_section = entry.active_section;
         symbols.global_scope = entry.global_scope;

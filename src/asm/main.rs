@@ -20,6 +20,7 @@ mod obj_file;
 mod section;
 use section::Sections;
 mod sources;
+use sources::Span;
 mod symbols;
 use symbols::Symbols;
 mod syntax;
@@ -100,6 +101,7 @@ fn main() -> ExitCode {
     warn_if_opt_stack_not_empty(&nb_errors_left, &options);
     charmaps.warn_if_stack_not_empty(&nb_errors_left, &options);
     sections.warn_if_stack_not_empty(&nb_errors_left, &options);
+    sections.reject_active_union(&Span::TopLevel, &nb_errors_left, &options);
 
     let nb_errors = options.max_errors - nb_errors_left.get();
     if nb_errors != 0 {
