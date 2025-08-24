@@ -104,6 +104,7 @@ pub fn parse_file(
                     if crate::cond::active_condition_mut(&mut parse_ctx.lexer)
                         .is_some_and(|cond| cond.entered_block) =>
                 {
+                    parse_ctx.push_line_token(token, &mut line_tokens);
                     // HACK: if we were executing the previous block, we need to not lex the remainder of the block!
                     //       This enables code like:
                     // ```
