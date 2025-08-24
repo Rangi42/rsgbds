@@ -508,12 +508,12 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                     self.write_byte(0x51)?;
                     self.write_string(name)?;
                 }
-                OpKind::StartOfSect(name) => {
-                    self.write_byte(0x54)?;
+                OpKind::SizeOfSect(name) => {
+                    self.write_byte(0x53)?;
                     self.write_string(name)?;
                 }
-                OpKind::SizeOfSect(name) => {
-                    self.write_byte(0x55)?;
+                OpKind::StartOfSect(name) => {
+                    self.write_byte(0x54)?;
                     self.write_string(name)?;
                 }
                 &OpKind::SizeOfRegion(region) => {
