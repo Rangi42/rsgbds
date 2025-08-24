@@ -428,11 +428,7 @@ impl Expr {
 
         match self.try_const_eval(symbols, macro_args, sections) {
             Ok((value, span)) => Ok(Either::Left((value, span))),
-            Err(Error {
-                kind:
-                    ErrKind::SymNotFound(..) | ErrKind::SymDeleted(..) | ErrKind::SymNotConst { .. },
-                ..
-            }) => {
+            Err(Error { kind, .. }) if kind.can_be_deferred_to_linker() => {
                 Ok(Either::Right(Self {
                     payload: self
                         .payload
@@ -814,6 +810,27 @@ impl Error {
     }
 }
 impl ErrKind {
+    fn can_be_deferred_to_linker(&self) -> bool {
+        match self {
+            Self::SymNotFound(..)
+            | Self::SymDeleted(..)
+            | Self::SymNotConst { .. }
+            | Self::SectAddrNotConst { .. }
+            | Self::SizeOfSectNotConst(..)
+            | Self::SymBankNotConst(..)
+            | Self::SectBankNotConst(..)
+            | Self::SizeOfRegion
+            | Self::StartOfRegion => true,
+            Self::NonNumericSym(..)
+            | Self::SymError(..)
+            | Self::BankOfNonLabel(..)
+            | Self::DivBy0
+            | Self::RstRange(..)
+            | Self::LdhRange(..)
+            | Self::BitRange(..)
+            | Self::NoExpr => false,
+        }
+    }
     fn messages(&self, identifiers: &Identifiers) -> (String, String) {
         match self {
             Self::SymNotFound(ident) => (
