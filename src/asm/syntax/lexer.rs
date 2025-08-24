@@ -2250,12 +2250,11 @@ impl Lexer {
                     '\\' => {
                         let backup = chars.clone();
                         // If the backslash isn't a line continuation, we'll want to process it normally.
-                        if chars
-                            .next_if(|&(_ofs, ch)| {
-                                matches!(ch, chars!(whitespace) | chars!(newline))
-                            })
-                            .is_none()
-                        {
+                        chars.next(); // Consume the backslash.
+                        if !matches!(
+                            chars.peek(),
+                            Some((_, chars!(whitespace) | chars!(newline)))
+                        ) {
                             chars = backup;
                             break;
                         }
@@ -2360,7 +2359,7 @@ impl Lexer {
                     }
 
                     '\\' => {
-                        let ch = chars.peek().copied();
+                        let backup = chars.clone();
                         if let Some(res) = Self::read_macro_arg(
                             &mut chars,
                             text,
@@ -2386,15 +2385,18 @@ impl Lexer {
                                     });
                                 }
                             }
-                        } else if matches!(ch, Some((_, ','))) {
-                            // This escape is only valid in raw contexts.
-                            string.push(',');
-                        } else if let Some(value) =
-                            Self::get_char_escape(ch, ofs, ctx, text, &mut chars, &params)
-                        {
-                            string.push(value);
                         } else {
-                            todo!();
+                            chars = backup; // `read_macro_arg` may spuriously consume characters.
+                            let ch = chars.peek().copied(); // Do not consume the character; if it's a newline, `get_char_escape` needs it.
+                            if matches!(ch, Some((_, ','))) {
+                                // This escape is only valid in raw contexts.
+                                chars.next(); // Consume the comma.
+                                string.push(',');
+                            } else if let Some(value) =
+                                Self::get_char_escape(ch, ofs, ctx, text, &mut chars, &params)
+                            {
+                                string.push(value);
+                            }
                         }
                     }
                     '{' => {

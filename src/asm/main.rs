@@ -95,7 +95,6 @@ fn main() -> ExitCode {
         &mut options,
     );
 
-    // TODO: unclosed UNION
     sections.warn_if_unclosed_load_block(&nb_errors_left, &options);
     sections.check_section_sizes(&nb_errors_left, &options);
     warn_if_opt_stack_not_empty(&nb_errors_left, &options);
