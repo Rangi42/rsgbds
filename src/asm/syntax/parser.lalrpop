@@ -192,7 +192,7 @@ SectionAttrs: (SectionAttrs, (CompactString, Span)) = {
 	<kind:SectionKind?> <name:StringExpr> "," <mem_region:MemRegion> <addr:("[" <Expr> "]")?> => {
 		(ctx.mandatory_section_attrs(kind, mem_region, addr), name)
 	},
-	<attrs:SectionAttrs> ","               "bank"  "[" <bank:Expr>       "]" => ctx.set_bank_of(attrs, bank),
+	<attrs:SectionAttrs> "," <span_idx:@L> "bank"  "[" <bank:Expr>       "]" =>  ctx.set_bank_of(attrs, bank,  span_idx),
 	<attrs:SectionAttrs> "," <span_idx:@L> "align" "[" <align:AlignArgs> "]" => ctx.set_align_of(attrs, align, span_idx),
 };
 SectionKind: SectionKind = { "union" => SectionKind::Union, "fragment" => SectionKind::Fragment };

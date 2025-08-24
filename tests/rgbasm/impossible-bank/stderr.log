@@ -1,3 +1,10 @@
-error: impossible-bank.asm(1):
-    BANK only allowed for ROMX, WRAMX, SRAM, or VRAM sections
-Assembly aborted with 1 error!
+error: the bank can only be specified for banked memory regions
+   ╭─[ test.asm:1:23 ]
+   │
+ 1 │ SECTION "hram", HRAM, BANK[0]
+   │                       ──┬─  
+   │                         ╰─── `bank[]` is not permitted for HRAM sections
+   │ 
+   │ Help: `bank[]` is only permitted for ROMX, WRAMX, SRAM, and VRAM sections
+───╯
+1 error generated.

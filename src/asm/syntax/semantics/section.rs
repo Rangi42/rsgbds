@@ -58,41 +58,59 @@ impl parse_ctx!() {
         &self,
         (mut attrs, name): (SectionAttrs, (CompactString, Span)),
         bank: Expr,
+        span_idx: usize,
     ) -> (SectionAttrs, (CompactString, Span)) {
-        match self.try_const_eval(&bank) {
-            Ok((value, span)) => {
-                let value = value as u32;
-                if (attrs.mem_region.min_bank()..=attrs.mem_region.max_bank()).contains(&value) {
-                    match attrs.bank {
-                        None => attrs.bank = Some(value),
-                        Some(bank) => {
-                            if bank != value {
-                                self.error(&span, |error| {
-                                    error.set_message("conflicting bank constraints for section");
-                                    error.add_label(
-                                        diagnostics::error_label(&span).with_message(format!(
-                                            "specified again as {value} here"
-                                        )),
-                                    );
-                                    error.set_note(format!("previously specified as {bank}"));
-                                });
+        if !attrs.mem_region.is_banked() {
+            let span = &self.line_spans[span_idx];
+            self.error(span, |error| {
+                error.set_message("the bank can only be specified for banked memory regions");
+                error.add_label(diagnostics::error_label(span).with_message(format!(
+                    "`bank[]` is not permitted for {} sections",
+                    attrs.mem_region.name()
+                )));
+                error.set_help(
+                    "`bank[]` is only permitted for ROMX, WRAMX, SRAM, and VRAM sections",
+                );
+            });
+        } else {
+            match self.try_const_eval(&bank) {
+                Ok((value, span)) => {
+                    let value = value as u32;
+                    if (attrs.mem_region.min_bank()..=attrs.mem_region.max_bank()).contains(&value)
+                    {
+                        match attrs.bank {
+                            None => attrs.bank = Some(value),
+                            Some(bank) => {
+                                if bank != value {
+                                    self.error(&span, |error| {
+                                        error.set_message(
+                                            "conflicting bank constraints for section",
+                                        );
+                                        error.add_label(
+                                            diagnostics::error_label(&span).with_message(format!(
+                                                "specified again as {value} here"
+                                            )),
+                                        );
+                                        error.set_note(format!("previously specified as {bank}"));
+                                    });
+                                }
                             }
                         }
+                    } else {
+                        self.error(&span, |error| {
+                            error.set_message("invalid bank constraint for section");
+                            error.add_label(diagnostics::error_label(&span).with_message(format!(
+                                "{} sections can be between {} and {}, not {}",
+                                attrs.mem_region.name(),
+                                attrs.mem_region.min_bank(),
+                                attrs.mem_region.max_bank(),
+                                value,
+                            )));
+                        });
                     }
-                } else {
-                    self.error(&span, |error| {
-                        error.set_message("invalid bank constraint for section");
-                        error.add_label(diagnostics::error_label(&span).with_message(format!(
-                            "{} sections can be between {} and {}, not {}",
-                            attrs.mem_region.name(),
-                            attrs.mem_region.min_bank(),
-                            attrs.mem_region.max_bank(),
-                            value,
-                        )));
-                    });
                 }
+                Err(err) => self.report_expr_error(err),
             }
-            Err(err) => self.report_expr_error(err),
         }
 
         (attrs, name)
