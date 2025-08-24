@@ -600,14 +600,14 @@ impl Instruction {
         }
     }
 
-    pub fn stop(byte: Expr, span: Span) -> Self {
+    pub fn stop(byte: Option<Expr>, span: Span) -> Self {
         Self {
             span,
             bytes: [0x10, Default::default()].into_iter().collect(),
-            patch: Some(Patch {
+            patch: byte.map(|expr| Patch {
                 kind: PatchKind::Byte,
                 offset: 1,
-                expr: byte,
+                expr,
             }),
         }
     }

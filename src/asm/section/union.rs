@@ -65,7 +65,6 @@ impl Sections {
                 debug_assert_eq!(*len, active.data_section.offset);
                 active.unions.push(UnionEntry {
                     offset_at_entry: active.data_section.offset,
-                    size: 0,
                 });
             }
         }
