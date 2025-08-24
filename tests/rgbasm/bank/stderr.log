@@ -1,23 +1,118 @@
-error: bank.asm(13) -> bank.asm::def_sect(8):
-    Expected constant expression: Section "ROMX_ok1"'s bank is not known
-error: bank.asm(13) -> bank.asm::def_sect(8):
-    Expected constant expression: "Label_u3"'s bank is not known
-error: bank.asm(15) -> bank.asm::def_sect(8):
-    Expected constant expression: Section "ROMX_bad"'s bank is not known
-error: bank.asm(15) -> bank.asm::def_sect(8):
-    Expected constant expression: "Label_u5"'s bank is not known
-error: bank.asm(17) -> bank.asm::def_sect(8):
-    Expected constant expression: Section "VRAM_bad"'s bank is not known
-error: bank.asm(17) -> bank.asm::def_sect(8):
-    Expected constant expression: "Label_u7"'s bank is not known
-error: bank.asm(19) -> bank.asm::def_sect(8):
-    Expected constant expression: Section "SRAM_bad"'s bank is not known
-error: bank.asm(19) -> bank.asm::def_sect(8):
-    Expected constant expression: "Label_u9"'s bank is not known
-error: bank.asm(22) -> bank.asm::def_sect(8):
-    Expected constant expression: Section "WRAMX_bad"'s bank is not known
-error: bank.asm(22) -> bank.asm::def_sect(8):
-    Expected constant expression: "Label_u12"'s bank is not known
-error: bank.asm(26):
-    BANK argument must be a label
-Assembly aborted with 11 errors!
+error: the bank of "ROMX_ok1" is not constant
+    ╭─[ test.asm:8:23 ]
+    │
+  8 │     PRINTLN "\1 (\2): ", BANK("\1"), " == ", BANK(Label\@)
+    │                          ─────┬────  
+    │                               ╰────── this section's bank is not known at this point
+    │ 
+ 13 │  def_sect ROMX_ok1, ROMX[$4567]
+    │  ────┬───  
+    │      ╰───── macro called here
+────╯
+error: the bank of `Label_u2` is not constant
+    ╭─[ test.asm:8:43 ]
+    │
+  8 │     PRINTLN "\1 (\2): ", BANK("\1"), " == ", BANK(Label\@)
+    │                                              ──────┬──────  
+    │                                                    ╰──────── this symbol's bank is not known at this point
+    │ 
+ 13 │  def_sect ROMX_ok1, ROMX[$4567]
+    │  ────┬───  
+    │      ╰───── macro called here
+────╯
+error: the bank of "ROMX_bad" is not constant
+    ╭─[ test.asm:8:23 ]
+    │
+  8 │     PRINTLN "\1 (\2): ", BANK("\1"), " == ", BANK(Label\@)
+    │                          ─────┬────  
+    │                               ╰────── this section's bank is not known at this point
+    │ 
+ 15 │  def_sect ROMX_bad, ROMX
+    │  ────┬───  
+    │      ╰───── macro called here
+────╯
+error: the bank of `Label_u4` is not constant
+    ╭─[ test.asm:8:43 ]
+    │
+  8 │     PRINTLN "\1 (\2): ", BANK("\1"), " == ", BANK(Label\@)
+    │                                              ──────┬──────  
+    │                                                    ╰──────── this symbol's bank is not known at this point
+    │ 
+ 15 │  def_sect ROMX_bad, ROMX
+    │  ────┬───  
+    │      ╰───── macro called here
+────╯
+error: the bank of "VRAM_bad" is not constant
+    ╭─[ test.asm:8:23 ]
+    │
+  8 │     PRINTLN "\1 (\2): ", BANK("\1"), " == ", BANK(Label\@)
+    │                          ─────┬────  
+    │                               ╰────── this section's bank is not known at this point
+    │ 
+ 17 │  def_sect VRAM_bad, VRAM
+    │  ────┬───  
+    │      ╰───── macro called here
+────╯
+error: the bank of `Label_u6` is not constant
+    ╭─[ test.asm:8:43 ]
+    │
+  8 │     PRINTLN "\1 (\2): ", BANK("\1"), " == ", BANK(Label\@)
+    │                                              ──────┬──────  
+    │                                                    ╰──────── this symbol's bank is not known at this point
+    │ 
+ 17 │  def_sect VRAM_bad, VRAM
+    │  ────┬───  
+    │      ╰───── macro called here
+────╯
+error: the bank of "SRAM_bad" is not constant
+    ╭─[ test.asm:8:23 ]
+    │
+  8 │     PRINTLN "\1 (\2): ", BANK("\1"), " == ", BANK(Label\@)
+    │                          ─────┬────  
+    │                               ╰────── this section's bank is not known at this point
+    │ 
+ 19 │  def_sect SRAM_bad, SRAM
+    │  ────┬───  
+    │      ╰───── macro called here
+────╯
+error: the bank of `Label_u8` is not constant
+    ╭─[ test.asm:8:43 ]
+    │
+  8 │     PRINTLN "\1 (\2): ", BANK("\1"), " == ", BANK(Label\@)
+    │                                              ──────┬──────  
+    │                                                    ╰──────── this symbol's bank is not known at this point
+    │ 
+ 19 │  def_sect SRAM_bad, SRAM
+    │  ────┬───  
+    │      ╰───── macro called here
+────╯
+error: the bank of "WRAMX_bad" is not constant
+    ╭─[ test.asm:8:23 ]
+    │
+  8 │     PRINTLN "\1 (\2): ", BANK("\1"), " == ", BANK(Label\@)
+    │                          ─────┬────  
+    │                               ╰────── this section's bank is not known at this point
+    │ 
+ 22 │  def_sect WRAMX_bad,WRAMX
+    │  ────┬───  
+    │      ╰───── macro called here
+────╯
+error: the bank of `Label_u11` is not constant
+    ╭─[ test.asm:8:43 ]
+    │
+  8 │     PRINTLN "\1 (\2): ", BANK("\1"), " == ", BANK(Label\@)
+    │                                              ──────┬──────  
+    │                                                    ╰──────── this symbol's bank is not known at this point
+    │ 
+ 22 │  def_sect WRAMX_bad,WRAMX
+    │  ────┬───  
+    │      ╰───── macro called here
+────╯
+error: requested the bank of `def_sect`, which is not a label
+    ╭─[ test.asm:26:24 ]
+    │
+ 26 │     PRINTLN "def_sect: ", BANK(def_sect) ; not a label
+    │                           ───────┬──────  
+    │                                  ╰──────── this symbol is a macro
+────╯
+11 errors generated.

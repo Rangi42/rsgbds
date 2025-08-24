@@ -557,7 +557,11 @@ impl Section {
     }
 
     pub fn bank(&self) -> Option<u32> {
-        self.attrs.bank
+        if self.attrs.mem_region.is_banked() {
+            self.attrs.bank
+        } else {
+            Some(self.attrs.mem_region.min_bank())
+        }
     }
 
     pub fn bytes_until_alignment(&self, alignment: u8, offset: u16, ofs_into_sect: usize) -> usize {
