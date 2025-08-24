@@ -707,6 +707,7 @@ pub enum SymbolError<'name, 'sym> {
     /// the symbol `{0}` doesn't exist
     NotFound(&'name str),
     /// the symbol `{0}` was deleted
+    // TODO: highlight that span
     Deleted(&'name str, &'sym Span),
     /// {0}
     FormatError(FormatError),

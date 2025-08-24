@@ -1,18 +1,71 @@
-error: use-purged-symbol.asm(6):
-    Macro "m" not defined; it was purged
-error: use-purged-symbol.asm(13) -> use-purged-symbol.asm::m2(10):
-    Bracketed symbol "argi" does not exist; it was purged
-error: use-purged-symbol.asm(15):
-    Expected constant expression: 'argi' is not constant at assembly time; it was purged
-error: use-purged-symbol.asm(17):
-    Interpolated symbol "argi" does not exist; it was purged
-warning: use-purged-symbol.asm(20): [-Wpurge]
-    Purging an exported symbol "Label"
-error: use-purged-symbol.asm(21):
-    Expected constant expression: 'Label' is not constant at assembly time; it was purged
-error: use-purged-symbol.asm(22):
-    Expected constant expression: "Label"'s bank is not known; it was purged
-warning: use-purged-symbol.asm(25): [-Wpurge]
-    Purging an exported symbol "Label2"
-FATAL: use-purged-symbol.asm(26):
-    Unknown symbol "Label2"; it was purged
+error: macro `m` does not exist
+   ╭─[ test.asm:6:2 ]
+   │
+ 5 │ PURGE m
+   │       ┬  
+   │       ╰── it has been deleted here
+ 6 │     m
+   │     ┬  
+   │     ╰── attempting to call the macro here
+───╯
+error: the symbol `argi` was deleted
+    ╭─[ test.asm:10:12 ]
+    │
+ 10 │     println "(\<argi>)!"
+    │               ───┬───  
+    │                  ╰───── this symbol is invalid
+    │ 
+ 13 │     m2 hello
+    │     ─┬  
+    │      ╰── macro called here
+────╯
+error: the symbol `argi` was deleted
+    ╭─[ test.asm:15:11 ]
+    │
+ 15 │ DEF n EQU argi
+    │           ──┬─  
+    │             ╰─── no symbol by this name exists at this point
+────╯
+error: the symbol `argi` was deleted
+    ╭─[ test.asm:17:12 ]
+    │
+ 17 │ PRINTLN "({argi})"
+    │            ──┬─  
+    │              ╰─── this interpolation is invalid
+────╯
+[-Wpurge=1] warning: deleting an exported symbol
+    ╭─[ test.asm:20:7 ]
+    │
+ 20 │ PURGE Label
+    │       ──┬──  
+    │         ╰──── deleting `Label` here
+────╯
+error: the symbol `Label` was deleted
+    ╭─[ test.asm:21:9 ]
+    │
+ 21 │ DEF x = Label
+    │         ──┬──  
+    │           ╰──── no symbol by this name exists at this point
+────╯
+error: the symbol `Label` was deleted
+    ╭─[ test.asm:22:9 ]
+    │
+ 22 │ DEF x = BANK(Label)
+    │         ─────┬─────  
+    │              ╰─────── no symbol by this name exists at this point
+────╯
+[-Wpurge=1] warning: deleting an exported symbol
+    ╭─[ test.asm:25:7 ]
+    │
+ 25 │ PURGE Label2
+    │       ───┬──  
+    │          ╰──── deleting `Label2` here
+────╯
+error: syntax error: unexpected section
+    ╭─[ test.asm:26:12 ]
+    │
+ 26 │ DEF x EQUS SECTION(Label2) ; fatal
+    │            ───┬───  
+    │               ╰───── expected "string", "identifier", or "strcat"
+────╯
+7 errors generated.

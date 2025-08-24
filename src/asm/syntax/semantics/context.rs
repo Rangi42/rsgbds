@@ -27,7 +27,7 @@ impl parse_ctx!() {
                 );
                 if let Some(del_span) = maybe_deleted {
                     error.add_label(
-                        diagnostics::error_label(del_span).with_message("it has been deleted here"),
+                        diagnostics::note_label(del_span).with_message("it has been deleted here"),
                     );
                 }
             }),
