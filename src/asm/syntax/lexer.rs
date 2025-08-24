@@ -1193,7 +1193,7 @@ impl Lexer {
                                         diagnostics::error_label(&span)
                                             .with_message(err.label_msg()),
                                     );
-                                    if ctx.ofs_scanned_for_expansion > 0 {
+                                    if ctx.span.node.kind.ends_implicitly() {
                                         error.set_help("characters inside of interpolations and macro args cannot start one themselves");
                                     }
                                 })

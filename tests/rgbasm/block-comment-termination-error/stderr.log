@@ -5,11 +5,4 @@ error: unterminated block comment
    │       ─┬  
    │        ╰── block comment starting here
 ───╯
-error: syntax error: unexpected end of input
-   ╭─[ test.asm:1:6 ]
-   │
- 1 │ PRINT /* block comments must terminate before EOF
-   │      ┬  
-   │      ╰── expected a numeric or string expression
-───╯
-2 errors generated.
+1 error generated.
