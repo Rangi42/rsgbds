@@ -164,6 +164,9 @@ impl Sections {
                 nb_errors_left,
                 options,
             );
-        };
+        } else {
+            // In case the last block wasn't the largest.
+            active.data_section.offset = self.sections[active.data_section.id].bytes.len();
+        }
     }
 }

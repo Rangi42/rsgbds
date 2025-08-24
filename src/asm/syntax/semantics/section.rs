@@ -286,7 +286,7 @@ impl parse_ctx!() {
             });
         };
 
-        // TODO: what should the symbol scope become?
+        // TODO: save the symbol scope to be restored at `endl`, and reset it
     }
 
     pub fn push_section(
@@ -300,6 +300,7 @@ impl parse_ctx!() {
         if let Some(stuff) = opt {
             self.create_section(stuff);
         }
+        self.symbols.end_scope();
     }
 
     pub fn pop_section(&mut self, span_idx: usize) {
