@@ -3,21 +3,7 @@ error: syntax error: unexpected *
    │
  2 │ def n equ 2 + * / ^ 3 ; oops
    │               ┬  
-   │               ╰── expected a number or an expression here
-───╯
-error: syntax error: unexpected /
-   ╭─[ test.asm:2:17 ]
-   │
- 2 │ def n equ 2 + * / ^ 3 ; oops
-   │                 ┬  
-   │                 ╰── expected a number or an expression here
-───╯
-error: syntax error: unexpected ^
-   ╭─[ test.asm:2:19 ]
-   │
- 2 │ def n equ 2 + * / ^ 3 ; oops
-   │                   ┬  
-   │                   ╰── expected a number or an expression here
+   │               ╰── expected "number", "identifier", "local identifier", "(", "+", "-", "!", ...5 others
 ───╯
 error: unterminated string literal
    ╭─[ test.asm:3:12 ]
@@ -31,27 +17,20 @@ error: syntax error: unexpected xor
    │
  6 │ ld xor, ret ; oh no :(
    │    ─┬─  
-   │     ╰─── expected a register or an expression
-───╯
-error: syntax error: unexpected xor
-   ╭─[ test.asm:6:4 ]
-   │
- 6 │ ld xor, ret ; oh no :(
-   │    ─┬─  
-   │     ╰─── expected nothing else on this line
+   │     ╰─── expected "[", "b", "c", "d", "e", "h", "l", ...7 others
 ───╯
 error: syntax error: unexpected :
    ╭─[ test.asm:9:9 ]
    │
  9 │ label3::: ; no!
    │         ┬  
-   │         ╰── expected an instruction or a directive here
+   │         ╰── expected "identifier", "adc", "add", "and", "bit", "call", "ccf", ...76 others
 ───╯
 error: syntax error: unexpected stop
     ╭─[ test.asm:10:6 ]
     │
  10 │ halt stop abort ; please
     │      ──┬─  
-    │        ╰─── expected nothing else on this line
+    │        ╰─── expected "::"
 ────╯
-8 errors generated.
+5 errors generated.

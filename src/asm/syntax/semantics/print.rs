@@ -14,7 +14,7 @@ impl parse_ctx!() {
     pub fn print(&self, value: Either<Expr, (CompactString, Span)>) {
         match value {
             Either::Left(expr) => match self.try_const_eval(&expr) {
-                Ok((value, _span)) => print!("${value:02X}"),
+                Ok((value, _span)) => print!("${value:X}"),
                 Err(err) => self.report_expr_error(err),
             },
             Either::Right((string, _span)) => print!("{string}"),

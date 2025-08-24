@@ -3,13 +3,6 @@ error: syntax error: unexpected a
    │
  2 │ print a
    │       ┬  
-   │       ╰── expected a numeric or string expression
+   │       ╰── expected "number", "string", "identifier", "local identifier", "(", "+", "-", ...7 others
 ───╯
-error: syntax error: unexpected a
-   ╭─[ test.asm:2:7 ]
-   │
- 2 │ print a
-   │       ┬  
-   │       ╰── expected nothing else on this line
-───╯
-2 errors generated.
+1 error generated.

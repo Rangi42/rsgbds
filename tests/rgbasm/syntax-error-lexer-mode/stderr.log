@@ -3,27 +3,13 @@ error: syntax error: unexpected af
    │
  7 │ def m = AF {newline} def n = 2
    │         ─┬  
-   │          ╰── expected a number or an expression here
-───╯
-error: syntax error: unexpected af
-   ╭─[ test.asm:7:9 ]
-   │
- 7 │ def m = AF {newline} def n = 2
-   │         ─┬  
-   │          ╰── expected nothing else on this line
+   │          ╰── expected "number", "identifier", "local identifier", "(", "+", "-", "!", ...5 others
 ───╯
 error: syntax error: unexpected af
     ╭─[ test.asm:11:5 ]
     │
  11 │ def AF = 1 {newline} def q = 2
     │     ─┬  
-    │      ╰── expected an identifier
+    │      ╰── expected "identifier"
 ────╯
-error: syntax error: unexpected af
-    ╭─[ test.asm:11:5 ]
-    │
- 11 │ def AF = 1 {newline} def q = 2
-    │     ─┬  
-    │      ╰── expected nothing else on this line
-────╯
-4 errors generated.
+2 errors generated.

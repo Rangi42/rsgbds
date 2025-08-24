@@ -1,9 +1,9 @@
 error: syntax error: unexpected end of line
-   ╭─[ syntax-error-eof-newline.inc:1:9 ]
+   ╭─[ syntax-error-eof-newline.inc:1:2 ]
    │
  1 │     SECTION
-   │            ┬  
-   │            ╰── expected a string expression here
+   │     ───┬───  
+   │        ╰───── expected "string", "identifier", "fragment", "union", or "strcat"
    │
    ├─[ test.asm:5:2 ]
    │
@@ -11,30 +11,4 @@ error: syntax error: unexpected end of line
    │     ───┬───  
    │        ╰───── file included from here
 ───╯
-error: syntax error: unexpected end of line
-   ╭─[ syntax-error-eof-newline.inc:1:9 ]
-   │
- 1 │     SECTION
-   │            ┬  
-   │            ╰── expected a comma here
-   │
-   ├─[ test.asm:5:2 ]
-   │
- 5 │     INCLUDE "syntax-error-eof-newline.inc"
-   │     ───┬───  
-   │        ╰───── file included from here
-───╯
-error: syntax error: unexpected end of line
-   ╭─[ syntax-error-eof-newline.inc:1:9 ]
-   │
- 1 │     SECTION
-   │            ┬  
-   │            ╰── expected a memory region name
-   │
-   ├─[ test.asm:5:2 ]
-   │
- 5 │     INCLUDE "syntax-error-eof-newline.inc"
-   │     ───┬───  
-   │        ╰───── file included from here
-───╯
-3 errors generated.
+1 error generated.
