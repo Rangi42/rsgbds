@@ -2251,16 +2251,13 @@ impl Lexer {
                         let backup = chars.clone();
                         // If the backslash isn't a line continuation, we'll want to process it normally.
                         chars.next(); // Consume the backslash.
-                        if !matches!(
-                            chars.peek(),
-                            Some((_, chars!(whitespace) | chars!(newline)))
-                        ) {
+                        if !matches!(chars.peek(), Some((_, chars!(line_cont)))) {
                             chars = backup;
                             break;
                         }
 
                         // Line continuations count as “whitespace”.
-                        if let Err(err) = Lexer::read_line_continuation(&mut chars) {
+                        if let Err(err) = Self::read_line_continuation(&mut chars) {
                             let mut span = ctx.new_span();
                             span.bytes.start += ofs;
                             span.bytes.end += match chars.peek() {
@@ -2274,6 +2271,33 @@ impl Lexer {
                                     diagnostics::error_label(&span).with_message(err.label_msg()),
                                 );
                             });
+                        }
+                    }
+                    '{' => {
+                        chars.next(); // Consume the brace.
+                        let _ = Self::read_interpolation(
+                            &mut chars,
+                            text,
+                            ctx,
+                            &mut string,
+                            params.identifiers,
+                            params.symbols,
+                            &mut params.macro_args,
+                            params.unique_id,
+                            params.sections,
+                            depth,
+                            params.nb_errors_left,
+                            params.options,
+                        );
+                        match string
+                            .char_indices()
+                            .find_map(|(ofs, ch)| matches!(ch, chars!(whitespace)).then_some(ofs))
+                        {
+                            Some(first_non_white_idx) => {
+                                string.drain(..first_non_white_idx);
+                                break;
+                            }
+                            None => string.clear(), // ...and continue iterating.
                         }
                     }
                     _ => break,
