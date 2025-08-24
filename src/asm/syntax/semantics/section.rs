@@ -4,7 +4,7 @@ use crate::{
     common::section::MemRegion,
     diagnostics,
     expr::Expr,
-    section::{AddrConstraint, SectionAttrs, SectionKind},
+    section::{ActiveSections, AddrConstraint, SectionAttrs, SectionKind},
     sources::Span,
     warning,
 };
@@ -177,11 +177,11 @@ impl parse_ctx!() {
     pub fn align_section(&mut self, (alignment, offset): (u8, u16), span_idx: usize) {
         let span = &self.line_spans[span_idx];
 
-        if let Some((_data_section, symbol_section)) = self.sections.active_section.as_mut() {
-            if let Err(err) = self.sections.sections[symbol_section.id]
+        if let Some(active) = self.sections.active_section.as_mut() {
+            if let Err(err) = self.sections.sections[active.sym_section.id]
                 .attrs
                 .address
-                .merge((alignment, offset).into(), symbol_section.offset)
+                .merge((alignment, offset).into(), active.sym_section.offset)
             {
                 self.error(span, |error| {
                     let (msg, label) = err.details();
@@ -202,10 +202,10 @@ impl parse_ctx!() {
     pub fn end_load_block(&mut self, span_idx: usize) {
         let span = &self.line_spans[span_idx];
 
-        if let Some((data_section, symbol_section)) = self.sections.active_section.as_mut() {
-            if !data_section.points_to_same_as(symbol_section) {
+        if let Some(active) = self.sections.active_section.as_mut() {
+            if active.is_load_block_active() {
                 // End the `LOAD` block.
-                *symbol_section = data_section.clone();
+                active.sym_section = active.data_section.clone();
             } else {
                 self.error(span, |error| {
                     error.set_message("`endl` used outside of a `load` block");
@@ -235,15 +235,40 @@ impl parse_ctx!() {
     pub fn set_symbol_section(
         &mut self,
         (attrs, (name, def_span)): (SectionAttrs, (CompactString, Span)),
+        span_idx: usize,
     ) {
-        let active_section = self.sections.create_if_not_exists(
+        let new_active_section = self.sections.create_if_not_exists(
             name,
             attrs,
             def_span,
             self.nb_errors_left,
             self.options,
         );
-        self.sections.active_section = Some((active_section.clone(), active_section));
+
+        let span = &self.line_spans[span_idx];
+
+        if let Some(active) = self.sections.active_section.as_mut() {
+            if active.is_section_active(new_active_section.id) {
+                self.error(span, |error| {
+                    error.set_message("`load` cannot designate the active section");
+                    error.add_label(diagnostics::error_label(span).with_message(format!(
+                        "section \"{}\" is active here",
+                        self.sections.sections.keys()[new_active_section.id],
+                    )));
+                });
+            } else {
+                active.sym_section = new_active_section;
+            }
+        } else {
+            self.error(span, |error| {
+                error.set_message("`load` used outside of a section");
+                error.add_label(
+                    diagnostics::error_label(span).with_message("this directive is invalid"),
+                );
+            });
+        };
+
+        // TODO: what should the symbol scope become?
     }
 
     pub fn push_section(
@@ -278,7 +303,7 @@ impl parse_ctx!() {
             self.nb_errors_left,
             self.options,
         );
-        self.sections.active_section = Some((active_section.clone(), active_section));
+        self.sections.active_section = Some(ActiveSections::new(active_section));
         self.symbols.end_scope();
     }
 }

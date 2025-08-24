@@ -129,6 +129,9 @@ Directive: () = {
 	// `db`, `dw`, `dl` and `ds` are `Datum`s, instead.
 	<span_idx:@L> "incbin" <path:StringExpr> <start:("," <Expr> ","?)?>         => ctx.incbin_file(path, start,       None,         span_idx),
 	<span_idx:@L> "incbin" <path:StringExpr> "," <start:Expr> "," <length:Expr> => ctx.incbin_file(path, Some(start), Some(length), span_idx),
+	<@L> "union" => ctx.start_union(<>),
+	"nextu" => ctx.union_next(),
+	"endu" => ctx.end_union(),
 	// `macros.rs`
 	<span_idx:@L> "shift" <amount:Expr?> => ctx.shift_macro_args(amount, span_idx),
 	// `opt.rs`
@@ -146,7 +149,7 @@ Directive: () = {
 	<span_idx:@L> "align" <align:AlignArgs> => ctx.align_section(align, span_idx),
 	<span_idx:@L> "endl" => ctx.end_load_block(span_idx),
 	<span_idx:@L> "endsection" => ctx.end_section(span_idx),
-	"load"    <SectionAttrs> => ctx.set_symbol_section(<>),
+	<span_idx:@L> "load" <attrs:SectionAttrs> => ctx.set_symbol_section(attrs, span_idx),
 	<span_idx:@L> "pushs" <attrs:SectionAttrs?> => ctx.push_section(attrs, span_idx),
 	<span_idx:@L> "pops" => ctx.pop_section(span_idx),
 	"section" <SectionAttrs> => ctx.create_section(<>),

@@ -890,9 +890,9 @@ impl SymbolData {
                 SymbolKind::Ref => None,
             },
             Self::Pc => Some(match sections.active_section.as_ref() {
-                Some((_data_sect, sym_sect)) => Ok(sections.sections[sym_sect.id]
+                Some(active) => Ok(sections.sections[active.sym_section.id]
                     .address()
-                    .map(|addr| i32::from(addr) + sym_sect.offset as i32)),
+                    .map(|addr| i32::from(addr) + active.sym_section.offset as i32)),
                 None => Err(SymbolError::PcOutsideSect("value")),
             }),
             Self::Narg => Some(match macro_args {
@@ -922,7 +922,7 @@ impl SymbolData {
                 SymbolKind::Ref => None,
             },
             SymbolData::Pc => match sections.active_section.as_ref() {
-                Some((_data_sect, sym_sect)) => Some(Ok((sym_sect.id, sym_sect.offset))),
+                Some(active) => Some(Ok((active.sym_section.id, active.sym_section.offset))),
                 None => Some(Err(SymbolError::PcOutsideSect("bank"))),
             },
             SymbolData::Narg => None,

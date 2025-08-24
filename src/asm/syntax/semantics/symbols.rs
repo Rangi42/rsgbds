@@ -14,8 +14,8 @@ impl parse_ctx!() {
     pub fn define_label(&mut self, name: Identifier, def_span_id: usize, exported: bool) {
         let def_span = self.nth_span(def_span_id);
 
-        if let Some((_data_section, sym_section)) = &self.sections.active_section {
-            sym_section.define_label(
+        if let Some(active) = self.sections.active_section.as_ref() {
+            active.sym_section.define_label(
                 name,
                 self.symbols,
                 self.identifiers,
@@ -99,7 +99,7 @@ impl parse_ctx!() {
             self.sections
                 .active_section
                 .as_ref()
-                .map(|(_data_sect, sym_sect)| sym_sect),
+                .map(|active| &active.sym_section),
             self.macro_args.last(),
             self.nb_errors_left,
             self.options,
@@ -130,7 +130,7 @@ impl parse_ctx!() {
                     self.sections
                         .active_section
                         .as_ref()
-                        .map(|(_data_sect, sym_sect)| sym_sect),
+                        .map(|active| &active.sym_section),
                     self.macro_args.last(),
                     self.nb_errors_left,
                     self.options,
@@ -167,7 +167,7 @@ impl parse_ctx!() {
                     self.sections
                         .active_section
                         .as_ref()
-                        .map(|(_data_sect, sym_sect)| sym_sect),
+                        .map(|active| &active.sym_section),
                     self.macro_args.last(),
                     self.nb_errors_left,
                     self.options,
@@ -208,7 +208,7 @@ impl parse_ctx!() {
                     self.sections
                         .active_section
                         .as_ref()
-                        .map(|(_data_sect, sym_sect)| sym_sect),
+                        .map(|active| &active.sym_section),
                     self.macro_args.last(),
                     self.nb_errors_left,
                     self.options,

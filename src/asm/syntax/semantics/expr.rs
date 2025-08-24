@@ -49,7 +49,7 @@ impl parse_ctx!() {
                     self.sections
                         .active_section
                         .as_ref()
-                        .map(|(_data_sect, sym_sect)| sym_sect),
+                        .map(|active| &active.sym_section),
                     self.macro_args.last(),
                 ) =>
             {

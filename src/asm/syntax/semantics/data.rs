@@ -51,8 +51,8 @@ impl parse_ctx!() {
                             if self.sections
                                 .active_section
                                 .as_ref()
-                                .is_some_and(|(_data_sect, sym_sect)| {
-                                    !self.sections.sections[sym_sect.id].attrs.mem_region.has_data()
+                                .is_some_and(|active| {
+                                    !self.sections.sections[active.sym_section.id].attrs.mem_region.has_data()
                                 })
                             {
                                 error.set_help("if you want multiple blocks of data to share the same space, consider using `union`");
@@ -72,14 +72,17 @@ impl parse_ctx!() {
             Either::Left(Either::Right(length)) => length,
 
             Either::Right((alignment, offset)) => {
-                if let Some((_data_section, sym_section)) = self.sections.active_section.as_ref() {
-                    let section = &mut self.sections.sections[sym_section.id];
+                if let Some(active) = self.sections.active_section.as_ref() {
+                    let section = &mut self.sections.sections[active.sym_section.id];
                     let length =
-                        section.bytes_until_alignment(alignment, offset, sym_section.offset);
+                        section.bytes_until_alignment(alignment, offset, active.sym_section.offset);
                     section
                         .attrs
                         .address
-                        .merge((alignment, offset).into(), sym_section.offset + length)
+                        .merge(
+                            (alignment, offset).into(),
+                            active.sym_section.offset + length,
+                        )
                         .unwrap();
                     length
                 } else {
@@ -331,5 +334,17 @@ impl parse_ctx!() {
             self.nb_errors_left,
             self.options,
         );
+    }
+
+    pub fn start_union(&mut self, span_idx: usize) {
+        todo!()
+    }
+
+    pub fn union_next(&mut self) {
+        todo!()
+    }
+
+    pub fn end_union(&mut self) {
+        todo!()
     }
 }

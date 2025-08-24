@@ -20,12 +20,31 @@ mod data;
 #[derive(Debug)]
 pub struct Sections {
     pub sections: IndexMap<CompactString, Section, FxBuildHasher>,
-    /// The first is the “data” section, the second is the “symbol” section.
-    pub active_section: Option<(ActiveSection, ActiveSection)>,
+    pub active_section: Option<ActiveSections>,
     section_stack: Vec<SectionStackEntry>,
     pub assertions: Vec<Assertion>,
 }
 type SectionId = usize; // Index into the `IndexMap`.
+#[derive(Debug)]
+pub struct ActiveSections {
+    /// The ID of the section to which bytes are emitted.
+    pub data_section: ActiveSection,
+    /// The ID of the section in which PC is.
+    pub sym_section: ActiveSection,
+    // TODO(perf): consider using a `smallvec` instead, this is hardly ever more than 1
+    unions: Vec<UnionEntry>,
+}
+#[derive(Debug)]
+struct UnionEntry {
+    offset_at_entry: usize,
+    size: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct ActiveSection {
+    pub id: SectionId,
+    pub offset: usize,
+}
 
 #[derive(Debug)]
 pub struct Section {
@@ -61,12 +80,6 @@ pub enum AddrConstraint {
     None,
     Align(u8, u16),
     Addr(u16),
-}
-
-#[derive(Debug, Clone)]
-pub struct ActiveSection {
-    pub id: SectionId,
-    pub offset: usize,
 }
 
 #[derive(Debug)]
@@ -105,7 +118,7 @@ pub enum AssertLevel {
 #[derive(Debug)]
 pub struct SectionStackEntry {
     pushs_span: Span,
-    active_section: Option<(ActiveSection, ActiveSection)>,
+    active_section: Option<ActiveSections>,
     global_scope: Option<Identifier>,
     local_scope: Option<Identifier>,
 }
@@ -234,8 +247,8 @@ impl Sections {
                 nb_errors_left,
                 options,
             ),
-            Some((data_sect, sym_sect)) => {
-                if !data_sect.points_to_same_as(&sym_sect) {
+            Some(active) => {
+                if active.is_load_block_active() {
                     diagnostics::warn(
                         warning!("unterminated-load"),
                         span,
@@ -255,10 +268,9 @@ impl Sections {
     }
 
     pub fn is_active_or_in_stack(&self, section_id: usize) -> bool {
-        let refs_section = |opt: &Option<(ActiveSection, ActiveSection)>| {
-            opt.as_ref().is_some_and(|(data_sect, sym_sect)| {
-                data_sect.id == section_id || sym_sect.id == section_id
-            })
+        let refs_section = |opt: &Option<ActiveSections>| {
+            opt.as_ref()
+                .is_some_and(|active| active.is_section_active(section_id))
         };
         refs_section(&self.active_section)
             || self
@@ -340,8 +352,8 @@ impl Sections {
 
     pub fn warn_if_unclosed_load_block(&self, nb_errors_left: &Cell<usize>, options: &Options) {
         match self.active_section.as_ref() {
-            Some((data_sect, sym_sect)) if !data_sect.points_to_same_as(sym_sect) => {
-                let span = &self.sections[sym_sect.id].def_span;
+            Some(active) if active.is_load_block_active() => {
+                let span = &self.sections[active.sym_section.id].def_span;
                 diagnostics::warn(
                     warning!("unterminated-load"),
                     span,
@@ -493,6 +505,29 @@ impl MergeError {
     }
 }
 
+impl ActiveSections {
+    pub fn new(section: ActiveSection) -> Self {
+        Self {
+            data_section: section.clone(),
+            sym_section: section,
+            unions: vec![],
+        }
+    }
+
+    pub fn is_load_block_active(&self) -> bool {
+        self.data_section.id != self.sym_section.id
+    }
+
+    pub fn is_section_active(&self, sect_id: usize) -> bool {
+        self.data_section.id == sect_id || self.sym_section.id == sect_id
+    }
+
+    pub fn advance_by(&mut self, nb_bytes: usize) {
+        self.data_section.offset += nb_bytes;
+        self.sym_section.offset += nb_bytes;
+    }
+}
+
 impl ActiveSection {
     pub fn define_label(
         &self,
@@ -516,9 +551,6 @@ impl ActiveSection {
             nb_errors_left,
             options,
         )
-    }
-    pub fn points_to_same_as(&self, other: &Self) -> bool {
-        self.id == other.id
     }
 }
 

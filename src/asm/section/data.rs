@@ -28,7 +28,7 @@ impl Sections {
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
-        let Some((data_section, symbol_section)) = self.active_section.as_mut() else {
+        let Some(active) = self.active_section.as_mut() else {
             diagnostics::error(
                 keyword_span,
                 |error| {
@@ -53,15 +53,16 @@ impl Sections {
             return;
         };
 
-        let data_sect = &mut self.sections[data_section.id];
+        let data_sect = &mut self.sections[active.data_section.id];
         match &mut data_sect.bytes {
             Contents::Data(data) => {
-                if data_section
+                if active
+                    .data_section
                     .offset
                     .checked_add(length)
                     .is_some_and(|new_ofs| new_ofs <= MAX_SECTION_SIZE)
                 {
-                    debug_assert_eq!(data.len(), data_section.offset);
+                    debug_assert_eq!(data.len(), active.data_section.offset);
                     data.extend(std::iter::repeat(options.runtime_opts.pad_byte).take(length));
                 } else {
                     data.resize(MAX_SECTION_SIZE, options.runtime_opts.pad_byte);
@@ -69,24 +70,24 @@ impl Sections {
             }
             Contents::NoData(len) => {
                 if !matches!(data_sect.attrs.kind, SectionKind::Union) {
-                    if data_section
+                    if active
+                        .data_section
                         .offset
                         .checked_add(length)
                         .is_some_and(|new_ofs| new_ofs <= MAX_SECTION_SIZE)
                     {
-                        debug_assert_eq!(*len, data_section.offset);
+                        debug_assert_eq!(*len, active.data_section.offset);
                         *len += length;
                     } else {
                         *len = MAX_SECTION_SIZE;
                     }
                 } else {
-                    *len = std::cmp::max(*len, data_section.offset + length);
+                    *len = std::cmp::max(*len, active.data_section.offset + length);
                 }
             }
         }
 
-        data_section.offset += length;
-        symbol_section.offset += length;
+        active.advance_by(length);
     }
 
     pub fn emit_padding(
@@ -375,7 +376,7 @@ impl Sections {
         options: &Options,
         emission_callback: F,
     ) {
-        let Some((data_section, symbol_section)) = self.active_section.as_mut() else {
+        let Some(active) = self.active_section.as_mut() else {
             diagnostics::error(
                 keyword_span,
                 |error| {
@@ -400,22 +401,23 @@ impl Sections {
             return;
         };
 
-        let data_sect = &mut self.sections[data_section.id];
+        let data_sect = &mut self.sections[active.data_section.id];
         match &mut data_sect.bytes {
             Contents::Data(data) => {
-                if data_section
+                if active
+                    .data_section
                     .offset
                     .checked_add(nb_bytes)
                     .is_some_and(|new_ofs| new_ofs <= MAX_SECTION_SIZE)
                 {
-                    debug_assert_eq!(data.len(), data_section.offset);
+                    debug_assert_eq!(data.len(), active.data_section.offset);
 
                     emission_callback(
-                        data_section.offset,
+                        active.data_section.offset,
                         EmissionContext {
                             patches: &mut data_sect.patches,
                             data,
-                            symbol_section,
+                            symbol_section: &mut active.sym_section,
                             identifiers,
                             nb_errors_left,
                             options,
@@ -432,12 +434,13 @@ impl Sections {
             }
 
             Contents::NoData(len) => {
-                if data_section
+                if active
+                    .data_section
                     .offset
                     .checked_add(nb_bytes)
                     .is_some_and(|new_ofs| new_ofs <= MAX_SECTION_SIZE)
                 {
-                    debug_assert_eq!(*len, data_section.offset);
+                    debug_assert_eq!(*len, active.data_section.offset);
 
                     diagnostics::error(
                         keyword_span,
@@ -466,8 +469,7 @@ impl Sections {
             }
         }
 
-        data_section.offset += nb_bytes;
-        symbol_section.offset += nb_bytes;
+        active.advance_by(nb_bytes);
     }
 }
 

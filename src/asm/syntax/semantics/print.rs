@@ -68,7 +68,7 @@ impl parse_ctx!() {
                             .sections
                             .active_section
                             .as_ref()
-                            .map(|(_data_sect, sym_sect)| (sym_sect.id, sym_sect.offset)),
+                            .map(|active| (active.sym_section.id, active.sym_section.offset)),
                     },
                     message: match msg {
                         Some((string, _span)) => string,
