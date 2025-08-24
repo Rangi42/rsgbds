@@ -12,11 +12,11 @@ error: A symbol called "_NARG" already exists
    │ │ 
    │ ╰─ the name is reserved here...
    │
-   ├─[ test.asm:5:1 ]
+   ├─[ test.asm:5:11 ]
    │
  5 │ DEF _NARG EQU 12
-   │ ─┬─  
-   │  ╰─── ...so it's not available for this definition
+   │           ─┬─  
+   │            ╰─── ...so it's not available for this definition
 ───╯
 error: A symbol called "_NARG" already exists
    ╭─[ <built-in>:1:1 ]
@@ -25,11 +25,11 @@ error: A symbol called "_NARG" already exists
    │ │ 
    │ ╰─ the name is reserved here...
    │
-   ├─[ test.asm:6:1 ]
+   ├─[ test.asm:6:13 ]
    │
  6 │ REDEF _NARG EQU 34
-   │ ──┬──  
-   │   ╰──── ...so it's not available for this definition
+   │             ─┬─  
+   │              ╰─── ...so it's not available for this definition
 ───╯
 error: A symbol called "_NARG" already exists
    ╭─[ <built-in>:1:1 ]
@@ -38,11 +38,11 @@ error: A symbol called "_NARG" already exists
    │ │ 
    │ ╰─ the name is reserved here...
    │
-   ├─[ test.asm:8:1 ]
+   ├─[ test.asm:8:11 ]
    │
  8 │ DEF _NARG = 56
-   │ ─┬─  
-   │  ╰─── ...so it's not available for this definition
+   │           ┬  
+   │           ╰── ...so it's not available for this definition
 ───╯
 error: A symbol called "_NARG" already exists
    ╭─[ <built-in>:1:1 ]
@@ -51,11 +51,11 @@ error: A symbol called "_NARG" already exists
    │ │ 
    │ ╰─ the name is reserved here...
    │
-   ├─[ test.asm:9:1 ]
+   ├─[ test.asm:9:13 ]
    │
  9 │ REDEF _NARG = 78
-   │ ──┬──  
-   │   ╰──── ...so it's not available for this definition
+   │             ┬  
+   │             ╰── ...so it's not available for this definition
 ───╯
 error: A symbol called "_NARG" already exists
     ╭─[ <built-in>:1:1 ]
@@ -64,11 +64,11 @@ error: A symbol called "_NARG" already exists
     │ │ 
     │ ╰─ the name is reserved here...
     │
-    ├─[ test.asm:11:1 ]
+    ├─[ test.asm:11:11 ]
     │
  11 │ DEF _NARG EQUS "hello"
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │           ──┬─  
+    │             ╰─── ...so it's not available for this definition
 ────╯
 error: A symbol called "_NARG" already exists
     ╭─[ <built-in>:1:1 ]
@@ -77,11 +77,11 @@ error: A symbol called "_NARG" already exists
     │ │ 
     │ ╰─ the name is reserved here...
     │
-    ├─[ test.asm:12:1 ]
+    ├─[ test.asm:12:13 ]
     │
  12 │ REDEF _NARG EQUS "world"
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │             ──┬─  
+    │               ╰─── ...so it's not available for this definition
 ────╯
 error: A symbol called "_NARG" already exists
     ╭─[ <built-in>:1:1 ]
@@ -110,11 +110,11 @@ error: A symbol called "." already exists
     │ │ 
     │ ╰─ the name is reserved here...
     │
-    ├─[ test.asm:22:1 ]
+    ├─[ test.asm:22:7 ]
     │
  22 │ DEF . EQU 12
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │       ─┬─  
+    │        ╰─── ...so it's not available for this definition
 ────╯
 error: A symbol called "." already exists
     ╭─[ <built-in>:1:1 ]
@@ -123,11 +123,11 @@ error: A symbol called "." already exists
     │ │ 
     │ ╰─ the name is reserved here...
     │
-    ├─[ test.asm:23:1 ]
+    ├─[ test.asm:23:9 ]
     │
  23 │ REDEF . EQU 34
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │         ─┬─  
+    │          ╰─── ...so it's not available for this definition
 ────╯
 error: A symbol called "." already exists
     ╭─[ <built-in>:1:1 ]
@@ -136,11 +136,11 @@ error: A symbol called "." already exists
     │ │ 
     │ ╰─ the name is reserved here...
     │
-    ├─[ test.asm:25:1 ]
+    ├─[ test.asm:25:7 ]
     │
  25 │ DEF . = 56
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │       ┬  
+    │       ╰── ...so it's not available for this definition
 ────╯
 error: A symbol called "." already exists
     ╭─[ <built-in>:1:1 ]
@@ -149,11 +149,11 @@ error: A symbol called "." already exists
     │ │ 
     │ ╰─ the name is reserved here...
     │
-    ├─[ test.asm:26:1 ]
+    ├─[ test.asm:26:9 ]
     │
  26 │ REDEF . = 78
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │         ┬  
+    │         ╰── ...so it's not available for this definition
 ────╯
 error: A symbol called "." already exists
     ╭─[ <built-in>:1:1 ]
@@ -162,11 +162,11 @@ error: A symbol called "." already exists
     │ │ 
     │ ╰─ the name is reserved here...
     │
-    ├─[ test.asm:28:1 ]
+    ├─[ test.asm:28:7 ]
     │
  28 │ DEF . EQUS "hello"
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │       ──┬─  
+    │         ╰─── ...so it's not available for this definition
 ────╯
 error: A symbol called "." already exists
     ╭─[ <built-in>:1:1 ]
@@ -175,11 +175,11 @@ error: A symbol called "." already exists
     │ │ 
     │ ╰─ the name is reserved here...
     │
-    ├─[ test.asm:29:1 ]
+    ├─[ test.asm:29:9 ]
     │
  29 │ REDEF . EQUS "world"
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │         ──┬─  
+    │           ╰─── ...so it's not available for this definition
 ────╯
 error: A symbol called "." already exists
     ╭─[ <built-in>:1:1 ]

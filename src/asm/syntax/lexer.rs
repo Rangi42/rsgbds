@@ -1918,7 +1918,8 @@ impl Lexer {
             }
         }
 
-        if first_char == '.' && name.contains(|ch| ch != '.') {
+        let not_just_dots = name.contains(|ch| ch != '.');
+        if first_char == '.' && not_just_dots {
             if let Some(scope) = params.symbols.global_scope {
                 let scope_name = params.identifiers.resolve(scope).unwrap();
                 debug_assert!(!scope_name.contains('.'), "scope = {scope_name:?}");
@@ -1940,7 +1941,7 @@ impl Lexer {
             }
         }
         let identifier = params.identifiers.get_or_intern(&name);
-        if is_local {
+        if is_local && not_just_dots {
             tok!("local identifier"(identifier))
         } else {
             tok!("identifier"(identifier))

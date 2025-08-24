@@ -39,11 +39,11 @@ error: A symbol called "__UTC_YEAR__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:9:1 ]
+    ├─[ test.asm:9:8 ]
     │
   9 │ DEF \1 EQU 0
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │        ─┬─  
+    │         ╰─── ...so it's not available for this definition
     │ 
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
@@ -56,11 +56,11 @@ error: A symbol called "__UTC_YEAR__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:10:1 ]
+    ├─[ test.asm:10:8 ]
     │
  10 │ DEF \1 EQU 0
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │        ─┬─  
+    │         ╰─── ...so it's not available for this definition
     │ 
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
@@ -73,11 +73,11 @@ error: A symbol called "__UTC_YEAR__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:13:1 ]
+    ├─[ test.asm:13:8 ]
     │
  13 │ DEF \1 = 0
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │        ┬  
+    │        ╰── ...so it's not available for this definition
     │ 
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
@@ -90,11 +90,11 @@ error: A symbol called "__UTC_YEAR__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:14:1 ]
+    ├─[ test.asm:14:8 ]
     │
  14 │ DEF \1 = 0
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │        ┬  
+    │        ╰── ...so it's not available for this definition
     │ 
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
@@ -107,11 +107,11 @@ error: A symbol called "__UTC_YEAR__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:17:1 ]
+    ├─[ test.asm:17:8 ]
     │
  17 │ DEF \1 EQUS "hello"
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │        ──┬─  
+    │          ╰─── ...so it's not available for this definition
     │ 
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
@@ -124,11 +124,11 @@ error: A symbol called "__UTC_YEAR__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:18:1 ]
+    ├─[ test.asm:18:8 ]
     │
  18 │ DEF \1 EQUS "hello"
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │        ──┬─  
+    │          ╰─── ...so it's not available for this definition
     │ 
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
@@ -141,11 +141,11 @@ error: A symbol called "__UTC_YEAR__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:21:1 ]
+    ├─[ test.asm:21:10 ]
     │
  21 │ REDEF \1 = 0
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │          ┬  
+    │          ╰── ...so it's not available for this definition
     │ 
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
@@ -158,11 +158,11 @@ error: A symbol called "__UTC_YEAR__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:22:1 ]
+    ├─[ test.asm:22:10 ]
     │
  22 │ REDEF \1 = 0
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │          ┬  
+    │          ╰── ...so it's not available for this definition
     │ 
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
@@ -175,11 +175,11 @@ error: A symbol called "__UTC_YEAR__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:25:1 ]
+    ├─[ test.asm:25:10 ]
     │
  25 │ REDEF \1 EQU 0
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │          ─┬─  
+    │           ╰─── ...so it's not available for this definition
     │ 
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
@@ -192,11 +192,11 @@ error: A symbol called "__UTC_YEAR__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:26:1 ]
+    ├─[ test.asm:26:10 ]
     │
  26 │ REDEF \1 EQU 0
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │          ─┬─  
+    │           ╰─── ...so it's not available for this definition
     │ 
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
@@ -209,11 +209,11 @@ error: A symbol called "__UTC_YEAR__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:29:1 ]
+    ├─[ test.asm:29:10 ]
     │
  29 │ REDEF \1 EQUS "hello"
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │          ──┬─  
+    │            ╰─── ...so it's not available for this definition
     │ 
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
@@ -226,11 +226,11 @@ error: A symbol called "__UTC_YEAR__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:30:1 ]
+    ├─[ test.asm:30:10 ]
     │
  30 │ REDEF \1 EQUS "hello"
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │          ──┬─  
+    │            ╰─── ...so it's not available for this definition
     │ 
  36 │     tickle __UTC_YEAR__, 1
     │     ───┬──  
@@ -277,11 +277,11 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:9:1 ]
+    ├─[ test.asm:9:8 ]
     │
   9 │ DEF \1 EQU 0
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │        ─┬─  
+    │         ╰─── ...so it's not available for this definition
     │ 
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
@@ -294,11 +294,11 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:10:1 ]
+    ├─[ test.asm:10:8 ]
     │
  10 │ DEF \1 EQU 0
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │        ─┬─  
+    │         ╰─── ...so it's not available for this definition
     │ 
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
@@ -311,11 +311,11 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:13:1 ]
+    ├─[ test.asm:13:8 ]
     │
  13 │ DEF \1 = 0
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │        ┬  
+    │        ╰── ...so it's not available for this definition
     │ 
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
@@ -328,11 +328,11 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:14:1 ]
+    ├─[ test.asm:14:8 ]
     │
  14 │ DEF \1 = 0
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │        ┬  
+    │        ╰── ...so it's not available for this definition
     │ 
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
@@ -345,11 +345,11 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:17:1 ]
+    ├─[ test.asm:17:8 ]
     │
  17 │ DEF \1 EQUS "hello"
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │        ──┬─  
+    │          ╰─── ...so it's not available for this definition
     │ 
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
@@ -362,11 +362,11 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:18:1 ]
+    ├─[ test.asm:18:8 ]
     │
  18 │ DEF \1 EQUS "hello"
-    │ ─┬─  
-    │  ╰─── ...so it's not available for this definition
+    │        ──┬─  
+    │          ╰─── ...so it's not available for this definition
     │ 
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
@@ -379,11 +379,11 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:21:1 ]
+    ├─[ test.asm:21:10 ]
     │
  21 │ REDEF \1 = 0
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │          ┬  
+    │          ╰── ...so it's not available for this definition
     │ 
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
@@ -396,11 +396,11 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:22:1 ]
+    ├─[ test.asm:22:10 ]
     │
  22 │ REDEF \1 = 0
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │          ┬  
+    │          ╰── ...so it's not available for this definition
     │ 
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
@@ -413,11 +413,11 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:25:1 ]
+    ├─[ test.asm:25:10 ]
     │
  25 │ REDEF \1 EQU 0
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │          ─┬─  
+    │           ╰─── ...so it's not available for this definition
     │ 
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
@@ -430,11 +430,11 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:26:1 ]
+    ├─[ test.asm:26:10 ]
     │
  26 │ REDEF \1 EQU 0
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │          ─┬─  
+    │           ╰─── ...so it's not available for this definition
     │ 
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
@@ -447,11 +447,11 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:29:1 ]
+    ├─[ test.asm:29:10 ]
     │
  29 │ REDEF \1 EQUS "hello"
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │          ──┬─  
+    │            ╰─── ...so it's not available for this definition
     │ 
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
@@ -464,11 +464,11 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │ │ 
     │ ╰─ the name is defined here...
     │
-    ├─[ test.asm:30:1 ]
+    ├─[ test.asm:30:10 ]
     │
  30 │ REDEF \1 EQUS "hello"
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │          ──┬─  
+    │            ╰─── ...so it's not available for this definition
     │ 
  37 │     tickle __ISO_8601_UTC__, 0
     │     ───┬──  
