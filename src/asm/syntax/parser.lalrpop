@@ -224,6 +224,7 @@ CompoundAssignOp: BinOp = {
 RsKindKeyword: i32 = { "rb" => 1, "rw" => 2, "rl" => 4 };
 
 // TODO: accept invalid forms of instructions, to report better error messages for them
+//       It would also enable removing the `#[inline]`s on the register productions
 Instruction: Option<Instruction> = {
 	<l_span_idx:@L> "adc" <operands:ArithInstrOperands> <r_span_idx:@R> => {
 		Some(Instruction::adc(operands, ctx.span_from_to(l_span_idx, r_span_idx)))
@@ -340,30 +341,61 @@ Instruction: Option<Instruction> = {
 		Some(Instruction::xor(operands, ctx.span_from_to(l_span_idx, r_span_idx)))
 	},
 
-	// TODO: `ldh [$ff00 + c]`
-	<l_span_idx:@L> "ldh" RegA "," "[" RegC "]" <r_span_idx:@R> => {
-		Some(Instruction::ldh_c(false, ctx.span_from_to(l_span_idx, r_span_idx)))
-	},
-	<l_span_idx:@L> "ldh" "[" RegC "]" "," RegA <r_span_idx:@R> => {
-		Some(Instruction::ldh_c(true, ctx.span_from_to(l_span_idx, r_span_idx)))
-	},
 	<l_span_idx:@L> "ldh" RegA "," "[" <addr:Expr> "]" <r_span_idx:@R> => {
 		Some(Instruction::ldh(false, addr, ctx.span_from_to(l_span_idx, r_span_idx), ctx.nth_span(l_span_idx)))
 	},
 	<l_span_idx:@L> "ldh" "[" <addr:Expr> "]" "," RegA <r_span_idx:@R> => {
 		Some(Instruction::ldh(true, addr, ctx.span_from_to(l_span_idx, r_span_idx), ctx.nth_span(l_span_idx)))
 	},
+	// Need to use `ExprSum` to avoid a reduce/reduce grammar conflict. It should be sufficient for the intended use cases.
+	<l_span_idx:@L> LdOrLdh RegA "," "[" <ff00:(<ExprSum<ExprAtom>> "+")?> "c" "]" <r_span_idx:@R> => {
+		let _ = ff00.map(|expr| ctx.check_expr_is_ff00(expr));
+		Some(Instruction::ldh_c(false, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> LdOrLdh "[" <ff00:(<ExprSum<ExprAtom>> "+")?> "c" "]" "," RegA <r_span_idx:@R> => {
+		let _ = ff00.map(|expr| ctx.check_expr_is_ff00(expr));
+		Some(Instruction::ldh_c(true, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
 
-	// TODO: other forms of `ld`
 	<l_span_idx:@L> "ld" <lhs:Reg8> "," <rhs:Reg8> <r_span_idx:@R> => {
 		Instruction::ld_r8_r8(lhs, rhs, ctx.span_from_to(l_span_idx, r_span_idx), ctx.nb_errors_left, ctx.options)
 	},
+	<l_span_idx:@L> "ld" <reg:Reg8> "," <imm:Expr> <r_span_idx:@R> => {
+		Some(Instruction::ld_r8_imm(reg, imm, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "ld" <reg:Reg16Arith> "," <imm:Expr> <r_span_idx:@R> => {
+		Some(Instruction::ld_r16_imm(reg, imm, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "ld" RegA "," "[" <reg:Reg16Mem> "]" <r_span_idx:@R> => {
+		Some(Instruction::ld_a_r16_ind(false, reg, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "ld" "[" <reg:Reg16Mem> "]" "," RegA <r_span_idx:@R> => {
+		Some(Instruction::ld_a_r16_ind(true, reg, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "ld" RegA "," "[" <addr:Expr> "]" <r_span_idx:@R> => {
+		Some(Instruction::ld_a_addr(false, addr, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "ld" "[" <addr:Expr> "]" "," RegA <r_span_idx:@R> => {
+		Some(Instruction::ld_a_addr(true, addr, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "ld" "sp" "," "hl" <r_span_idx:@R> => {
+		Some(Instruction::ld_sp_hl(ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "ld" "hl" "," "sp" <ofs:OfsExpr> <r_span_idx:@R> => {
+		Some(Instruction::ld_hl_sp_ofs(ofs, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
+	<l_span_idx:@L> "ld" "[" <addr:Expr> "]" "," "sp" <r_span_idx:@R> => {
+		Some(Instruction::ld_addr_sp(addr, ctx.span_from_to(l_span_idx, r_span_idx)))
+	},
 };
+#[inline]
+LdOrLdh = { "ld", "ldh" };
 ArithInstrOperands = (RegA ",")? <Reg8OrImm8>;
 Reg8OrImm8: Either<Reg8, Expr> = {
 	Reg8 => Either::Left(<>),
 	Expr => Either::Right(<>),
 };
+#[inline]
 Reg8: Reg8 = {
 	RegB => Reg8::B,
 	RegC => Reg8::C,
@@ -381,12 +413,14 @@ RegE = { "e", "low"  "(" <"de"> ")" };
 RegH = { "h", "high" "(" <"hl"> ")" };
 RegL = { "l", "low"  "(" <"hl"> ")" };
 RegA = { "a", "high" "(" <"af"> ")" };
+#[inline]
 Reg16Arith: Reg16Arith = {
 	"bc" => Reg16Arith::Bc,
 	"de" => Reg16Arith::De,
 	"hl" => Reg16Arith::Hl,
 	"sp" => Reg16Arith::Sp,
 };
+#[inline]
 Reg16Mem: Reg16Mem = {
 	"bc" => Reg16Mem::Bc,
 	"de" => Reg16Mem::De,
@@ -395,6 +429,7 @@ Reg16Mem: Reg16Mem = {
 	"hld" => Reg16Mem::Hld,
 	"hl" "-" => Reg16Mem::Hld,
 };
+#[inline]
 Reg16Stack: Reg16Stack = {
 	"bc" => Reg16Stack::Bc,
 	"de" => Reg16Stack::De,
@@ -423,6 +458,11 @@ ConstExpr: i32 = Expr => match ctx.try_const_eval(&<>) {
 		ctx.report_expr_error(err);
 		0
 	}
+};
+
+OfsExpr: Expr = {
+	<span_idx:@L> "+" <expr:Expr> => expr.unary_op(UnOp::Identity,   ctx.nth_span(span_idx)),
+	<span_idx:@L> "-" <expr:Expr> => expr.unary_op(UnOp::Negation,   ctx.nth_span(span_idx)),
 };
 
 // Places that don't handle strings and expressions together can use `Expr` directly.

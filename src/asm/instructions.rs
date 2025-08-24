@@ -3,7 +3,7 @@ use std::cell::Cell;
 use arrayvec::ArrayVec;
 use either::Either;
 
-use crate::{expr::Expr, section::PatchKind, sources::Span, Options};
+use crate::{diagnostics, expr::Expr, section::PatchKind, sources::Span, Options};
 
 #[derive(Debug)]
 pub struct Instruction {
@@ -82,6 +82,18 @@ impl Instruction {
         options: &Options,
     ) -> Option<Self> {
         if src == Reg8::HlInd && dest == Reg8::HlInd {
+            diagnostics::error(
+                &span,
+                |error| {
+                    error.set_message("`ld [hl], [hl]` doesn't exist");
+                    error.add_label(
+                        diagnostics::error_label(&span).with_message("this instruction is invalid"),
+                    );
+                    error.set_note("trivia: its would-be encoding is occupied by `halt` instead");
+                },
+                nb_errors_left,
+                options,
+            );
             None
         } else {
             Some(Self {
