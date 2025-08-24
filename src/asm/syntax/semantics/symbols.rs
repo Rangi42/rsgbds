@@ -217,4 +217,39 @@ impl parse_ctx!() {
             Err(error) => self.report_expr_error(error),
         }
     }
+
+    pub fn export_symbol(&mut self, name: Identifier, span_idx: usize) {
+        let span = self.nth_span(span_idx);
+        self.symbols.export(
+            name,
+            span,
+            self.identifiers,
+            self.nb_errors_left,
+            self.options,
+        );
+    }
+
+    pub fn delete_symbols(&mut self, names: Vec<(usize, Identifier)>) {
+        for (span_idx, name) in names {
+            let span = self.nth_span(span_idx);
+            self.symbols.delete(
+                name,
+                span,
+                self.identifiers,
+                self.nb_errors_left,
+                self.options,
+            );
+        }
+    }
+
+    pub fn reset_rs(&mut self) {
+        *self.symbols.rs() = 0;
+    }
+
+    pub fn set_rs(&mut self, expr: Expr) {
+        match self.try_const_eval(&expr) {
+            Ok((value, _span)) => *self.symbols.rs() = value,
+            Err(error) => self.report_expr_error(error),
+        }
+    }
 }

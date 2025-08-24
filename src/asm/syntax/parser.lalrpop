@@ -162,11 +162,16 @@ Directive: () = {
 	<export:(<@L> "export")?> <redef:Def> <name:"identifier"> <span_idx:@L> <stride:RsKindKeyword> <value:Expr?> => {
 		ctx.define_rs(export, redef, name, stride, value, span_idx)
 	},
+	"export" NonEmptyCommaList<Export> => (),
+	"purge" <NonEmptyCommaList<(@L Identifier)>> => ctx.delete_symbols(<>), // Symbols are buffered to enable `PURGE string, {string}`.
+	"rsreset" => ctx.reset_rs(),
+	"rsset" <Expr> => ctx.set_rs(<>),
 };
 PrintArg: () = StringOrExpr => ctx.print(<>);
 Option: () = <span_idx:@L> <string:"string"> => ctx.process_option(&string, span_idx);
 Def: bool = { "def" => false, "redef" => true };
 NumDefKeyword: bool = { "equ" => false, "=" => true };
+Export: () = <span_idx:@L> <name:Identifier> => ctx.export_symbol(name, span_idx);
 
 // This is necessary so that the options are pushed before the first `Option` is reduced (and thus options altered).
 Pusho: () = {
@@ -509,6 +514,10 @@ CommaList<T>: Vec<T> = <mut list:(<T> ",")*> <last:T?> => match last {
 		list.push(elem);
 		list
 	}
+};
+NonEmptyCommaList<T>: Vec<T> = <mut list:(<T> ",")*> <last:T> ","? => {
+	list.push(last);
+	list
 };
 
 
