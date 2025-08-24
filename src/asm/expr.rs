@@ -10,7 +10,6 @@ use crate::{
     section::{SectionKind, Sections},
     sources::Span,
     symbols::{SymbolData, SymbolError, Symbols},
-    syntax::tokens::{tok, TokenPayload},
     Identifier, Identifiers, Options,
 };
 
@@ -520,16 +519,45 @@ impl Op {
     }
 }
 
-operators! { // Sorted from lowest binding power (precedence), to highest.
-    BinOp[left_assoc] LogicalOr("||");
-    BinOp[left_assoc] LogicalAnd("&&");
-    BinOp[left_assoc] NotEqual("!="), Equal("=="), LessEq("<="), Less("<"), GreaterEq(">="), Greater(">");
-    BinOp[left_assoc] Add("+"), Subtract("-");
-    BinOp[left_assoc] And("&"), Or("|"), Xor("^");
-    BinOp[left_assoc] LeftShift("<<"), RightShift(">>"), UnsignedRightShift(">>>");
-    BinOp[left_assoc] Multiply("*"), Divide("/"), Modulo("%");
-    UnOp Complement("~"), Identity("+"), Negation("-"), Not("!");
-    BinOp[right_assoc] Exponent("**");
+// Sorted from lowest binding power (precedence), to highest.
+#[derive(Debug, Clone, Copy)]
+pub enum BinOp {
+    LogicalOr,
+
+    LogicalAnd,
+
+    NotEqual,
+
+    Equal,
+    LessEq,
+    Less,
+    GreaterEq,
+    Greater,
+
+    Add,
+    Subtract,
+
+    And,
+    Or,
+    Xor,
+
+    LeftShift,
+    RightShift,
+    UnsignedRightShift,
+
+    Multiply,
+    Divide,
+    Modulo,
+
+    Exponent,
+}
+// All unary operators are situated between `Modulo` and `Exponent`.
+#[derive(Debug, Clone, Copy)]
+pub enum UnOp {
+    Complement,
+    Identity,
+    Negation,
+    Not,
 }
 
 /// Convenience function to turn a Rust boolean to rgbasm's equivalent.
@@ -891,87 +919,3 @@ impl ErrKind {
         }
     }
 }
-
-macro_rules! operators {
-    ($(
-        $kind:ident $([$assoc:ident])? $first_name:ident $first_tok:tt $(, $name:ident $tok:tt)*
-    );* $(;)?) => {
-        enum Precedence {$( $first_name, )*} // Only used to auto-gen incrementing values.
-        binary_operators! {$( $kind $([$assoc])? $first_name $first_tok $(, $name $tok)* );*}
-        unary_operators! {$( $kind $([$assoc])? $first_name $first_tok $(, $name $tok)* );*}
-    };
-}
-macro_rules! binary_operators {
-    ($(
-        $(BinOp[$assoc:ident] $first_name:ident($first_token:tt) $(, $name:ident($token:tt))*)?
-        $(UnOp $($un_name:ident $un_tok:tt),+)?
-    );*) => {
-        #[derive(Debug, Clone, Copy)]
-        pub enum BinOp {
-            $($( $first_name, $( $name, )*)?)*
-        }
-        impl BinOp {
-            pub fn from_token(token: &TokenPayload) -> Option<Self> {
-                match token {
-                    $($(
-                        tok!($first_token) => Some(Self::$first_name),
-                        $( tok!($token) => Some(Self::$name), )*
-                    )?)*
-                    _ => None,
-                }
-            }
-
-            pub fn binding_power(&self) -> (u8,u8) {
-                match self {$($(
-                    Self::$first_name $( | Self::$name )* => $assoc!((Precedence::$first_name as u8) * 2 + 1),
-                )?)*}
-            }
-        }
-    };
-}
-macro_rules! unary_operators {
-    ($(
-        $(BinOp[$assoc:ident] $($bin_name:ident $bin_tok:tt),+)?
-        $(UnOp $first_name:ident($first_token:tt) $(, $name:ident($token:tt))*)?
-    );*) => {
-        #[derive(Debug, Clone, Copy)]
-        pub enum UnOp {
-            $($( $first_name, $( $name, )*)?)*
-        }
-        impl UnOp {
-            pub fn from_token(token: &TokenPayload) -> Option<Self> {
-                match token {
-                    $($(
-                        tok!($first_token) => Some(Self::$first_name),
-                        $( tok!($token) => Some(Self::$name), )*
-                    )?)*
-                    _ => None,
-                }
-            }
-
-            pub fn binding_power(&self) -> ((),u8) {
-                match self {$($(
-                    Self::$first_name $( | Self::$name )* => ((), (Precedence::$first_name as u8) * 2 + 1),
-                )?)*}
-            }
-        }
-    };
-}
-
-// A left-associative operator binds the operand to its right tighter than the operand to its left.
-// This might seem backwards, but from the point of view of the operand, it means that the operand
-// to its *left* binds tighter than the one to its *right*; so the one to the left has priority.
-macro_rules! left_assoc {
-    ($base:expr) => {
-        (($base, $base + 1))
-    };
-}
-macro_rules! right_assoc {
-    ($base:expr) => {
-        (($base + 1, $base))
-    };
-}
-
-// This `use` allows using the macros before they are defined within the same file.
-// (`macro_rules!` are a little janky at times.)
-use {binary_operators, left_assoc, operators, right_assoc, unary_operators};
