@@ -71,6 +71,14 @@ impl Condition {
     fn id(&self) -> u8 {
         *self as u8
     }
+    pub fn negate(self) -> Self {
+        match self {
+            Self::Nz => Self::Z,
+            Self::Z => Self::Nz,
+            Self::Nc => Self::C,
+            Self::C => Self::Nc,
+        }
+    }
 }
 
 impl Instruction {

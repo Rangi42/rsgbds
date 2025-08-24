@@ -441,6 +441,7 @@ InstrCond: Condition = {
 	"z" => Condition::Z,
 	"nc" => Condition::Nc,
 	"c" => Condition::C,
+	"!" <InstrCond> => <>.negate(),
 };
 
 // Since a top-level identifier can be either a string or an expression, it must be handled specially.
