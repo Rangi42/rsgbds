@@ -3,12 +3,7 @@ use std::{fmt::Display, fs::File, io::Read};
 use compact_str::CompactString;
 use either::Either;
 
-use crate::{
-    common::S,
-    diagnostics::{self, ReportBuilder},
-    expr::Expr,
-    sources::Span,
-};
+use crate::{common::S, diagnostics, expr::Expr, sources::Span};
 
 use super::parse_ctx;
 
@@ -235,7 +230,7 @@ impl parse_ctx!() {
                     use std::io::ErrorKind;
                     if err.kind() == ErrorKind::UnexpectedEof {
                         error.set_message(eof_msg);
-                        error.add_label(diagnostics::error_label(span).with_message(eof_label))
+                        error.add_label(diagnostics::error_label(span).with_message(eof_label));
                     } else {
                         error.set_message(format!("failed to read \"{path}\""));
                         error.add_label(diagnostics::error_label(span).with_message(err));
@@ -261,7 +256,7 @@ impl parse_ctx!() {
                         write!(
                             f,
                             "cannot read {length} byte{} (after skipping {start})",
-                            S::from(*length)
+                            S::from(*length),
                         )
                     }
                 }

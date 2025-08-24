@@ -1,6 +1,6 @@
 use compact_str::CompactString;
 
-use crate::{diagnostics, sources::Span, Identifier, Identifiers};
+use crate::{diagnostics, sources::Span, Identifier};
 
 use super::parse_ctx;
 

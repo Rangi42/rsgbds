@@ -3,7 +3,6 @@ use std::{
     collections::{hash_map::Entry, HashMap},
 };
 
-use compact_str::CompactString;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::{
@@ -81,7 +80,7 @@ impl Charmaps {
             ));
         }
         let Some(i) = self.find_charmap(target_name) else {
-            return Err(CharmapError::NoSuchCharmap(target_name.into(), def_span));
+            return Err(CharmapError::NoSuchCharmap(target_name, def_span));
         };
         self.charmaps.push(Charmap {
             def_span,

@@ -154,7 +154,7 @@ impl parse_ctx!() {
         let synthetic_expr = Expr::symbol(name, name_span).binary_op(operator, expr, Span::Builtin); // This span is not used.
 
         match self.try_const_eval(&synthetic_expr) {
-            Ok((value, span)) => {
+            Ok((value, _span)) => {
                 let span = self.nth_span(op_span_idx);
                 self.symbols.define_constant(
                     name,

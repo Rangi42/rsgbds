@@ -35,7 +35,7 @@ pub Line = DiffMarker? <LineContents>;
 LineContents = {
 	SpecialDirective, // TODO: accept labels before those, to produce a clearer error message
 	LabelDef? <Directive>,
-	LabelDef? <Instructions>,
+	LabelDef? <Emittable>,
 	LabelDef? <MacroCall>,
 	LabelDef // LALRPOP doesn't allow productions to match no tokens, so empty lines are simply not passed to the parser.
 };
@@ -55,8 +55,8 @@ LabelDef: () = {
 };
 
 // Capturing `Instruction_Emit` as the "focus" of the repetition makes it return a `Vec<()>`, which does not allocate.
-Instructions = <Emittable> ("::" <Emittable>)*;
-Emittable: () = {
+Emittable = <Datum> ("::" <Datum>)*;
+Datum: () = {
 	Instruction => ctx.emit_instruction(<>),
 	// For convenience, these directives are also allowed.
 	<span_idx:@L> "ds" <length:Expr>                     => ctx.allocate_space(Either::Left(Either::Left(length)), span_idx),
@@ -126,7 +126,7 @@ Directive: () = {
 	<@L> "break" => ctx.break_loop(<>),
 	"include" <StringExpr> => ctx.include_file(<>),
 	// `data.rs`
-	// `db`, `dw`, `dl` and `ds` are `Emittable`s, instead.
+	// `db`, `dw`, `dl` and `ds` are `Datum`s, instead.
 	<span_idx:@L> "incbin" <path:StringExpr> <start:("," <Expr> ","?)?>         => ctx.incbin_file(path, start,       None,         span_idx),
 	<span_idx:@L> "incbin" <path:StringExpr> "," <start:Expr> "," <length:Expr> => ctx.incbin_file(path, Some(start), Some(length), span_idx),
 	// `macros.rs`
