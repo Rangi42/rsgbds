@@ -184,7 +184,7 @@ Pusho: () = {
 };
 
 AssertParams: (AssertLevel, Expr, Option<(CompactString, Span)>) = {
-	<level:AssertLevel?> <expr:Expr> <msg:("," <StringExpr>)?> => (level.unwrap_or(AssertLevel::Error), expr, msg)
+	<level:(<AssertLevel> ",")?> <expr:Expr> <msg:("," <StringExpr>)?> => (level.unwrap_or(AssertLevel::Error), expr, msg)
 };
 AssertLevel: AssertLevel = { "warn" => AssertLevel::Warn, "fail" => AssertLevel::Error, "fatal" => AssertLevel::Fatal };
 
