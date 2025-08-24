@@ -806,13 +806,13 @@ impl SymbolData {
     pub fn exists(
         &self,
         scope: Option<&Identifier>,
-        active_section: Option<&ActiveSection>,
+        active_sym_section: Option<&ActiveSection>,
         macro_args: Option<&MacroArgs>,
     ) -> bool {
         match self {
             SymbolData::User { .. } | SymbolData::Builtin(..) => true,
             SymbolData::Deleted(..) => false,
-            SymbolData::Pc => active_section.is_some(),
+            SymbolData::Pc => active_sym_section.is_some(),
             SymbolData::Narg => macro_args.is_some(),
             SymbolData::Dot | SymbolData::DotDot => scope.is_some(),
         }

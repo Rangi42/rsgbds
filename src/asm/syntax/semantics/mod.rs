@@ -11,6 +11,7 @@ mod condition;
 mod context;
 mod data;
 mod error;
+mod expr;
 mod instructions;
 mod macros;
 mod opt;

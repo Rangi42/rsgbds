@@ -484,7 +484,15 @@ ExprAtomNoIdent: Expr = {
 	"(" <Expr> ")",
 	<span_idx:@L> <ident:"local identifier"> => Expr::symbol(ident, ctx.nth_span(span_idx)),
 	<span_idx:@L> <number:"number"> => Expr::number(number, ctx.nth_span(span_idx)),
-	// TODO: builtin functions, character literals, and function calls
+	<l_span_idx:@L> "bank" "(" <ident:(@L Identifier)>  ")" <r_span_idx:@R> => ctx.bank_of_ident(ident, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "bank" "(" <sect:StringExprNoIdent> ")" <r_span_idx:@R> => Expr::bank_of_section(sect.0, ctx.span_from_to(l_span_idx, r_span_idx)),
+	<l_span_idx:@L> "def" "(" <ident:Identifier> ")" <r_span_idx:@R> => ctx.expr_def_of_symbol(ident, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "sizeof" "(" <sect:StringExpr>  ")" <r_span_idx:@R> => Expr::size_of_section(sect.0, ctx.span_from_to(l_span_idx, r_span_idx)),
+	<l_span_idx:@L> "sizeof" "(" <region:MemRegion> ")" <r_span_idx:@R> =>  Expr::size_of_region(region, ctx.span_from_to(l_span_idx, r_span_idx)),
+	<l_span_idx:@L> "startof" "(" <sect:StringExpr>  ")" <r_span_idx:@R> => Expr::start_of_section(sect.0, ctx.span_from_to(l_span_idx, r_span_idx)),
+	<l_span_idx:@L> "startof" "(" <region:MemRegion> ")" <r_span_idx:@R> =>  Expr::start_of_region(region, ctx.span_from_to(l_span_idx, r_span_idx)),
+
+	// TODO: more builtin functions, character literals, and function calls
 };
 
 StringExpr: (CompactString, Span) = {
