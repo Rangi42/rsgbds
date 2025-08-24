@@ -389,8 +389,8 @@ Reg16Mem: Reg16Mem = {
 	"de" => Reg16Mem::De,
 	"hli" => Reg16Mem::Hli,
 	"hl" "+" => Reg16Mem::Hli,
-	"hld" => Reg16Mem::Hli,
-	"hl" "-" => Reg16Mem::Hli,
+	"hld" => Reg16Mem::Hld,
+	"hl" "-" => Reg16Mem::Hld,
 };
 Reg16Stack: Reg16Stack = {
 	"bc" => Reg16Stack::Bc,
