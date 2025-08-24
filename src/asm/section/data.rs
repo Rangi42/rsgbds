@@ -8,13 +8,12 @@ use crate::{
     expr::Expr,
     instructions::Instruction,
     macro_args::MacroArgs,
-    section::{Patch, PatchKind},
     sources::Span,
     symbols::Symbols,
     Identifiers, Options,
 };
 
-use super::{ActiveSection, Contents, LinkTimeExpr, SectionKind, Sections};
+use super::{ActiveSection, Contents, LinkTimeExpr, Patch, PatchKind, SectionKind, Sections};
 
 const MAX_SECTION_SIZE: usize = 0x1_000_000;
 
@@ -69,20 +68,18 @@ impl Sections {
                 }
             }
             Contents::NoData(len) => {
-                if !matches!(data_sect.attrs.kind, SectionKind::Union) {
-                    if active
-                        .data_section
-                        .offset
-                        .checked_add(length)
-                        .is_some_and(|new_ofs| new_ofs <= MAX_SECTION_SIZE)
-                    {
-                        debug_assert_eq!(*len, active.data_section.offset);
-                        *len += length;
-                    } else {
-                        *len = MAX_SECTION_SIZE;
-                    }
-                } else {
+                if matches!(data_sect.attrs.kind, SectionKind::Union) || !active.unions.is_empty() {
                     *len = std::cmp::max(*len, active.data_section.offset + length);
+                } else if active
+                    .data_section
+                    .offset
+                    .checked_add(length)
+                    .is_some_and(|new_ofs| new_ofs <= MAX_SECTION_SIZE)
+                {
+                    debug_assert_eq!(*len, active.data_section.offset);
+                    *len += length;
+                } else {
+                    *len = MAX_SECTION_SIZE;
                 }
             }
         }

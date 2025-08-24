@@ -1,5 +1,17 @@
-error: union-in-rom.asm(2):
-    Cannot use UNION inside of ROM0 or ROMX sections
-error: union-in-rom.asm(3):
-    Found ENDU outside of a UNION construct
-Assembly aborted with 2 errors!
+error: `union` used in ROM
+   ╭─[ test.asm:2:1 ]
+   │
+ 2 │ UNION
+   │ ──┬──  
+   │   ╰──── a ROM0 section is active here
+   │ 
+   │ Help: `union` can only be used in RAM sections
+───╯
+error: `endu` used outside of a union
+   ╭─[ test.asm:3:1 ]
+   │
+ 3 │ ENDU
+   │ ──┬─  
+   │   ╰─── no `union` matches this
+───╯
+2 errors generated.

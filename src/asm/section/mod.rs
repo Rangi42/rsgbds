@@ -16,6 +16,7 @@ use crate::{
 
 /// Contains more `impl`s on [`Sections`], related to emitting data.
 mod data;
+mod union;
 
 #[derive(Debug)]
 pub struct Sections {
@@ -40,7 +41,7 @@ struct UnionEntry {
     size: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActiveSection {
     pub id: SectionId,
     pub offset: usize,

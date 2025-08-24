@@ -1,4 +1,12 @@
-error: section-union.asm(37):
-    Section already declared as SECTION UNION
-FATAL: section-union.asm(37):
-    Cannot create section "test" (1 error)
+error: incorrect type used for section "test"
+    ╭─[ test.asm:37:9 ]
+    │
+  1 │ SECTION UNION "test", WRAM0
+    │               ───┬──  
+    │                  ╰──── ...but originally defined as union here
+    │ 
+ 37 │ SECTION "test", WRAM0 ; Don't allow creating a section that's not a union!
+    │         ───┬──  
+    │            ╰──── defined again as normal here...
+────╯
+1 error generated.

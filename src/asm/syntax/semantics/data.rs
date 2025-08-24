@@ -337,14 +337,20 @@ impl parse_ctx!() {
     }
 
     pub fn start_union(&mut self, span_idx: usize) {
-        todo!()
+        let span = &self.line_spans[span_idx];
+        self.sections
+            .enter_union(span, self.nb_errors_left, self.options);
     }
 
-    pub fn union_next(&mut self) {
-        todo!()
+    pub fn union_next(&mut self, span_idx: usize) {
+        let span = &self.line_spans[span_idx];
+        self.sections
+            .next_union_block(span, self.nb_errors_left, self.options);
     }
 
-    pub fn end_union(&mut self) {
-        todo!()
+    pub fn end_union(&mut self, span_idx: usize) {
+        let span = &self.line_spans[span_idx];
+        self.sections
+            .end_union_block(span, self.nb_errors_left, self.options);
     }
 }

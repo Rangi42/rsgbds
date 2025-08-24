@@ -1,9 +1,28 @@
-error: invalid-union.asm(1):
-    Found ENDU outside of a UNION construct
-error: invalid-union.asm(2):
-    Found NEXTU outside of a UNION construct
-error: invalid-union.asm(3):
-    UNIONs must be inside a SECTION
-error: invalid-union.asm(7):
-    Unterminated UNION construct
-Assembly aborted with 4 errors!
+error: `endu` used outside of a section
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ ENDU ; outside UNION
+   │ ──┬─  
+   │   ╰─── no section is active at this point
+   │ 
+   │ Help: consider opening a section with `section` before this
+───╯
+error: `nextu` used outside of a section
+   ╭─[ test.asm:2:1 ]
+   │
+ 2 │ NEXTU ; outside UNION
+   │ ──┬──  
+   │   ╰──── no section is active at this point
+   │ 
+   │ Help: consider opening a section with `section` before this
+───╯
+error: `union` used outside of a section
+   ╭─[ test.asm:3:1 ]
+   │
+ 3 │ UNION ; outside SECTION
+   │ ──┬──  
+   │   ╰──── no section is active at this point
+   │ 
+   │ Help: consider opening a section with `section` before this
+───╯
+3 errors generated.

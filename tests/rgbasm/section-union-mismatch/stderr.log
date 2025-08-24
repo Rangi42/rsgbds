@@ -1,4 +1,8 @@
-error: section-union-mismatch.asm(2):
-    Section already declared as fixed at different address $c000
-FATAL: section-union-mismatch.asm(2):
-    Cannot create section "test" (1 error)
+error: cannot place the section at address $c001
+   ╭─[ test.asm:2:15 ]
+   │
+ 2 │ SECTION UNION "test", WRAM0[$c001]
+   │               ───┬──  
+   │                  ╰──── the section is already fixed at address $c000
+───╯
+1 error generated.
