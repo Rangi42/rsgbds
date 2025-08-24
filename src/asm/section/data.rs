@@ -286,7 +286,7 @@ impl Sections {
                 if let Some((eval_res, patch)) = patch_res {
                     let offset = offset + usize::from(patch.offset);
                     match eval_res {
-                        Ok(Either::Left((value, _span))) => match patch.kind {
+                        Ok(Either::Left((value, span))) => match patch.kind {
                             PatchKind::Byte => ctx.data[offset] = value as u8,
                             PatchKind::Word => {
                                 ctx.data[offset..].copy_from_slice(&(value as i16).to_le_bytes())
@@ -294,7 +294,17 @@ impl Sections {
                             PatchKind::Long => {
                                 ctx.data[offset..].copy_from_slice(&value.to_le_bytes())
                             }
-                            PatchKind::Jr => todo!(),
+                            // To write the byte, we'd have to know PC's value as well, and we can't reborrow the sections right now.
+                            // Thus, defer this to later.
+                            PatchKind::Jr => ctx.patches.push(Patch {
+                                kind: PatchKind::Jr,
+                                rest: LinkTimeExpr {
+                                    span: instruction.span.clone(),
+                                    expr: Expr::number(value, span),
+                                    offset,
+                                    pc: Some((ctx.symbol_section.id, ctx.symbol_section.offset)),
+                                },
+                            }),
                         },
 
                         Ok(Either::Right(expr)) => ctx.patches.push(Patch {
