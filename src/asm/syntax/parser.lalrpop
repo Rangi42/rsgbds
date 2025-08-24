@@ -124,7 +124,7 @@ Directive: () = {
 	<span_idx:@L> "popc" => ctx.pop_charmap(span_idx),
 	// `context.rs`
 	<@L> "break" => ctx.break_loop(<>),
-	"include" <StringExpr> => ctx.include_file(<>),
+	<span_idx:@L> "include" <path:StringExpr> => ctx.include_file(path, span_idx),
 	// `data.rs`
 	// `db`, `dw`, `dl` and `ds` are `Datum`s, instead.
 	<span_idx:@L> "incbin" <path:StringExpr> <start:("," <Expr> ","?)?>         => ctx.incbin_file(path, start,       None,         span_idx),

@@ -184,12 +184,14 @@ impl parse_ctx!() {
         }
     }
 
-    pub fn include_file(&mut self, (path, span): (CompactString, Span)) {
+    pub fn include_file(&mut self, (path, path_span): (CompactString, Span), span_idx: usize) {
+        let span = self.nth_span(span_idx);
+
         match Source::load_file(&path) {
             Ok(source) => push_file(self, source, Some(Rc::new(span.extract_normal()))),
-            Err(err) => self.error(&span, |error| {
+            Err(err) => self.error(&path_span, |error| {
                 error.set_message("unable to read the file at \"{path}\"");
-                error.add_label(diagnostics::error_label(&span).with_message(err));
+                error.add_label(diagnostics::error_label(&path_span).with_message(err));
             }),
         }
     }
