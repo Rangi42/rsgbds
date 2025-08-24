@@ -1,2 +1,8 @@
-FATAL: incbin-negative-bad.asm(3):
-    Constant must not be negative: -42
+error: negative start offset given to `incbin`
+   ╭─[ test.asm:3:23 ]
+   │
+ 3 │ INCBIN "../data.bin", -42
+   │                       ─┬─  
+   │                        ╰─── this evaluates to -42
+───╯
+1 error generated.

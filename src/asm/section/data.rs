@@ -315,6 +315,43 @@ impl Sections {
             },
         );
     }
+
+    pub fn emit_byte_slice(
+        &mut self,
+        slice: &[u8],
+        keyword_span: &Span,
+        identifiers: &Identifiers,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        self.emit_data(
+            "binary file",
+            slice.len(),
+            keyword_span,
+            identifiers,
+            nb_errors_left,
+            options,
+            |_offset, ctx| ctx.data.extend_from_slice(slice),
+        );
+    }
+
+    pub fn check_could_emit_slice(
+        &mut self,
+        keyword_span: &Span,
+        identifiers: &Identifiers,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        self.emit_data(
+            "binary file",
+            0,
+            keyword_span,
+            identifiers,
+            nb_errors_left,
+            options,
+            |_offset, _ctx| {},
+        );
+    }
 }
 
 struct EmissionContext<'patches, 'data, 'sym_sect, 'idents, 'nerrs, 'options> {

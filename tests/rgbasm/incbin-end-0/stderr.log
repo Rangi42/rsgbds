@@ -1,3 +1,10 @@
-error: incbin-end-0.asm(1):
-    Cannot output data outside of a SECTION
-Assembly aborted with 1 error!
+error: binary file emitted outside of a section
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ INCBIN "../data.bin", 123, 0
+   │ ───┬──  
+   │    ╰──── no section is active at this point
+   │ 
+   │ Help: consider opening a section with `section` before this
+───╯
+1 error generated.

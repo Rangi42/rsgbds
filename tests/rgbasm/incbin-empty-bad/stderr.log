@@ -1,3 +1,8 @@
-error: incbin-empty-bad.asm(3):
-    Specified range in INCBIN file 'empty.bin' is out of bounds (0 + 1 > 0)
-Assembly aborted with 1 error!
+error: specified length is greater than end of `incbin` file
+   ╭─[ test.asm:3:8 ]
+   │
+ 3 │ INCBIN "../empty.bin", 0, 1
+   │        ───────┬──────  
+   │               ╰──────── cannot read 1 byte (after skipping 0)
+───╯
+1 error generated.

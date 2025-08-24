@@ -1,1 +1,1 @@
-INCBIN "../../empty.bin", 123, 0
+INCBIN "../data.bin", 123, 0

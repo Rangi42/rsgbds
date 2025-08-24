@@ -1,7 +1,14 @@
+use std::{fmt::Display, fs::File, io::Read};
+
 use compact_str::CompactString;
 use either::Either;
 
-use crate::{diagnostics, expr::Expr, sources::Span};
+use crate::{
+    common::S,
+    diagnostics::{self, ReportBuilder},
+    expr::Expr,
+    sources::Span,
+};
 
 use super::parse_ctx;
 
@@ -181,5 +188,153 @@ impl parse_ctx!() {
                 }
             }
         }
+    }
+
+    #[allow(clippy::read_zero_byte_vec)] // False positive on Rust 1.73.
+    pub fn incbin_file(
+        &mut self,
+        (path, path_span): (CompactString, Span),
+        start_expr: Option<Expr>,
+        length_expr: Option<Expr>,
+        span_idx: usize,
+    ) {
+        let length = length_expr.and_then(|expr| match self.try_const_eval(&expr) {
+            Ok((value, span)) => {
+                if value < 0 {
+                    self.error(&span, |error| {
+                        error.set_message("negative length given to `incbin`");
+                        error.add_label(
+                            diagnostics::error_label(&span)
+                                .with_message(format!("this evaluates to {value}")),
+                        );
+                    });
+                    None
+                } else {
+                    Some(value as usize)
+                }
+            }
+            Err(err) => {
+                self.report_expr_error(err);
+                None
+            }
+        });
+        if length == Some(0) {
+            let span = &self.line_spans[span_idx];
+            self.sections.check_could_emit_slice(
+                span,
+                self.identifiers,
+                self.nb_errors_left,
+                self.options,
+            );
+            return; // Don't even try to open the file if we would be including none of it.
+        }
+
+        let report_io_err =
+            |err: std::io::Error, span: &Span, eof_msg: &str, eof_label: EofLabel| {
+                self.error(span, |error| {
+                    use std::io::ErrorKind;
+                    if err.kind() == ErrorKind::UnexpectedEof {
+                        error.set_message(eof_msg);
+                        error.add_label(diagnostics::error_label(span).with_message(eof_label))
+                    } else {
+                        error.set_message(format!("failed to read \"{path}\""));
+                        error.add_label(diagnostics::error_label(span).with_message(err));
+                    }
+                })
+            };
+        enum EofLabel {
+            None,
+            Start(usize),
+            Length(Option<i32>, usize),
+        }
+        impl Display for EofLabel {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    EofLabel::None => unreachable!(),
+                    EofLabel::Start(start) => {
+                        write!(f, "cannot skip the first {start} byte{}", S::from(*start))
+                    }
+                    EofLabel::Length(None, length) => {
+                        write!(f, "cannot read {length} byte{}", S::from(*length))
+                    }
+                    EofLabel::Length(Some(start), length) => {
+                        write!(
+                            f,
+                            "cannot read {length} byte{} (after skipping {start})",
+                            S::from(*length)
+                        )
+                    }
+                }
+            }
+        }
+
+        let mut file = match File::open(&path) {
+            Ok(file) => file,
+            Err(err) => {
+                report_io_err(err, &path_span, "", EofLabel::None);
+                return;
+            }
+        };
+
+        let mut data = vec![];
+        let start = start_expr.and_then(|expr| match self.try_const_eval(&expr) {
+            Ok((value, span)) => {
+                if value < 0 {
+                    self.error(&span, |error| {
+                        error.set_message("negative start offset given to `incbin`");
+                        error.add_label(
+                            diagnostics::error_label(&span)
+                                .with_message(format!("this evaluates to {value}")),
+                        );
+                    });
+                    Some(0)
+                } else if value != 0 {
+                    data.resize(value as usize, 0);
+                    if let Err(err) = file.read_exact(&mut data) {
+                        report_io_err(
+                            err,
+                            &span,
+                            "specified start offset is greater than length of `incbin` file",
+                            EofLabel::Start(value as usize),
+                        );
+                    }
+                    Some(value)
+                } else {
+                    Some(0)
+                }
+            }
+            Err(err) => {
+                self.report_expr_error(err);
+                None
+            }
+        });
+
+        let res = match length {
+            Some(length) => {
+                data.resize(length, 0);
+                file.read_exact(&mut data)
+            }
+            None => {
+                data.clear();
+                file.read_to_end(&mut data).map(|_| ())
+            }
+        };
+        if let Err(err) = res {
+            report_io_err(
+                err,
+                &path_span,
+                "specified length is greater than end of `incbin` file",
+                EofLabel::Length(start, length.unwrap_or_default()),
+            );
+        }
+
+        let span = &self.line_spans[span_idx];
+        self.sections.emit_byte_slice(
+            &data,
+            span,
+            self.identifiers,
+            self.nb_errors_left,
+            self.options,
+        );
     }
 }

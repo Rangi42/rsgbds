@@ -1,3 +1,8 @@
-error: incbin-end-bad.asm(3):
-    Specified range in INCBIN file 'data.bin' is out of bounds (123 + 1 > 123)
-Assembly aborted with 1 error!
+error: specified length is greater than end of `incbin` file
+   ╭─[ test.asm:3:8 ]
+   │
+ 3 │ INCBIN "../data.bin", 123, 1
+   │        ──────┬──────  
+   │              ╰──────── cannot read 1 byte (after skipping 123)
+───╯
+1 error generated.

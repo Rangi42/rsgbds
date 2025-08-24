@@ -127,7 +127,8 @@ Directive: () = {
 	"include" <StringExpr> => ctx.include_file(<>),
 	// `data.rs`
 	// `db`, `dw`, `dl` and `ds` are `Emittable`s, instead.
-// TODO: `incbin`...
+	<span_idx:@L> "incbin" <path:StringExpr> <start:("," <Expr> ","?)?>         => ctx.incbin_file(path, start,       None,         span_idx),
+	<span_idx:@L> "incbin" <path:StringExpr> "," <start:Expr> "," <length:Expr> => ctx.incbin_file(path, Some(start), Some(length), span_idx),
 	// `macros.rs`
 	<span_idx:@L> "shift" <amount:Expr?> => ctx.shift_macro_args(amount, span_idx),
 	// `opt.rs`
