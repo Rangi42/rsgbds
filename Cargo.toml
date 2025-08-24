@@ -21,12 +21,14 @@ default = ["rgbasm", "rgblink", "rgbfix", "rgbgfx"]
 
 rgbasm = [
 	# CLI.
-	"dep:clap",
-	"dep:os_info",
 	"dep:ariadne",
-	"dep:yansi",
+	"dep:cfg-if",
+	"dep:clap",
+	"dep:funty",
+	"dep:os_info",
 	"dep:shadow-rs",
 	"dep:sysexits",
+	"dep:yansi",
 	# Specific deps.
 	"dep:arrayvec",
 	"dep:chrono",
@@ -46,35 +48,40 @@ rgbasm = [
 ]
 rgblink = [
 	# CLI.
-	"dep:clap",
-	"dep:os_info",
 	"dep:ariadne",
-	"dep:yansi",
+	"dep:cfg-if",
+	"dep:clap",
+	"dep:funty",
+	"dep:os_info",
 	"dep:shadow-rs",
 	"dep:sysexits",
+	"dep:yansi",
 ]
 rgbfix = [
 	# CLI.
-	"dep:clap",
-	"dep:os_info",
 	"dep:ariadne",
-	"dep:yansi",
+	"dep:cfg-if",
+	"dep:clap",
+	"dep:funty",
+	"dep:os_info",
 	"dep:shadow-rs",
 	"dep:sysexits",
+	"dep:yansi",
 ]
 rgbgfx = [
 	# CLI.
-	"dep:clap",
-	"dep:os_info",
 	"dep:ariadne",
-	"dep:yansi",
+	"dep:cfg-if",
+	"dep:clap",
+	"dep:funty",
+	"dep:os_info",
 	"dep:shadow-rs",
 	"dep:sysexits",
+	"dep:yansi",
 	# Specific deps.
 	"dep:arrayvec",
 	"dep:bitvec",
 	"dep:cfg-if",
-	"dep:funty",
 	"dep:plumers",
 ]
 
