@@ -690,7 +690,7 @@ impl EmissionContext<'_, '_, '_, '_, '_, '_> {
         eval_msg: &'static str,
         help_text: Option<&'static str>,
     ) -> bool {
-        if (-256..=255).contains(&value) {
+        if !(-256..=255).contains(&value) {
             diagnostics::warn(
                 warning!("truncation=1"),
                 span,
@@ -737,7 +737,7 @@ impl EmissionContext<'_, '_, '_, '_, '_, '_> {
         eval_msg: &'static str,
         help_text: Option<&'static str>,
     ) -> bool {
-        if (-65536..=65535).contains(&value) {
+        if !(-65536..=65535).contains(&value) {
             diagnostics::warn(
                 warning!("truncation=1"),
                 span,
