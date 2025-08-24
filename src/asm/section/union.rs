@@ -7,17 +7,17 @@ use super::{Contents, Sections, UnionEntry};
 impl Sections {
     pub fn enter_union(
         &mut self,
-        keyword_span: &Span,
+        keyword_span: Span,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
         let Some(active) = self.active_section.as_mut() else {
             diagnostics::error(
-                keyword_span,
+                &keyword_span,
                 |error| {
                     error.set_message("`union` used outside of a section");
                     error.add_label(
-                        diagnostics::error_label(keyword_span)
+                        diagnostics::error_label(&keyword_span)
                             .with_message("no section is active at this point"),
                     );
                     if self
@@ -40,10 +40,10 @@ impl Sections {
         match &mut data_sect.bytes {
             Contents::Data(_data) => {
                 diagnostics::error(
-                    keyword_span,
+                    &keyword_span,
                     |error| {
                         error.set_message("`union` used in ROM");
-                        error.add_label(diagnostics::error_label(keyword_span).with_message(
+                        error.add_label(diagnostics::error_label(&keyword_span).with_message(
                             format!(
                                 "a {} section is active here",
                                 data_sect.attrs.mem_region.name(),
@@ -65,6 +65,7 @@ impl Sections {
                 debug_assert_eq!(*len, active.data_section.offset);
                 active.unions.push(UnionEntry {
                     offset_at_entry: active.data_section.offset,
+                    span: keyword_span,
                 });
             }
         }

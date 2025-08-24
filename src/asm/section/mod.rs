@@ -38,6 +38,7 @@ pub struct ActiveSections {
 #[derive(Debug)]
 struct UnionEntry {
     offset_at_entry: usize,
+    span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -258,6 +259,22 @@ impl Sections {
                                 diagnostics::warning_label(span)
                                     .with_message("no `endl` before this point"),
                             );
+                        },
+                        nb_errors_left,
+                        options,
+                    );
+                }
+
+                if let Some(union) = active.unions.last() {
+                    diagnostics::error(
+                        &union.span,
+                        |error| {
+                            error.set_message("unclosed `union`");
+                            error.add_labels([
+                                diagnostics::note_label(&union.span)
+                                    .with_message("this `union` doesn't have a matching `endu`..."),
+                                diagnostics::error_label(span).with_message("...before this"),
+                            ]);
                         },
                         nb_errors_left,
                         options,

@@ -337,7 +337,7 @@ impl parse_ctx!() {
     }
 
     pub fn start_union(&mut self, span_idx: usize) {
-        let span = &self.line_spans[span_idx];
+        let span = self.nth_span(span_idx);
         self.sections
             .enter_union(span, self.nb_errors_left, self.options);
     }
