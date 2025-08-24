@@ -358,7 +358,7 @@ impl Lexer {
     pub fn next_char_is_a_colon(&mut self) -> bool {
         // This is only meant to be used after lexing an identifier, which will have `peek`ed the next character;
         // so we can rely on expansions having been triggered.
-        self.top_context().remaining_text().chars().next() == Some(':')
+        self.top_context().remaining_text().starts_with(':')
     }
 
     fn peek(&mut self, params: &mut LexerParams) -> Option<char> {
