@@ -116,7 +116,7 @@ pub fn parse_file(
                     let token = parse_ctx.next_token();
                     parse_ctx.push_line_token(token, &mut line_tokens);
                 }
-                tok!("identifier"(_)) | tok!("opt") => {
+                tok!("identifier"(_)) | tok!("opt") | tok!("pusho") => {
                     // Raw line.
                     parse_ctx.push_line_token(token, &mut line_tokens);
                     while let Some((string, span)) = parse_ctx.next_token_raw() {
