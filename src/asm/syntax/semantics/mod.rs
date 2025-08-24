@@ -6,6 +6,7 @@ use crate::{
 
 use super::{parse_ctx, tokens::TokenPayload};
 
+mod charmap;
 mod condition;
 mod context;
 mod data;

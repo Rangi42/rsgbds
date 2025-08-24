@@ -68,9 +68,9 @@ fn main() -> ExitCode {
     let nb_errors_left = Cell::new(options.max_errors);
 
     let mut identifiers = Identifiers::new();
-    let mut charmaps = Charmaps::new();
     let mut sections = Sections::new();
     let mut symbols = Symbols::new(&mut identifiers, defines, &nb_errors_left, &options);
+    let mut charmaps = Charmaps::new(&mut identifiers);
 
     if let Some(preinclude_path) = &options.preinclude {
         syntax::parse_file(

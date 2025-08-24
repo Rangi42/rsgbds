@@ -115,6 +115,13 @@ ForParams: (Option<Expr>, Expr, Option<Expr>) = {
 };
 
 Directive: () = {
+	// `charmap.rs`
+	"charmap" <what:StringExpr> "," <mapping:CommaList<ConstExpr>> => ctx.charmap_entry(what, mapping),
+	<span_idx:@L> "newcharmap" <name:"identifier"> <src:("," <"identifier">)?> => ctx.create_charmap(name, src, span_idx),
+	"setcharmap" <span_idx:@L> <name:"identifier"> => ctx.switch_to_charmap(name, span_idx),
+	<span_idx:@L> "pushc" => ctx.push_charmap(),
+	<span_idx:@L> "pushc" <name:"identifier"> <src:("," <"identifier">)?> => { ctx.push_charmap(); ctx.create_charmap(name, src, span_idx) },
+	<span_idx:@L> "popc" => ctx.pop_charmap(span_idx),
 	// `context.rs`
 	<@L> "break" => ctx.break_loop(<>),
 	"include" <StringExpr> => ctx.include_file(<>),
@@ -161,6 +168,7 @@ Option: () = <span_idx:@L> <string:"string"> => ctx.process_option(&string, span
 Def: bool = { "def" => false, "redef" => true };
 NumDefKeyword: bool = { "equ" => false, "=" => true };
 
+// This is necessary so that the options are pushed before the first `Option` is reduced (and thus options altered).
 Pusho: () = {
 	"pusho" => ctx.push_options(),
 	Pusho <Option>
@@ -396,6 +404,16 @@ StringOrExpr: Either<Expr, (CompactString, Span)> = {
 	ExprLogicOr<ExprAtomNoIdent> => Either::Left(<>),
 	StringExprNoIdent => Either::Right(<>),
 	<span_idx:@L> <ident:"identifier"> => ctx.string_or_numeric_sym(ident, span_idx),
+};
+
+// Try to avoid using this, as the default value upon error may cause spurious errors to be reported.
+// Currently only used to avoid a `Vec<Expr>`.
+ConstExpr: i32 = Expr => match ctx.try_const_eval(&<>) {
+	Ok((value, _span)) => value,
+	Err(err) => {
+		ctx.report_expr_error(err);
+		0
+	}
 };
 
 // Places that don't handle strings and expressions together can use `Expr` directly.

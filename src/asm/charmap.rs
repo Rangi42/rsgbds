@@ -1,38 +1,35 @@
 use std::{
     cell::Cell,
-    collections::{
-        hash_map::{DefaultHasher, Entry},
-        HashMap,
-    },
-    hash::BuildHasherDefault,
+    collections::{hash_map::Entry, HashMap},
 };
 
 use compact_str::CompactString;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::{
     common::Captures,
     diagnostics::{self, warning},
     sources::Span,
-    Options,
+    Identifier, Identifiers, Options,
 };
 
 #[derive(Debug)]
 pub struct Charmaps {
-    // TODO: consider using an `IndexMap` instead
+    // TODO(perf): consider using an `IndexMap` instead
     charmaps: Vec<Charmap>,
     active_charmap_id: usize,
-    // TODO: consider using `smallvec` or such, since this is hardly ever more than 1.
+    // TODO(perf): consider using `smallvec` or such, since this is hardly ever more than 1.
     stack: Vec<usize>,
 }
 
 #[derive(Debug)]
 pub struct Charmap {
     def_span: Span,
-    name: CompactString,
+    name: Identifier,
     nodes: Vec<Node>,
     root_node: Children,
 }
-type Children = HashMap<char, usize, BuildHasherDefault<DefaultHasher>>;
+type Children = FxHashMap<char, usize>;
 #[derive(Debug, Clone)]
 struct Node {
     children: Children,
@@ -42,38 +39,41 @@ struct Node {
 const DEFAULT_CHARMAP_NAME: &str = "main";
 
 impl Charmaps {
-    pub fn new() -> Self {
+    pub fn new(identifiers: &mut Identifiers) -> Self {
         Self {
-            charmaps: vec![Charmap::new(DEFAULT_CHARMAP_NAME.into(), Span::Builtin)],
+            charmaps: vec![Charmap::new(
+                Span::Builtin,
+                identifiers.get_or_intern_static(DEFAULT_CHARMAP_NAME),
+            )],
             active_charmap_id: 0,
             stack: vec![],
         }
     }
 
-    fn find_charmap(&self, name: &str) -> Option<usize> {
+    fn find_charmap(&self, name: Identifier) -> Option<usize> {
         self.charmaps
             .iter()
             .position(|charmap| name == charmap.name)
     }
-    pub fn make_new(&mut self, name: CompactString, def_span: Span) -> Result<(), CharmapError> {
-        if let Some(i) = self.find_charmap(&name) {
+    pub fn make_new(&mut self, name: Identifier, def_span: Span) -> Result<(), CharmapError> {
+        if let Some(i) = self.find_charmap(name) {
             return Err(CharmapError::Conflict(
                 name,
                 def_span,
                 self.charmaps[i].def_span.clone(),
             ));
         }
-        self.charmaps.push(Charmap::new(name, def_span));
+        self.charmaps.push(Charmap::new(def_span, name));
         self.active_charmap_id = self.charmaps.len() - 1;
         Ok(())
     }
     pub fn make_copy(
         &mut self,
-        name: CompactString,
+        name: Identifier,
         def_span: Span,
-        target_name: &str,
+        target_name: Identifier,
     ) -> Result<(), CharmapError> {
-        if let Some(i) = self.find_charmap(&name) {
+        if let Some(i) = self.find_charmap(name) {
             return Err(CharmapError::Conflict(
                 name,
                 def_span,
@@ -92,7 +92,7 @@ impl Charmaps {
         self.active_charmap_id = self.charmaps.len() - 1;
         Ok(())
     }
-    pub fn switch_to(&mut self, name: &str) -> Option<()> {
+    pub fn switch_to(&mut self, name: Identifier) -> Option<()> {
         // TODO: if the charmap doesn't exist, suggest closely-named ones
         self.active_charmap_id = self.find_charmap(name)?;
         Some(())
@@ -102,6 +102,9 @@ impl Charmaps {
     }
     pub fn active_charmap_mut(&mut self) -> &mut Charmap {
         &mut self.charmaps[self.active_charmap_id]
+    }
+    pub fn is_main_charmap_active(&self) -> bool {
+        self.active_charmap_id == 0
     }
 
     pub fn push_active_charmap(&mut self) {
@@ -130,12 +133,12 @@ impl Charmaps {
     }
 }
 impl Charmap {
-    fn new(name: CompactString, def_span: Span) -> Self {
+    fn new(def_span: Span, name: Identifier) -> Self {
         Self {
             def_span,
             name,
             nodes: vec![],
-            root_node: HashMap::with_capacity_and_hasher(128, BuildHasherDefault::default()),
+            root_node: HashMap::with_capacity_and_hasher(128, FxBuildHasher),
         }
     }
 
@@ -165,10 +168,12 @@ impl Charmap {
         self.nodes.is_empty()
     }
 
-    pub fn warn_on_passthrough(
+    fn warn_on_passthrough(
         &self,
         c: char,
+        is_main_charmap: bool,
         span: &Span,
+        identifiers: &Identifiers,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
@@ -178,14 +183,14 @@ impl Charmap {
                 diagnostics::warning!("unmapped-char=1"),
                 span,
                 |warning| {
-                    warning.set_message(format!("'{}' is not mapped", c.escape_default(),));
+                    warning.set_message(format!("'{}' is not mapped", c.escape_default()));
                     warning
                         .add_label(diagnostics::warning_label(span).with_message("in this string"));
                 },
                 nb_errors_left,
                 options,
             );
-        } else if self.name != DEFAULT_CHARMAP_NAME {
+        } else if !is_main_charmap {
             // Warn if this character is not mapped, except in the default charmap.
             diagnostics::warn(
                 diagnostics::warning!("unmapped-char=2"),
@@ -194,7 +199,7 @@ impl Charmap {
                     warning.set_message(format!(
                         "'{}' is not mapped in charmap \"{}\"",
                         c.escape_default(),
-                        &self.name,
+                        identifiers.resolve(self.name).unwrap(),
                     ));
                     warning
                         .add_label(diagnostics::warning_label(span).with_message("in this string"));
@@ -205,30 +210,50 @@ impl Charmap {
         }
     }
 
-    pub fn encode<'string>(
+    pub fn encode<'a>(
         &self,
-        string: &'string str,
-    ) -> impl Iterator<Item = CharMapping<'_>> + Captures<&'string ()> {
-        Encoder(self, string)
+        (string, string_span): (&'a str, &'a Span),
+        is_main_charmap: bool,
+        identifiers: &'a Identifiers,
+        nb_errors_left: &'a Cell<usize>,
+        options: &'a Options,
+    ) -> impl Iterator<Item = CharMapping<'_>> + Captures<&'a ()> {
+        Encoder {
+            charmap: self,
+            string,
+            string_span,
+            is_main_charmap,
+            identifiers,
+            nb_errors_left,
+            options,
+        }
     }
 }
 #[derive(Debug)]
-struct Encoder<'charmap, 'string>(&'charmap Charmap, &'string str);
+struct Encoder<'charmap, 'a> {
+    charmap: &'charmap Charmap,
+    string: &'a str,
+    string_span: &'a Span,
+    is_main_charmap: bool,
+    identifiers: &'a Identifiers,
+    nb_errors_left: &'a Cell<usize>,
+    options: &'a Options,
+}
 impl<'charmap> Iterator for Encoder<'charmap, '_> {
     type Item = CharMapping<'charmap>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // RGBASM matches charmaps using the common “leftmost-longest” scheme.
-        let chars = self.1.char_indices();
+        let chars = self.string.char_indices();
 
-        let mut children = &self.0.root_node;
+        let mut children = &self.charmap.root_node;
         let mut target_node = None;
         // Read characters from the string, either until we reach a dead end, or exhaust the string.
         for (offset, c) in chars {
             let Some(&node_id) = children.get(&c) else {
                 break;
             };
-            let node = &self.0.nodes[node_id];
+            let node = &self.charmap.nodes[node_id];
             if !node.mapping.is_empty() {
                 target_node = Some((&node.mapping, offset + c.len_utf8()));
             }
@@ -236,12 +261,20 @@ impl<'charmap> Iterator for Encoder<'charmap, '_> {
         }
 
         if let Some((mapping, nb_bytes)) = target_node {
-            self.1 = &self.1[nb_bytes..];
+            self.string = &self.string[nb_bytes..];
             Some(CharMapping::Mapped(mapping))
         } else {
             // Default identity mapping: just return one character.
-            let c = self.1.chars().next()?;
-            self.1 = &self.1[c.len_utf8()..];
+            let c = self.string.chars().next()?;
+            self.string = &self.string[c.len_utf8()..];
+            self.charmap.warn_on_passthrough(
+                c,
+                self.is_main_charmap,
+                self.string_span,
+                self.identifiers,
+                self.nb_errors_left,
+                self.options,
+            );
             Some(CharMapping::Passthrough(c))
         }
     }
@@ -289,8 +322,8 @@ impl ExactSizeIterator for CharValues<'_> {
 
 #[derive(Debug)]
 pub enum CharmapError {
-    Conflict(CompactString, Span, Span),
-    NoSuchCharmap(CompactString, Span),
+    Conflict(Identifier, Span, Span),
+    NoSuchCharmap(Identifier, Span),
 }
 impl CharmapError {
     pub fn diag_span(&self) -> &Span {
@@ -299,10 +332,17 @@ impl CharmapError {
             CharmapError::NoSuchCharmap(_, span) => span,
         }
     }
-    pub fn make_diag<'span>(&'span self, error: &mut crate::diagnostics::ReportBuilder<'span>) {
+    pub fn make_diag<'span>(
+        &'span self,
+        error: &mut crate::diagnostics::ReportBuilder<'span>,
+        identifiers: &Identifiers,
+    ) {
         match self {
             CharmapError::Conflict(name, this_def, existing) => {
-                error.set_message(format!("a charmap called \"{name}\" already exists"));
+                error.set_message(format!(
+                    "a charmap called \"{}\" already exists",
+                    identifiers.resolve(*name).unwrap()
+                ));
                 error.add_labels([
                     diagnostics::error_label(this_def)
                         .with_message("attempting to create it here..."),
@@ -311,7 +351,10 @@ impl CharmapError {
                 ])
             }
             CharmapError::NoSuchCharmap(name, span) => {
-                error.set_message(format!("no charmap called \"{name}\" exists"));
+                error.set_message(format!(
+                    "no charmap called \"{}\" exists",
+                    identifiers.resolve(*name).unwrap()
+                ));
                 error.add_label(diagnostics::error_label(span).with_message("requested here"));
             }
         }

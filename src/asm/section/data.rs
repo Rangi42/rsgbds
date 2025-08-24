@@ -151,6 +151,7 @@ impl Sections {
         keyword_span: &Span,
         identifiers: &Identifiers,
         charmap: &Charmap,
+        is_main_charmap: bool,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
@@ -161,7 +162,9 @@ impl Sections {
             identifiers,
             nb_errors_left,
             options,
-            |_offset, mut ctx| Self::push_byte_string(string, charmap, str_span, &mut ctx),
+            |_offset, mut ctx| {
+                Self::push_byte_string(string, charmap, str_span, is_main_charmap, &mut ctx)
+            },
         );
     }
 
@@ -195,6 +198,7 @@ impl Sections {
         keyword_span: &Span,
         identifiers: &Identifiers,
         charmap: &Charmap,
+        is_main_charmap: bool,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
@@ -205,7 +209,9 @@ impl Sections {
             identifiers,
             nb_errors_left,
             options,
-            |_offset, mut ctx| Self::push_word_string(string, charmap, str_span, &mut ctx),
+            |_offset, mut ctx| {
+                Self::push_word_string(string, charmap, str_span, is_main_charmap, &mut ctx)
+            },
         );
     }
 
@@ -235,9 +241,11 @@ impl Sections {
     pub fn emit_long_string(
         &mut self,
         string: &str,
+        str_span: &Span,
         keyword_span: &Span,
         identifiers: &Identifiers,
         charmap: &Charmap,
+        is_main_charmap: bool,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
@@ -248,7 +256,9 @@ impl Sections {
             identifiers,
             nb_errors_left,
             options,
-            |_offset, mut ctx| Self::push_long_string(string, charmap, &mut ctx),
+            |_offset, mut ctx| {
+                Self::push_long_string(string, str_span, charmap, is_main_charmap, &mut ctx)
+            },
         );
     }
 
@@ -555,10 +565,17 @@ impl Sections {
         string: &str,
         charmap: &Charmap,
         str_span: &Span,
+        is_main_charmap: bool,
         ctx: &mut EmissionContext,
     ) {
         let mut warned = false;
-        for mapping in charmap.encode(string) {
+        for mapping in charmap.encode(
+            (string, str_span),
+            is_main_charmap,
+            ctx.identifiers,
+            ctx.nb_errors_left,
+            ctx.options,
+        ) {
             for value in mapping {
                 if !warned {
                     warned = ctx.check_8_bit(
@@ -579,10 +596,17 @@ impl Sections {
         string: &str,
         charmap: &Charmap,
         str_span: &Span,
+        is_main_charmap: bool,
         ctx: &mut EmissionContext,
     ) {
         let mut warned = false;
-        for mapping in charmap.encode(string) {
+        for mapping in charmap.encode(
+            (string, str_span),
+            is_main_charmap,
+            ctx.identifiers,
+            ctx.nb_errors_left,
+            ctx.options,
+        ) {
             for value in mapping {
                 if !warned {
                     warned = ctx.check_16_bit(
@@ -599,8 +623,20 @@ impl Sections {
         }
     }
 
-    fn push_long_string(string: &str, charmap: &Charmap, ctx: &mut EmissionContext) {
-        for mapping in charmap.encode(string) {
+    fn push_long_string(
+        string: &str,
+        str_span: &Span,
+        charmap: &Charmap,
+        is_main_charmap: bool,
+        ctx: &mut EmissionContext,
+    ) {
+        for mapping in charmap.encode(
+            (string, str_span),
+            is_main_charmap,
+            ctx.identifiers,
+            ctx.nb_errors_left,
+            ctx.options,
+        ) {
             for value in mapping {
                 // No truncation checks here, since we are working with 32-bit values already.
                 ctx.data.extend_from_slice(&value.to_le_bytes());
