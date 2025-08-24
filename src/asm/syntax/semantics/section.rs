@@ -105,7 +105,7 @@ impl parse_ctx!() {
     ) -> (SectionAttrs, (CompactString, Span)) {
         if let Err(err) = attrs
             .address
-            .merge(AddrConstraint::Align(alignment, offset), 0)
+            .merge(AddrConstraint::from((alignment, offset)), 0)
         {
             let span = &self.line_spans[span_idx];
             self.error(span, |error| {

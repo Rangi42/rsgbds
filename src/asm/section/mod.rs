@@ -395,24 +395,18 @@ impl AddrConstraint {
     pub fn merge(&mut self, other: Self, offset: usize) -> Result<(), MergeError> {
         match (self as &mut _, other) {
             // If the new constraint is nonexistent, then there is nothing to do.
-            (_, AddrConstraint::None) => Ok(()),
+            (_, Self::None) => Ok(()),
             // In these cases, the new constraint simply replaces the old one, with no chance of conflict either.
-            (AddrConstraint::None, AddrConstraint::Align(align, align_ofs)) => {
-                *self = AddrConstraint::Align(
-                    align,
-                    align_ofs.wrapping_sub(offset as u16) % (1 << align),
-                );
+            (Self::None, Self::Align(align, align_ofs)) => {
+                *self = Self::Align(align, align_ofs.wrapping_sub(offset as u16) % (1 << align));
                 Ok(())
             }
-            (AddrConstraint::None, AddrConstraint::Addr(addr)) => {
-                *self = AddrConstraint::Addr(addr.wrapping_sub(offset as u16));
+            (Self::None, Self::Addr(addr)) => {
+                *self = Self::Addr(addr.wrapping_sub(offset as u16));
                 Ok(())
             }
             // Now we get to the interesting cases.
-            (
-                AddrConstraint::Align(align, align_ofs),
-                AddrConstraint::Align(other_align, other_align_ofs),
-            ) => {
+            (Self::Align(align, align_ofs), Self::Align(other_align, other_align_ofs)) => {
                 let cur_align_offset = align_ofs.wrapping_add(offset as u16) % (1 << *align);
                 if other_align_ofs % (1 << *align) == cur_align_offset % (1 << other_align) {
                     if *align < other_align {
@@ -430,18 +424,18 @@ impl AddrConstraint {
                     ))
                 }
             }
-            (AddrConstraint::Align(align, align_ofs), AddrConstraint::Addr(addr)) => {
+            (Self::Align(align, align_ofs), Self::Addr(addr)) => {
                 let cur_align_offset = align_ofs
                     .wrapping_add(offset as u16)
                     .rem_euclid(1 << *align);
                 if addr % (1 << *align) == cur_align_offset {
-                    *self = AddrConstraint::Addr(addr.wrapping_sub(offset as u16));
+                    *self = Self::Addr(addr.wrapping_sub(offset as u16));
                     Ok(())
                 } else {
                     Err(MergeError::BadAlignFixed(*align, cur_align_offset, addr))
                 }
             }
-            (AddrConstraint::Addr(addr), AddrConstraint::Align(align, align_ofs)) => {
+            (Self::Addr(addr), Self::Align(align, align_ofs)) => {
                 let cur_addr = addr.wrapping_add(offset as u16);
                 if cur_addr % (1 << align) == align_ofs {
                     Ok(())
@@ -449,7 +443,7 @@ impl AddrConstraint {
                     Err(MergeError::FixedBadAlign(cur_addr, align, align_ofs))
                 }
             }
-            (AddrConstraint::Addr(addr), AddrConstraint::Addr(other_addr)) => {
+            (Self::Addr(addr), Self::Addr(other_addr)) => {
                 let cur_addr = addr.wrapping_add(offset as u16);
                 if cur_addr == other_addr {
                     Ok(())
