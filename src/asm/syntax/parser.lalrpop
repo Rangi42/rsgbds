@@ -471,43 +471,43 @@ Expr = ExprLogicOr<ExprAtom>;
 // The point of all of these macros is to pass `Atom` as the expression's LHS all the way to `ExprExponent`,
 // so that leading identifiers can be excluded when they would be ambiguous with string expressions.
 ExprLogicOr<Atom>: Expr = {
-	<lhs:ExprLogicOr<Atom>> <span_idx:@L> "||" <rhs:ExprLogicAnd<ExprAtom>> => lhs.binary_op(BinOp::LogicalOr, rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprLogicOr<ExprAtom>> <span_idx:@L> "||" <rhs:ExprLogicAnd<ExprAtom>> => lhs.binary_op(BinOp::LogicalOr, rhs, ctx.nth_span(span_idx)),
 	ExprLogicAnd<Atom>
 };
 ExprLogicAnd<Atom>: Expr = {
-	<lhs:ExprLogicAnd<Atom>> <span_idx:@L> "&&" <rhs:ExprComparison<ExprAtom>> => lhs.binary_op(BinOp::LogicalAnd, rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprLogicAnd<ExprAtom>> <span_idx:@L> "&&" <rhs:ExprComparison<ExprAtom>> => lhs.binary_op(BinOp::LogicalAnd, rhs, ctx.nth_span(span_idx)),
 	ExprComparison<Atom>
 };
 ExprComparison<Atom>: Expr = {
-	<lhs:ExprComparison<Atom>> <span_idx:@L> "!=" <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::NotEqual,  rhs, ctx.nth_span(span_idx)),
-	<lhs:ExprComparison<Atom>> <span_idx:@L> "==" <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::Equal,     rhs, ctx.nth_span(span_idx)),
-	<lhs:ExprComparison<Atom>> <span_idx:@L> "<=" <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::LessEq,    rhs, ctx.nth_span(span_idx)),
-	<lhs:ExprComparison<Atom>> <span_idx:@L> "<"  <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::Less,      rhs, ctx.nth_span(span_idx)),
-	<lhs:ExprComparison<Atom>> <span_idx:@L> ">=" <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::GreaterEq, rhs, ctx.nth_span(span_idx)),
-	<lhs:ExprComparison<Atom>> <span_idx:@L> ">"  <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::Greater,   rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprComparison<ExprAtom>> <span_idx:@L> "!=" <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::NotEqual,  rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprComparison<ExprAtom>> <span_idx:@L> "==" <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::Equal,     rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprComparison<ExprAtom>> <span_idx:@L> "<=" <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::LessEq,    rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprComparison<ExprAtom>> <span_idx:@L> "<"  <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::Less,      rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprComparison<ExprAtom>> <span_idx:@L> ">=" <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::GreaterEq, rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprComparison<ExprAtom>> <span_idx:@L> ">"  <rhs:ExprSum<ExprAtom>> => lhs.binary_op(BinOp::Greater,   rhs, ctx.nth_span(span_idx)),
 	ExprSum<Atom>
 };
 ExprSum<Atom>: Expr = {
-	<lhs:ExprSum<Atom>> <span_idx:@L> "+" <rhs:ExprBitOp<ExprAtom>> => lhs.binary_op(BinOp::Add,      rhs, ctx.nth_span(span_idx)),
-	<lhs:ExprSum<Atom>> <span_idx:@L> "-" <rhs:ExprBitOp<ExprAtom>> => lhs.binary_op(BinOp::Subtract, rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprSum<ExprAtom>> <span_idx:@L> "+" <rhs:ExprBitOp<ExprAtom>> => lhs.binary_op(BinOp::Add,      rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprSum<ExprAtom>> <span_idx:@L> "-" <rhs:ExprBitOp<ExprAtom>> => lhs.binary_op(BinOp::Subtract, rhs, ctx.nth_span(span_idx)),
 	ExprBitOp<Atom>
 };
 ExprBitOp<Atom>: Expr = {
-	<lhs:ExprBitOp<Atom>> <span_idx:@L> "&" <rhs:ExprShift<ExprAtom>> => lhs.binary_op(BinOp::And, rhs, ctx.nth_span(span_idx)),
-	<lhs:ExprBitOp<Atom>> <span_idx:@L> "|" <rhs:ExprShift<ExprAtom>> => lhs.binary_op(BinOp::Or,  rhs, ctx.nth_span(span_idx)),
-	<lhs:ExprBitOp<Atom>> <span_idx:@L> "^" <rhs:ExprShift<ExprAtom>> => lhs.binary_op(BinOp::Xor, rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprBitOp<ExprAtom>> <span_idx:@L> "&" <rhs:ExprShift<ExprAtom>> => lhs.binary_op(BinOp::And, rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprBitOp<ExprAtom>> <span_idx:@L> "|" <rhs:ExprShift<ExprAtom>> => lhs.binary_op(BinOp::Or,  rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprBitOp<ExprAtom>> <span_idx:@L> "^" <rhs:ExprShift<ExprAtom>> => lhs.binary_op(BinOp::Xor, rhs, ctx.nth_span(span_idx)),
 	ExprShift<Atom>
 };
 ExprShift<Atom>: Expr = {
-	<lhs:ExprShift<Atom>> <span_idx:@L> "<<"  <rhs:ExprFactor<ExprAtom>> => lhs.binary_op(BinOp::LeftShift,          rhs, ctx.nth_span(span_idx)),
-	<lhs:ExprShift<Atom>> <span_idx:@L> ">>"  <rhs:ExprFactor<ExprAtom>> => lhs.binary_op(BinOp::RightShift,         rhs, ctx.nth_span(span_idx)),
-	<lhs:ExprShift<Atom>> <span_idx:@L> ">>>" <rhs:ExprFactor<ExprAtom>> => lhs.binary_op(BinOp::UnsignedRightShift, rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprShift<ExprAtom>> <span_idx:@L> "<<"  <rhs:ExprFactor<ExprAtom>> => lhs.binary_op(BinOp::LeftShift,          rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprShift<ExprAtom>> <span_idx:@L> ">>"  <rhs:ExprFactor<ExprAtom>> => lhs.binary_op(BinOp::RightShift,         rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprShift<ExprAtom>> <span_idx:@L> ">>>" <rhs:ExprFactor<ExprAtom>> => lhs.binary_op(BinOp::UnsignedRightShift, rhs, ctx.nth_span(span_idx)),
 	ExprFactor<Atom>
 };
 ExprFactor<Atom>: Expr = {
-	<lhs:ExprFactor<Atom>> <span_idx:@L> "*" <rhs:ExprUnary<ExprAtom>> => lhs.binary_op(BinOp::Multiply, rhs, ctx.nth_span(span_idx)),
-	<lhs:ExprFactor<Atom>> <span_idx:@L> "/" <rhs:ExprUnary<ExprAtom>> => lhs.binary_op(BinOp::Divide,   rhs, ctx.nth_span(span_idx)),
-	<lhs:ExprFactor<Atom>> <span_idx:@L> "%" <rhs:ExprUnary<ExprAtom>> => lhs.binary_op(BinOp::Modulo,   rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprFactor<ExprAtom>> <span_idx:@L> "*" <rhs:ExprUnary<ExprAtom>> => lhs.binary_op(BinOp::Multiply, rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprFactor<ExprAtom>> <span_idx:@L> "/" <rhs:ExprUnary<ExprAtom>> => lhs.binary_op(BinOp::Divide,   rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprFactor<ExprAtom>> <span_idx:@L> "%" <rhs:ExprUnary<ExprAtom>> => lhs.binary_op(BinOp::Modulo,   rhs, ctx.nth_span(span_idx)),
 	ExprUnary<Atom>
 };
 ExprUnary<Atom>: Expr = {
@@ -518,7 +518,7 @@ ExprUnary<Atom>: Expr = {
 	ExprExponent<Atom>
 };
 ExprExponent<Atom>: Expr = { // Note the reversed expression tokens, which make `**` right-associative.
-	<lhs:Atom> <span_idx:@L> "**" <rhs:ExprExponent<ExprAtom>> => lhs.binary_op(BinOp::Exponent, rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprAtom> <span_idx:@L> "**" <rhs:ExprExponent<ExprAtom>> => lhs.binary_op(BinOp::Exponent, rhs, ctx.nth_span(span_idx)),
 	Atom
 };
 ExprAtom: Expr = {
