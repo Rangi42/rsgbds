@@ -1,3 +1,8 @@
-error: invalid-bank.asm(1):
-    VRAM bank value $0002 out of range ($0000 to $0001)
-Assembly aborted with 1 error!
+error: invalid bank constraint for section
+   ╭─[ test.asm:1:28 ]
+   │
+ 1 │ SECTION "vram", VRAM, BANK[2]
+   │                            ┬  
+   │                            ╰── VRAM sections can be between 0 and 1, not 2
+───╯
+1 error generated.

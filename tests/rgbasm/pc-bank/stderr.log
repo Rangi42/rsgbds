@@ -1,5 +1,15 @@
-error: pc-bank.asm(2):
-    Source address $2a00 not between $FF00 to $FFFF
-error: pc-bank.asm(11):
-    Expected constant expression: Current section's bank is not known
-Assembly aborted with 2 errors!
+error: $2A00 is not a valid address for `ldh`
+   ╭─[ test.asm:2:10 ]
+   │
+ 2 │     ldh a, [BANK(@) * 256] ; This should be complained about at assembly time
+   │             ──────┬──────  
+   │                   ╰──────── this must be between $FF00 and $FFFF inclusive
+───╯
+error: the bank of `@` is not constant
+    ╭─[ test.asm:11:12 ]
+    │
+ 11 │     DEF ERR = BANK(@)
+    │               ───┬───  
+    │                  ╰───── this symbol's bank is not known at this point
+────╯
+2 errors generated.
