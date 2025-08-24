@@ -50,7 +50,6 @@ pub enum SymbolKind {
     String(CompactString),
     Macro(NormalSpan),
     Label { section_id: usize, offset: usize },
-    Ref,
 }
 
 impl Symbols {
@@ -300,24 +299,6 @@ impl Symbols {
                         };
                         Ok(())
                     }
-                    // Numeric symbols override "references" (themselves essentially placeholders).
-                    // References also do not conflict with themselves.
-                    SymbolData::User {
-                        kind: SymbolKind::Ref,
-                        exported: previously_exported,
-                        ..
-                    } if matches!(
-                        kind,
-                        SymbolKind::Label { .. } | SymbolKind::Numeric { .. } | SymbolKind::Ref
-                    ) =>
-                    {
-                        *existing = SymbolData::User {
-                            definition,
-                            kind,
-                            exported: exported || *previously_exported,
-                        };
-                        Ok(())
-                    }
                     SymbolData::User {
                         definition: cur_definition,
                         kind: cur_kind,
@@ -365,24 +346,41 @@ impl Symbols {
     ) {
         match self.symbols.entry(name) {
             Entry::Vacant(entry) => {
-                entry.insert(SymbolData::User {
-                    definition: span,
-                    kind: SymbolKind::Ref,
-                    exported: true,
-                });
+                diagnostics::error(
+                    &span,
+                    |error| {
+                        error.set_message("cannot export undefined symbol");
+                        error.add_label(diagnostics::error_label(&span).with_message(format!(
+                            "`{}` is not defined at this point",
+                            identifiers.resolve(name).unwrap(),
+                        )));
+                    },
+                    nb_errors_left,
+                    options,
+                );
             }
 
             Entry::Occupied(mut entry) => match entry.get_mut() {
                 SymbolData::Deleted(..) => {
-                    entry.insert(SymbolData::User {
-                        definition: span,
-                        kind: SymbolKind::Ref,
-                        exported: true,
-                    });
+                    diagnostics::error(
+                        &span,
+                        |error| {
+                            error.set_message("cannot export deleted symbol");
+                            error.add_labels([
+                                diagnostics::error_label(&span).with_message(format!(
+                                    "`{}` is not defined at this point",
+                                    identifiers.resolve(name).unwrap(),
+                                )),
+                                diagnostics::note_label(&span).with_message("it was deleted here"),
+                            ]);
+                        },
+                        nb_errors_left,
+                        options,
+                    );
                 }
                 SymbolData::User {
                     exported,
-                    kind: SymbolKind::Label { .. } | SymbolKind::Numeric { .. } | SymbolKind::Ref,
+                    kind: SymbolKind::Label { .. } | SymbolKind::Numeric { .. },
                     ..
                 } => *exported = true,
                 ref sym @ SymbolData::User { ref definition, .. } => diagnostics::error(
@@ -582,30 +580,6 @@ impl Symbols {
         )
     }
 
-    pub fn create_ref(
-        &mut self,
-        name: Identifier,
-        identifiers: &Identifiers,
-        ref_span: Span,
-        active_section: Option<&ActiveSection>,
-        macro_args: Option<&MacroArgs>,
-        nb_errors_left: &Cell<usize>,
-        options: &Options,
-    ) {
-        self.define_symbol(
-            name,
-            identifiers,
-            ref_span,
-            SymbolKind::Ref,
-            false, // Not exported.
-            false, // Not redefining.
-            active_section,
-            macro_args,
-            nb_errors_left,
-            options,
-        )
-    }
-
     pub fn rs(&mut self) -> &mut i32 {
         let Some(SymbolData::Builtin(SymbolKind::Numeric {
             value,
@@ -648,27 +622,6 @@ impl Symbols {
             Entry::Occupied(mut entry) => {
                 let sym = entry.get_mut();
                 match sym {
-                    SymbolData::User {
-                        definition,
-                        kind: SymbolKind::Ref,
-                        ..
-                    } => diagnostics::error(
-                        &deletion_span,
-                        |error| {
-                            error.set_message("cannot delete a symbol that doesn't exist");
-                            error.add_labels([
-                                diagnostics::error_label(&deletion_span).with_message(format!(
-                                    "no symbol named `{}` exists at this point",
-                                    identifiers.resolve(name).unwrap(),
-                                )),
-                                diagnostics::error_label(definition)
-                                    .with_message("the name was previously referenced here"),
-                            ]);
-                        },
-                        nb_errors_left,
-                        options,
-                    ),
-
                     SymbolData::User { exported, kind, .. } => {
                         if *exported {
                             diagnostics::warn(
@@ -788,8 +741,7 @@ impl SymbolKind {
             ) => *mutable == *other_mutable,
             (SymbolKind::String(_), SymbolKind::String(_))
             | (SymbolKind::Macro(_), SymbolKind::Macro(_))
-            | (SymbolKind::Label { .. }, SymbolKind::Label { .. })
-            | (SymbolKind::Ref, SymbolKind::Ref) => true,
+            | (SymbolKind::Label { .. }, SymbolKind::Label { .. }) => true,
             (_, _) => false,
         }
     }
@@ -831,7 +783,6 @@ impl SymbolData {
                 SymbolKind::String(_) => "string",
                 SymbolKind::Macro(_) => "macro",
                 SymbolKind::Label { .. } => "label",
-                SymbolKind::Ref => "missing",
             },
             SymbolData::Pc => "label",
             SymbolData::Narg => "constant",
@@ -852,7 +803,6 @@ impl SymbolData {
                 SymbolKind::String(string) => Some(Ok(string.clone())),
                 SymbolKind::Macro(_) => None,
                 SymbolKind::Label { .. } => None,
-                SymbolKind::Ref => None,
             },
             Self::Pc => None,
             Self::Narg => None,
@@ -887,7 +837,6 @@ impl SymbolData {
                     .find(*section_id)
                     .address()
                     .map(|base_addr| base_addr as i32 + *offset as i32))),
-                SymbolKind::Ref => None,
             },
             Self::Pc => Some(match sections.active_section.as_ref() {
                 Some(active) => Ok(sections.sections[active.sym_section.id]
@@ -919,7 +868,6 @@ impl SymbolData {
                 SymbolKind::Numeric { .. } => None,
                 SymbolKind::String(_) => None,
                 SymbolKind::Macro(_) => None,
-                SymbolKind::Ref => None,
             },
             SymbolData::Pc => match sections.active_section.as_ref() {
                 Some(active) => Some(Ok((active.sym_section.id, active.sym_section.offset))),

@@ -24,7 +24,7 @@ type IndexMap<K, V> = indexmap::IndexMap<K, V, FxBuildHasher>;
 type IndexSet<V> = indexmap::IndexSet<V, FxBuildHasher>;
 
 type FileNodeRegistry<'nodes> = IndexSet<&'nodes FileNode>;
-type SymRegistry<'sym> = IndexMap<Identifier, (&'sym NormalSpan, &'sym SymbolKind, bool)>;
+type SymRegistry<'sym> = IndexMap<Identifier, Option<(&'sym NormalSpan, &'sym SymbolKind, bool)>>;
 
 const VERSION_STRING: &[u8] = b"RGB9";
 const REVISION: u32 = 12;
@@ -131,8 +131,10 @@ fn register_file_nodes<'nodes>(
         }
     };
 
-    for (_name, &(span, _kind, _exported)) in registered_symbols {
-        register_span(span);
+    for (_name, opt) in registered_symbols {
+        if let Some((span, _kind, _exported)) = opt {
+            register_span(span);
+        }
     }
     for (_name, sect) in &sections.sections {
         let Span::Normal(span) = &sect.def_span else {
@@ -167,7 +169,7 @@ fn register_symbols<'sym>(symbols: &'sym Symbols, sections: &Sections) -> SymReg
             exported: true,
         } = sym
         {
-            Some((*name, (span, kind, true)))
+            Some((*name, Some((span, kind, true))))
         } else {
             None
         }
@@ -177,16 +179,14 @@ fn register_symbols<'sym>(symbols: &'sym Symbols, sections: &Sections) -> SymReg
         sections
             .all_link_time_exprs()
             .flat_map(|expr| expr.expr.ops().filter_map(|op| op.get_symbol()))
-            .flat_map(|ident| {
-                let SymbolData::User {
+            .flat_map(|ident| match symbols.symbols.get(&ident) {
+                None => Some((ident, None)),
+                Some(SymbolData::User {
                     definition: Span::Normal(span),
                     kind,
                     exported,
-                } = &symbols.symbols[&ident]
-                else {
-                    return None;
-                };
-                Some((ident, (span, kind, *exported)))
+                }) => Some((ident, Some((span, kind, *exported)))),
+                Some(_) => None,
             }),
     );
 
@@ -299,48 +299,31 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
     }
 
     fn write_symbols(&mut self) -> std::io::Result<()> {
-        for (&ident, &(definition, kind, exported)) in self.registered_symbols.as_slice() {
+        for (&ident, opt) in self.registered_symbols.as_slice() {
             self.write_string(self.identifiers.resolve(ident).unwrap())?;
 
-            match kind {
-                SymbolKind::String(_) | SymbolKind::Macro(_) => unreachable!(),
-                SymbolKind::Numeric { value, .. } => {
-                    write_numeric_sym(definition, *value as u32, u32::MAX, exported, self)?
+            match opt {
+                None => self.write_byte(1)?,
+
+                Some((definition, kind, exported)) => {
+                    self.write_byte(if *exported { 2 } else { 0 })?;
+
+                    let (node_id, line_no) = self.resolve_span(definition);
+                    self.write_long(node_id)?;
+                    self.write_long(line_no)?;
+
+                    let (value, section_id) = match kind {
+                        SymbolKind::String(_) | SymbolKind::Macro(_) => unreachable!(),
+                        SymbolKind::Numeric { value, .. } => (*value as u32, u32::MAX),
+                        SymbolKind::Label { section_id, offset } => {
+                            // The offset must be in u32 range, as section sizes are lower than u16 range.
+                            // Section IDs are also checked for validity by the earlier check of the number of sections.
+                            (*offset as u32, *section_id as u32)
+                        }
+                    };
+                    self.write_long(section_id)?;
+                    self.write_long(value)?;
                 }
-                SymbolKind::Label { section_id, offset } => {
-                    // The offset must be in u32 range, as section sizes are lower than u16 range.
-                    // Section IDs are also checked for validity by the earlier check of the number of sections.
-                    write_numeric_sym(
-                        definition,
-                        *offset as u32,
-                        *section_id as u32,
-                        exported,
-                        self,
-                    )?
-                }
-                SymbolKind::Ref => {
-                    debug_assert!(!exported);
-                    self.write_byte(1)?;
-                }
-            }
-            fn write_numeric_sym(
-                definition: &NormalSpan,
-                value: u32,
-                section_id: u32,
-                exported: bool,
-                ctx: &mut WriteContext,
-            ) -> std::io::Result<()> {
-                ctx.write_byte(if exported { 2 } else { 0 })?;
-
-                let (node_id, line_no) = ctx.resolve_span(definition);
-                ctx.write_long(node_id)?;
-                ctx.write_long(line_no)?;
-
-                ctx.write_long(section_id)?;
-
-                ctx.write_long(value)?;
-
-                Ok(())
             }
         }
         Ok(())
