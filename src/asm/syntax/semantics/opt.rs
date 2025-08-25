@@ -17,24 +17,28 @@ impl parse_ctx!() {
         match option_char {
             Some('b') => handle_error(
                 self.options.runtime_opts.parse_b(option_arg),
+                'b',
                 span,
                 self.nb_errors_left,
                 self.options,
             ),
             Some('g') => handle_error(
                 self.options.runtime_opts.parse_g(option_arg),
+                'g',
                 span,
                 self.nb_errors_left,
                 self.options,
             ),
             Some('p') => handle_error(
                 self.options.runtime_opts.parse_p(option_arg),
+                'p',
                 span,
                 self.nb_errors_left,
                 self.options,
             ),
             Some('Q') => handle_error(
                 self.options.runtime_opts.parse_q(option_arg),
+                'Q',
                 span,
                 self.nb_errors_left,
                 self.options,
@@ -51,12 +55,14 @@ impl parse_ctx!() {
                             self.options,
                         )
                     }),
+                'r',
                 span,
                 self.nb_errors_left,
                 self.options,
             ),
             Some('W') => handle_error(
                 self.options.runtime_opts.parse_w(option_arg),
+                'W',
                 span,
                 self.nb_errors_left,
                 self.options,
@@ -78,6 +84,7 @@ impl parse_ctx!() {
 
         fn handle_error<E: Display>(
             r: Result<(), E>,
+            option: char,
             span: &Span,
             nb_errors_left: &Cell<usize>,
             options: &Options,
@@ -86,7 +93,8 @@ impl parse_ctx!() {
                 diagnostics::error(
                     span,
                     |error| {
-                        error.set_message(err);
+                        error.set_message(format!("invalid argument to option '{option}'"));
+                        error.add_label(diagnostics::error_label(span).with_message(err));
                     },
                     nb_errors_left,
                     options,
