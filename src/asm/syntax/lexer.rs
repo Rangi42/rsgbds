@@ -2347,7 +2347,7 @@ impl Lexer {
                     chars!(newline) => return ofs,
                     ';' => {
                         Self::read_line_comment(&mut chars);
-                        break;
+                        return chars.peek().map_or(text.len(), |(ofs, _newline_char)| *ofs);
                     }
                     '/' => {
                         if chars.next_if(|&(_ofs, ch)| ch == '*').is_some() {
