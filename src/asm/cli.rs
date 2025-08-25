@@ -166,14 +166,25 @@ impl RuntimeOptions {
         let mut digits = [Default::default(); N];
         for (i, slot) in digits.iter_mut().enumerate() {
             *slot = chars.next().ok_or(DynCharParseErr::WrongCharCount(i))?;
-            // Only allow printable ASCII characters, to avoid surprising behaviours.
-            if !slot.is_ascii_graphic() {
+            // Only allow identifier characters, to avoid surprising behaviours. (Not underscores, since they serve as separators.)
+            if !slot.is_ascii_alphanumeric() && !matches!(*slot, '.' | '#' | '@') {
                 return Err(DynCharParseErr::BadChar(*slot).into());
             }
         }
         match chars.count() {
             0 => {}
             n => return Err(DynCharParseErr::WrongCharCount(N + n).into()),
+        }
+        for (i, slot) in digits.iter().copied().enumerate() {
+            if let Some(digit) = slot.to_digit(N as u32) {
+                if digit != i as u32 {
+                    return Err(DynCharParseErr::CannotRemapDigit(slot).into());
+                }
+            }
+            // Check for uniqueness.
+            if digits[i + 1..].iter().any(|digit| *digit == slot) {
+                return Err(DynCharParseErr::Repeated(slot).into());
+            }
         }
         *target = digits;
         Ok(())
@@ -189,26 +200,38 @@ impl RuntimeOptions {
 enum DynCharParseErr {
     WrongCharCount(usize),
     BadChar(char),
+    Repeated(char),
+    CannotRemapDigit(char),
 }
 #[derive(Debug, Display)]
 pub enum BinDigitsParseErr {
-    /// The argument must be exactly two characters long, not {0}
+    /// the argument must be exactly 2 characters long, not {0}
     WrongCharCount(usize),
-    /// Only printable ASCII characters are allowed, not '{0}'
+    /// only alphanumeric ASCII characters and `.@#` are allowed, not '{0}'
     BadChar(char),
+    /// '{0}' was specified twice
+    Repeated(char),
+    /// digits such as '{0}' must appear in their original position
+    CannotRemapDigit(char),
 }
 #[derive(Debug, Display)]
 pub enum GfxCharsParseErr {
-    /// The argument must be exactly four characters long, not {0}
+    /// the argument must be exactly 4 characters long, not {0}
     WrongCharCount(usize),
-    /// Only printable ASCII characters are allowed, not '{0}'
+    /// only alphanumeric ASCII characters and `.@#` are allowed, not '{0}'
     BadChar(char),
+    /// '{0}' was specified twice
+    Repeated(char),
+    /// digits such as '{0}' must appear in their original position
+    CannotRemapDigit(char),
 }
 impl From<DynCharParseErr> for BinDigitsParseErr {
     fn from(value: DynCharParseErr) -> Self {
         match value {
             DynCharParseErr::WrongCharCount(n) => Self::WrongCharCount(n),
             DynCharParseErr::BadChar(c) => Self::BadChar(c),
+            DynCharParseErr::Repeated(c) => Self::Repeated(c),
+            DynCharParseErr::CannotRemapDigit(c) => Self::CannotRemapDigit(c),
         }
     }
 }
@@ -217,6 +240,8 @@ impl From<DynCharParseErr> for GfxCharsParseErr {
         match value {
             DynCharParseErr::WrongCharCount(n) => Self::WrongCharCount(n),
             DynCharParseErr::BadChar(c) => Self::BadChar(c),
+            DynCharParseErr::Repeated(c) => Self::Repeated(c),
+            DynCharParseErr::CannotRemapDigit(c) => Self::CannotRemapDigit(c),
         }
     }
 }
@@ -243,7 +268,7 @@ impl RuntimeOptions {
 pub enum FixPrecParseErr {
     /// {0}
     BadNum(std::num::ParseIntError),
-    /// Fixed-point precision must be between 1 and 31, not {0}
+    /// fixed-point precision must be between 1 and 31, not {0}
     #[from(ignore)]
     OutOfRange(usize),
 }
@@ -377,12 +402,12 @@ impl RuntimeOptions {
 }
 #[derive(Debug, Display, From)]
 pub enum WarningParseErr<'arg> {
-    /// Invalid warning level: {0}
+    /// invalid warning level: {0}
     BadLevel(std::num::ParseIntError),
     /// {1} is too large a parameter for `-W{0}`, the maximum is {2}
     #[from(ignore)]
     ParamOutOfRange(&'static str, usize, usize),
-    /// Unknown warning name `{0}`
+    /// unknown warning name `{0}`
     #[from(ignore)]
     Unknown(&'arg str),
 }
