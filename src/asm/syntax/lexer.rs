@@ -2239,6 +2239,7 @@ impl Lexer {
 
         let depth = self.contexts.len();
         let mut starting_whitespace_len = 0;
+        let mut end_offset = 0; // Dummy value, it will always be written to in the closure.
         self.with_active_context_raw(&mut span, |ctx, text| {
             let mut chars = text.char_indices().peekable();
 
@@ -2308,10 +2309,11 @@ impl Lexer {
             }
 
             let mut parens_depth = 0usize;
+            end_offset = chars.peek().map_or(text.len(), |(ofs, _ch)| *ofs);
             while let Some((ofs, ch)) = chars.next() {
                 last_char = Some(ch);
 
-                match ch {
+                let was_blank = match ch {
                     '"' => {
                         string.push('"');
                         let _len = Self::read_string_inner(
@@ -2325,6 +2327,7 @@ impl Lexer {
                         );
                         string.push('"');
                         last_char = Some('"'); // The terminating quote.
+                        false
                     }
                     '#' => {
                         string.push('#');
@@ -2342,6 +2345,7 @@ impl Lexer {
                             string.push('"');
                             last_char = Some('"'); // The terminating quote.
                         }
+                        false
                     }
 
                     chars!(newline) => return ofs,
@@ -2372,6 +2376,7 @@ impl Lexer {
                         } else {
                             string.push('/');
                         }
+                        false
                     }
 
                     ',' if parens_depth == 0 => return ofs,
@@ -2379,10 +2384,12 @@ impl Lexer {
                     '(' => {
                         parens_depth += 1;
                         string.push('(');
+                        false
                     }
                     ')' if parens_depth != 0 => {
                         parens_depth -= 1;
                         string.push(')');
+                        false
                     }
 
                     '\\' => {
@@ -2425,8 +2432,10 @@ impl Lexer {
                                 string.push(value);
                             }
                         }
+                        false
                     }
                     '{' => {
+                        let len_before_interpolation = string.len();
                         let _ = Self::read_interpolation(
                             &mut chars,
                             text,
@@ -2441,9 +2450,17 @@ impl Lexer {
                             params.nb_errors_left,
                             params.options,
                         );
+                        !string[len_before_interpolation..]
+                            .contains(|ch| !matches!(ch, chars!(whitespace)))
                     }
 
-                    _ => string.push(ch),
+                    _ => {
+                        string.push(ch);
+                        matches!(ch, chars!(whitespace))
+                    }
+                };
+                if !was_blank {
+                    end_offset = chars.peek().map_or(text.len(), |(ofs, _ch)| *ofs);
                 }
             }
             text.len()
@@ -2454,7 +2471,7 @@ impl Lexer {
         string.truncate(trimmed_len);
 
         // Adjust the span to remove the whitespace.
-        // TODO: the end is not adjusted, so e.g. a line comment will be counted when it shouldn't
+        span.bytes.end = span.bytes.start + end_offset;
         span.bytes.start += starting_whitespace_len;
         debug_assert!(span.bytes.start <= span.bytes.end, "span: {:?}", span.bytes);
 
