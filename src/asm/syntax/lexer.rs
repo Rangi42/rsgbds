@@ -20,6 +20,7 @@ use compact_str::CompactString;
 use unicase::UniCase;
 
 use crate::{
+    common::S,
     cond::Condition,
     diagnostics::{self, warning, ReportBuilder},
     format::FormatSpec,
@@ -250,10 +251,11 @@ impl Lexer {
             diagnostics::error(
                 opt_span,
                 |error| {
-                    error.set_message("recursion is deeper than new limit");
+                    error.set_message("context stack is deeper than new limit");
                     error.add_label(diagnostics::error_label(opt_span).with_message(format!(
-                        "depth is {} contexts at this point",
-                        self.contexts.len()
+                        "depth is {} context{} at this point",
+                        self.contexts.len(),
+                        S::from(self.contexts.len()),
                     )))
                 },
                 nb_errors_left,
@@ -970,7 +972,8 @@ impl Lexer {
             |error| {
                 error.set_message("maximum recursion depth exceeded");
                 error.add_label(diagnostics::error_label(span).with_message(format!(
-                    "depth is {depth} contexts here, cannot enter a new one"
+                    "depth is {depth} context{} here, cannot enter a new one",
+                    S::from(depth),
                 )))
             },
             nb_errors_left,

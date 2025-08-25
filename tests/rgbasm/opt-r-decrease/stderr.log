@@ -1,4 +1,4 @@
-error: recursion is deeper than new limit
+error: context stack is deeper than new limit
     ╭─[ test.asm:4:9 ]
     │
   4 │     OPT r9
