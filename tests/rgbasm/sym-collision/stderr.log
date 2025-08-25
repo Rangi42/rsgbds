@@ -1,5 +1,15 @@
-warning: sym-collision.asm(20): [-Wpurge]
-    Purging a label "dork"
-error: sym-collision.asm(25):
-    Interpolated symbol "dork" does not exist; it was purged
-Assembly aborted with 1 error!
+[-Wpurge=2] warning: deleting a label
+    ╭─[ test.asm:20:8 ]
+    │
+ 20 │     PURGE dork
+    │           ──┬─  
+    │             ╰─── deleting `dork` here
+────╯
+error: the symbol `dork` was deleted
+    ╭─[ test.asm:25:18 ]
+    │
+ 25 │     PRINTLN "dork: {dork}"
+    │                     ──┬─  
+    │                       ╰─── this interpolation is invalid
+────╯
+1 error generated.
