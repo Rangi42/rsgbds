@@ -755,10 +755,10 @@ impl BinOp {
     }
 }
 
-// From the Rust standard library, currently unstable.
+// Lifted from the Rust standard library, currently unstable.
 fn div_floor(lhs: i32, rhs: i32) -> i32 {
-    let d = lhs / rhs;
-    let r = lhs % rhs;
+    let d = lhs.wrapping_div(rhs);
+    let r = lhs.wrapping_rem(rhs);
 
     // If the remainder is non-zero, we need to subtract one if the
     // signs of lhs and rhs differ, as this means we rounded upwards
