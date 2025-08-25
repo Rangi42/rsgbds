@@ -9,7 +9,10 @@ impl parse_ctx!() {
         let span = &self.line_spans[span_idx];
 
         let mut chars = string.chars();
-        let option_char = chars.next();
+        let option_char = match chars.next() {
+            Some('-') => chars.next(),
+            opt => opt,
+        };
         let option_arg = chars
             .as_str()
             .trim_start_matches(crate::syntax::lexer::is_whitespace);
