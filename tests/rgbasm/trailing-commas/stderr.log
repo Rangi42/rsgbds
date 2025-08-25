@@ -1,4 +1,14 @@
-warning: trailing-commas.asm(7): [-Wempty-macro-arg]
-    Empty macro argument
-warning: trailing-commas.asm(22): [-Wpurge]
-    Purging a label "lobsterThermidor"
+[-Wempty-macro-arg] warning: empty macro argument
+   ╭─[ test.asm:7:15 ]
+   │
+ 7 │     mac 1,2, 3 , ,5,
+   │                  │ 
+   │                  ╰─ here
+───╯
+[-Wpurge=2] warning: deleting a label
+    ╭─[ test.asm:22:8 ]
+    │
+ 22 │     purge lobsterThermidor,
+    │           ────────┬───────  
+    │                   ╰───────── deleting `lobsterThermidor` here
+────╯

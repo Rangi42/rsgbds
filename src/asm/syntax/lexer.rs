@@ -2486,7 +2486,14 @@ impl Lexer {
         if last_char == Some(',') {
             let mut dummy_span = span.clone();
             self.consume(&mut dummy_span);
-            return Some((string, Span::Normal(span)));
+            let span = Span::Normal(span);
+            if string.is_empty() {
+                params.warn(warning!("empty-macro-arg"), &span, |warning| {
+                    warning.set_message("empty macro argument");
+                    warning.add_label(diagnostics::error_label(&span).with_message("here"));
+                });
+            }
+            return Some((string, span));
         }
 
         // The last argument may end in a trailing comma, newline, or EOF.
