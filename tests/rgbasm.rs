@@ -42,7 +42,7 @@ fn run_test(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
 
     let flags_file_path = asm_path.with_file_name("flags.txt");
     if flags_file_path.exists() {
-        cmd = cmd.arg(format!("@{flags_file_path}"));
+        cmd = cmd.arg("@flags.txt");
     }
 
     let result = cmd.assert().with_assert(
