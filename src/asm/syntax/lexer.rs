@@ -2238,11 +2238,13 @@ impl Lexer {
         let mut last_char = None;
 
         let depth = self.contexts.len();
+        let mut starting_whitespace_len = 0;
         self.with_active_context_raw(&mut span, |ctx, text| {
             let mut chars = text.char_indices().peekable();
 
             // Trim leading whitespace (but stop at a block comment).
             while let Some(&(ofs, ch)) = chars.peek() {
+                starting_whitespace_len = ofs;
                 match ch {
                     chars!(whitespace) => {
                         chars.next();
@@ -2294,7 +2296,8 @@ impl Lexer {
                             .find_map(|(ofs, ch)| matches!(ch, chars!(whitespace)).then_some(ofs))
                         {
                             Some(first_non_white_idx) => {
-                                string.drain(..first_non_white_idx);
+                                drop(string.drain(..first_non_white_idx)); // We just care about the range being removed.
+                                                                           // Treat the brace as the first character of the span.
                                 break;
                             }
                             None => string.clear(), // ...and continue iterating.
@@ -2449,6 +2452,11 @@ impl Lexer {
         // Trim right whitespace.
         let trimmed_len = string.trim_end_matches(is_whitespace).len();
         string.truncate(trimmed_len);
+
+        // Adjust the span to remove the whitespace.
+        // TODO: the end is not adjusted, so e.g. a line comment will be counted when it shouldn't
+        span.bytes.start += starting_whitespace_len;
+        debug_assert!(span.bytes.start <= span.bytes.end, "span: {:?}", span.bytes);
 
         // Returning COMMAs to the parser would mean that two consecutive commas
         // (i.e. an empty argument) need to return two different tokens (string then comma)

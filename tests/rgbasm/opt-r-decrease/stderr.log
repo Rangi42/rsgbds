@@ -1,9 +1,9 @@
 error: recursion is deeper than new limit
-    ╭─[ test.asm:4:8 ]
+    ╭─[ test.asm:4:9 ]
     │
   4 │     OPT r9
-    │        ─┬─  
-    │         ╰─── depth is 11 contexts at this point
+    │         ─┬  
+    │          ╰── depth is 11 contexts at this point
     │ 
   7 │   m
     │   ┬  
