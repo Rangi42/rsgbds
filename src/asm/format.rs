@@ -58,6 +58,8 @@ pub enum FormatError {
     },
     /// missing character {for_what}
     MissingChar { for_what: &'static str },
+    /// missing number after '{0}'
+    MissingNumber(char),
     /// a {sym_kind} symbol cannot be formatted as {fmt_kind}
     BadKind {
         sym_kind: &'static str,
@@ -72,7 +74,9 @@ pub enum FormatError {
     FractionalFlag { flag_name: &'static str },
     /// fractional width cannot be more than 255
     FracWidthOver255,
-    /// fixed-point constant precision cannot be more than 31
+    /// fixed-point precision cannot be 0
+    FixPointZero,
+    /// fixed-point precision cannot be more than 31
     FixPointPrecOver31,
 }
 
@@ -90,8 +94,14 @@ impl FormatSpec {
             .map_or(0, |first_digit| {
                 parse_decimal(&mut chars, first_digit as usize)
             });
-        let frac = chars.next_if_eq(&'.').map(|_| todo!());
-        let precision = chars.next_if_eq(&'q').map(|_| todo!());
+        let frac = chars
+            .next_if_eq(&'.')
+            .map(|_ch| expect_decimal(&mut chars, '.'))
+            .transpose()?;
+        let precision = chars
+            .next_if_eq(&'q')
+            .map(|_ch| expect_decimal(&mut chars, 'q'))
+            .transpose()?;
         let kind = match chars.next() {
             Some('d') => Ok(FormatKind::Signed),
             Some('u') => Ok(FormatKind::Unsigned),
@@ -136,11 +146,20 @@ impl FormatSpec {
             }),
         }?;
 
+        fn expect_decimal(
+            chars: &mut Peekable<Chars>,
+            trigger_char: char,
+        ) -> Result<usize, FormatError> {
+            match chars.peek().and_then(|ch| ch.to_digit(10)) {
+                None => Err(FormatError::MissingNumber(trigger_char)),
+                Some(first_digit) => Ok(parse_decimal(chars, first_digit as usize)),
+            }
+        }
         fn parse_decimal(chars: &mut Peekable<Chars>, first_digit: usize) -> usize {
             let mut width = first_digit;
             loop {
                 chars.next();
-                let Some(digit) = chars.next().and_then(|ch| ch.to_digit(10)) else {
+                let Some(digit) = chars.peek().and_then(|ch| ch.to_digit(10)) else {
                     break width;
                 };
                 width = width * 10 + digit as usize;
@@ -166,9 +185,16 @@ impl FormatSpec {
             }
         }
 
-        if precision.is_some_and(|prec| prec > 31) {
-            return Err(FormatError::FixPointPrecOver31);
+        match precision {
+            Some(32..) => return Err(FormatError::FixPointPrecOver31),
+            Some(0) => return Err(FormatError::FixPointZero),
+            _ => {} // OK
         }
+        let precision = precision.map(|prec| prec as u8);
+        debug_assert!(
+            matches!(precision, None | Some(1..=31)),
+            "bad precision {precision:?} (default = {default_precision})",
+        );
         if let Some(256..) = frac {
             return Err(FormatError::FracWidthOver255);
         }
