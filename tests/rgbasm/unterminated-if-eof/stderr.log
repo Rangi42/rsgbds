@@ -5,11 +5,4 @@ error: unterminated conditional block
    │ ─┬  
    │  ╰── this `if` is missing a corresponding `endc`
 ───╯
-error: unterminated conditional block
-   ╭─[ test.asm:1:1 ]
-   │
- 1 │ if 0
-   │ ─┬  
-   │  ╰── this `if` is missing a corresponding `endc`
-───╯
-2 errors generated.
+1 error generated.
