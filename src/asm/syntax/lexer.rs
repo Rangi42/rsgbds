@@ -1448,6 +1448,7 @@ impl Lexer {
                             if let Some(first_digit) =
                                 self.peek(&mut params).and_then(|ch| ch.to_digit(16))
                             {
+                                self.consume(&mut span);
                                 let value =
                                     self.read_number(16, first_digit, &mut span, &mut params);
                                 break token!("number"(value));
@@ -1471,6 +1472,7 @@ impl Lexer {
                             if let Some(first_digit) =
                                 self.peek(&mut params).and_then(|ch| ch.to_digit(8))
                             {
+                                self.consume(&mut span);
                                 let value =
                                     self.read_number(8, first_digit, &mut span, &mut params);
                                 break token!("number"(value));
@@ -1497,6 +1499,7 @@ impl Lexer {
                                     .iter()
                                     .position(|&digit| digit == ch)
                             }) {
+                                self.consume(&mut span);
                                 let value = self.read_bin_number(
                                     first_digit as u32,
                                     &mut span,
