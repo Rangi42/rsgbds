@@ -868,7 +868,7 @@ impl Lexer {
                                         error.set_message(&err);
                                         error.add_label(
                                             diagnostics::error_label(&span).with_message(
-                                                "Error parsing this format specification",
+                                                "error parsing this format specification",
                                             ),
                                         );
                                     },
@@ -1456,11 +1456,11 @@ impl Lexer {
                                 let err_span = Span::Normal(span.clone());
                                 params.error(&err_span, |error| {
                                     error.set_message(
-                                        "Missing hexadecimal digit(s) after `0x` prefix",
+                                        "missing hexadecimal digit(s) after `0x` prefix",
                                     );
                                     error.add_label(
                                         diagnostics::error_label(&err_span).with_message(
-                                            "Expected at least one hex digit after this",
+                                            "expected at least one hex digit after this",
                                         ),
                                     );
                                 });
@@ -1482,7 +1482,7 @@ impl Lexer {
                                     error.set_message("missing octal digit(s) after `0o` prefix");
                                     error.add_label(
                                         diagnostics::error_label(&err_span).with_message(
-                                            "Expected at least one octal digit after this",
+                                            "expected at least one octal digit after this",
                                         ),
                                     );
                                 });
@@ -1512,20 +1512,20 @@ impl Lexer {
                                     error.set_message("missing octal digit(s) after `0o` prefix");
                                     error.add_label(
                                         diagnostics::error_label(&err_span).with_message(
-                                            "Expected at least one octal digit after this",
+                                            "expected at least one octal digit after this",
                                         ),
                                     );
                                 });
                                 span.bytes.end = span.bytes.start;
                             }
                         }
-                        Some('0'..='9') => {
-                            let value = self.read_number(10, 0, &mut span, &mut params);
+                        Some('0'..='9' | '.') => {
+                            let mut value = self.read_number(10, 0, &mut span, &mut params);
                             if let Some('.') = self.peek(&mut params) {
-                                todo!();
-                            } else {
-                                break token!("number"(value));
+                                self.consume(&mut span);
+                                value = self.read_fractional_part(value, &mut span, &mut params);
                             }
+                            break token!("number"(value));
                         }
                         _ => break token!("number"(0)),
                     }
@@ -1533,13 +1533,12 @@ impl Lexer {
                 Some(ch @ '1'..='9') => {
                     self.consume(&mut span);
                     let value = ch.to_digit(10).unwrap();
-                    let value = self.read_number(10, value, &mut span, &mut params);
-                    match self.peek(&mut params) {
-                        Some('.') => {
-                            todo!();
-                        }
-                        _ => break token!("number"(value)),
+                    let mut value = self.read_number(10, value, &mut span, &mut params);
+                    if let Some('.') = self.peek(&mut params) {
+                        self.consume(&mut span);
+                        value = self.read_fractional_part(value, &mut span, &mut params);
                     }
+                    break token!("number"(value));
                 }
                 Some('&') => {
                     self.consume(&mut span);
@@ -1616,7 +1615,7 @@ impl Lexer {
                                         .with_message("expected a hex digit after this"),
                                 );
                                 error.set_help(
-                                    "In rgbasm, the current address is notated `@`, not `$`",
+                                    "in rgbasm, the current address is notated `@`, not `$`",
                                 );
                             });
                             span.bytes.start = span.bytes.end;
@@ -1766,7 +1765,7 @@ impl Lexer {
         mut value: u32,
         span: &mut NormalSpan,
         params: &mut LexerParams,
-    ) -> i32 {
+    ) -> u32 {
         let mut overflowed = false;
 
         loop {
@@ -1794,10 +1793,130 @@ impl Lexer {
                     diagnostics::warning_label(&span)
                         .with_message(format!("this was truncated to {value}")),
                 )
-            })
+            });
         }
 
-        value as i32
+        value
+    }
+
+    fn read_fractional_part(
+        &mut self,
+        integer_part: u32,
+        span: &mut NormalSpan,
+        params: &mut LexerParams,
+    ) -> u32 {
+        let mut value = 0;
+        let mut divisor: u32 = 1;
+        let mut underscore_after_dot = false;
+        let mut too_many_digits = false;
+        let first_nondigit = 'digits: loop {
+            match self.peek(params) {
+                Some('_') => {
+                    self.consume(span);
+                    underscore_after_dot |= divisor == 1;
+                }
+                Some(digit @ '0'..='9') => {
+                    self.consume(span);
+                    match divisor.checked_mul(10) {
+                        Some(new_divisor) => divisor = new_divisor,
+                        None => {
+                            too_many_digits = true;
+                            // Discard additional digits, since we can't account for them.
+                            loop {
+                                match self.peek(params) {
+                                    Some('0'..='9' | '_') => {}
+                                    ch => break 'digits ch,
+                                }
+                            }
+                        }
+                    }
+                    value = value * 10 + digit.to_digit(10).unwrap();
+                }
+                ch => break ch,
+            }
+        };
+
+        let mut empty_precision = false;
+        let precision_raw = if matches!(first_nondigit, Some('q' | 'Q')) {
+            self.consume(span);
+            // Allow `q1`, but also `q.1`.
+            let first_digit = match self.peek(params) {
+                Some('.') => {
+                    self.consume(span);
+                    self.peek(params)
+                }
+                ch => ch,
+            };
+            if let Some(first_digit) = first_digit.and_then(|ch| ch.to_digit(10)) {
+                let mut precision = first_digit as i32;
+                self.consume(span);
+                while let Some(digit) = self.peek(params).and_then(|ch| ch.to_digit(10)) {
+                    self.consume(span);
+                    match precision.checked_mul(10) {
+                        Some(new_precision) => precision = new_precision + digit as i32,
+                        None => precision = i32::MAX, // This will trip the range check, and further digits will just take this code path again.
+                    }
+                }
+                precision
+            } else {
+                empty_precision = true;
+                params.options.runtime_opts.q_precision.into()
+            }
+        } else {
+            params.options.runtime_opts.q_precision.into()
+        };
+
+        // There we go, we finally have lexed the whole thing!
+        // This means the span is complete, and we can report any issues.
+        let span = Span::Normal(span.clone());
+        if underscore_after_dot {
+            params.error(&span, |error| {
+                error.set_message("expected a digit after 'q', not an underscore");
+                error.add_label(
+                    diagnostics::error_label(&span)
+                        .with_message("this fixed-point constant is invalid"),
+                );
+            });
+        }
+        if too_many_digits {
+            params.warn(warning!("large-constant"), &span, |warning| {
+                warning.set_message("too many digits after the dot");
+                warning.add_label(
+                    diagnostics::warning_label(&span)
+                        .with_message("some digits of this fixed-point constant were ignored"),
+                );
+            });
+        }
+        if empty_precision {
+            params.error(&span, |error| {
+                error.set_message("missing digits after 'q'");
+                error.add_label(
+                    diagnostics::error_label(&span)
+                        .with_message("this fixed-point constant is invalid"),
+                );
+            });
+        }
+        match super::semantics::fixed_point::clamp_fixpoint_precision(
+            precision_raw,
+            &span,
+            params.nb_errors_left,
+            params.options,
+        ) {
+            Some(precision) => {
+                if integer_part >= 1u32 << (32 - precision) {
+                    params.warn(warning!("large-constant"), &span, |warning| {
+                        warning.set_message("magnitude of fixed-point constant is too large");
+                        warning.add_label(diagnostics::warning_label(&span).with_message(format!(
+                            "the integer part of this was truncated to {}",
+                            integer_part % (1 << (32 - precision)),
+                        )))
+                    });
+                }
+                integer_part << precision
+                    | (value as f64 / divisor as f64 * 2.0f64.powi(precision.into())).round() as u32
+            }
+            None => integer_part,
+        }
     }
 
     fn read_bin_number(
@@ -1805,7 +1924,7 @@ impl Lexer {
         mut value: u32,
         span: &mut NormalSpan,
         params: &mut LexerParams,
-    ) -> i32 {
+    ) -> u32 {
         let mut overflowed = false;
 
         loop {
@@ -1838,7 +1957,7 @@ impl Lexer {
             })
         }
 
-        value as i32
+        value
     }
 
     fn read_gfx_constant(
@@ -1846,7 +1965,7 @@ impl Lexer {
         first_char: char,
         span: &mut NormalSpan,
         params: &mut LexerParams,
-    ) -> i32 {
+    ) -> u32 {
         fn value_of(ch: char, params: &LexerParams) -> u8 {
             params
                 .options
@@ -1889,7 +2008,7 @@ impl Lexer {
             })
         }
 
-        ((high_bitplane as u16) << 8 | low_bitplane as u16) as i32
+        (high_bitplane as u32) << 8 | low_bitplane as u32
     }
 
     fn read_identifier(

@@ -12,6 +12,7 @@ mod context;
 mod data;
 mod error;
 mod expr;
+pub mod fixed_point; // Exporting the fixed-point precision clamp function for the lexer.
 mod instructions;
 mod macros;
 mod opt;

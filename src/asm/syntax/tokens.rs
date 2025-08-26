@@ -59,7 +59,7 @@ define_tokens! {
         Newline,
 
         #[name = "number"]
-        Number(i32),
+        Number(u32),
         #[name = "string"]
         String(CompactString),
         #[name = "identifier"]
@@ -413,24 +413,32 @@ define_tokens! {
         Bank,
         #[name = "bitwidth", keyword()]
         Bitwidth,
+        #[name = "bytelen", keyword()]
+        Bytelen,
         #[name = "ceil", keyword()]
         Ceil,
+        #[name = "charcmp", keyword()]
+        Charcmp,
         #[name = "charlen", keyword()]
         Charlen,
+        #[name = "charsize", keyword()]
+        Charsize,
         #[name = "charsub", keyword()]
         Charsub,
+        #[name = "charval", keyword()]
+        Charval,
         #[name = "cos", keyword()]
         Cos,
         #[name = "def", keyword()]
         Def,
-        #[name = "fdiv", keyword()]
-        Fdiv,
+        #[name = "div", keyword()]
+        Div,
         #[name = "floor", keyword()]
         Floor,
         #[name = "fmod", keyword()]
         Fmod,
-        #[name = "fmul", keyword()]
-        Fmul,
+        #[name = "mul", keyword()]
+        Mul,
         #[name = "high", keyword()]
         High,
         #[name = "incharmap", keyword()]
@@ -443,6 +451,8 @@ define_tokens! {
         Low,
         #[name = "pow", keyword()]
         Pow,
+        #[name = "readfile", keyword()]
+        Readfile,
         #[name = "revchar", keyword()]
         Revchar,
         #[name = "round", keyword()]
@@ -453,12 +463,16 @@ define_tokens! {
         Sizeof,
         #[name = "startof", keyword()]
         Startof,
+        #[name = "strbyte", keyword()]
+        Strbyte,
         #[name = "strcat", keyword()]
         Strcat,
         #[name = "strchar", keyword()]
         Strchar,
         #[name = "strcmp", keyword()]
         Strcmp,
+        #[name = "strfind", keyword()]
+        Strfind,
         #[name = "strfmt", keyword()]
         Strfmt,
         #[name = "strin", keyword()]
@@ -467,6 +481,8 @@ define_tokens! {
         Strlen,
         #[name = "strlwr", keyword()]
         Strlwr,
+        #[name = "strrfind", keyword()]
+        Strrfind,
         #[name = "strrin", keyword()]
         Strrin,
         #[name = "strrpl", keyword()]

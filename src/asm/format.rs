@@ -10,7 +10,7 @@ pub struct FormatSpec {
     pad_with_zeros: bool,
     width: usize,
     frac: Option<usize>,
-    precision: usize,
+    precision: u8,
     pub kind: FormatKind,
 }
 #[derive(Debug, Clone, Copy, displaydoc::Display)]
@@ -77,7 +77,7 @@ pub enum FormatError {
 }
 
 impl FormatSpec {
-    pub fn parse(src: &str, default_precision: usize) -> Result<Self, FormatError> {
+    pub fn parse(src: &str, default_precision: u8) -> Result<Self, FormatError> {
         let mut chars = src.chars().peekable();
 
         let force_sign = chars.next_if(|ch| matches!(ch, '+' | ' '));
@@ -263,7 +263,7 @@ struct NumberFormatter {
     number: u32,
     force_sign: Option<char>,
     be_exact: bool,
-    precision: usize,
+    precision: u8,
     frac: usize,
     width: usize,
     pad_with_zeros: bool,

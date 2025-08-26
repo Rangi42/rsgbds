@@ -52,12 +52,12 @@ pub enum OpKind {
 
 #[derive(Debug)]
 pub struct Error {
-    span: Span,
-    kind: ErrKind,
+    pub span: Span,
+    pub kind: ErrKind,
 }
 
 #[derive(Debug)]
-enum ErrKind {
+pub enum ErrKind {
     SymNotFound(Identifier),
     SymDeleted(Identifier, Span),
     NonNumericSym(Identifier, &'static str),
@@ -865,6 +865,10 @@ impl Error {
             span: self.span,
             kind,
         }
+    }
+
+    pub fn can_be_deferred_to_linker(&self) -> bool {
+        self.kind.can_be_deferred_to_linker()
     }
 }
 impl ErrKind {

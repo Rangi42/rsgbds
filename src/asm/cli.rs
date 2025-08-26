@@ -260,7 +260,7 @@ impl RuntimeOptions {
                 self.q_precision = precision;
                 Ok(())
             }
-            n => Err(FixPrecParseErr::OutOfRange(n)),
+            n => Err(FixPrecParseErr::OutOfRange(n.into())),
         }
     }
 }
