@@ -1,5 +1,15 @@
-error: fixed-point-precision.asm(22):
-    Fixed-point constant precision must be between 1 and 31
-error: fixed-point-precision.asm(23):
-    Fixed-point constant precision 0 invalid, defaulting to 16
-Assembly aborted with 2 errors!
+error: invalid fixed-point precision
+    ╭─[ test.asm:22:12 ]
+    │
+ 22 │ def qerr = 1.25q32
+    │            ───┬───  
+    │               ╰───── this must be between 1 and 31 inclusive, not 32
+────╯
+error: fixed-point precision cannot be 0
+    ╭─[ test.asm:23:12 ]
+    │
+ 23 │     println "{q0f:qerr}"
+    │               ─┬─  
+    │                ╰─── error parsing this format specification
+────╯
+2 errors generated.
