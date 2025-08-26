@@ -1,15 +1,50 @@
-error: fixed-oob.asm(1):
-    Section "ROM0"'s fixed address $babe is outside of range [$0000; $7fff]
-error: fixed-oob.asm(3):
-    Section "ROMX"'s fixed address $beef is outside of range [$4000; $7fff]
-error: fixed-oob.asm(5):
-    Section "VRAM"'s fixed address $c0de is outside of range [$8000; $9fff]
-error: fixed-oob.asm(7):
-    Section "SRAM"'s fixed address $cafe is outside of range [$a000; $bfff]
-error: fixed-oob.asm(11):
-    Section "WRAMX"'s fixed address $0dad is outside of range [$d000; $dfff]
-error: fixed-oob.asm(13):
-    Section "OAM"'s fixed address $0cab is outside of range [$fe00; $fe9f]
-error: fixed-oob.asm(15):
-    Section "HRAM"'s fixed address $0bad is outside of range [$ff80; $fffe]
-Assembly aborted with 7 errors!
+error: invalid address constraint for section
+   ╭─[ test.asm:1:22 ]
+   │
+ 1 │ SECTION "ROM0", ROM0[$BABE]
+   │                      ──┬──  
+   │                        ╰──── ROM0 sections can be between $0000 and $7fff, not $babe
+───╯
+error: invalid address constraint for section
+   ╭─[ test.asm:3:22 ]
+   │
+ 3 │ SECTION "ROMX", ROMX[$BEEF]
+   │                      ──┬──  
+   │                        ╰──── ROMX sections can be between $4000 and $7fff, not $beef
+───╯
+error: invalid address constraint for section
+   ╭─[ test.asm:5:22 ]
+   │
+ 5 │ SECTION "VRAM", VRAM[$C0DE]
+   │                      ──┬──  
+   │                        ╰──── VRAM sections can be between $8000 and $9fff, not $c0de
+───╯
+error: invalid address constraint for section
+   ╭─[ test.asm:7:22 ]
+   │
+ 7 │ SECTION "SRAM", SRAM[$CAFE]
+   │                      ──┬──  
+   │                        ╰──── SRAM sections can be between $a000 and $bfff, not $cafe
+───╯
+error: invalid address constraint for section
+    ╭─[ test.asm:11:24 ]
+    │
+ 11 │ SECTION "WRAMX", WRAMX[$DAD]
+    │                        ──┬─  
+    │                          ╰─── WRAMX sections can be between $d000 and $dfff, not $0dad
+────╯
+error: invalid address constraint for section
+    ╭─[ test.asm:13:20 ]
+    │
+ 13 │ SECTION "OAM", OAM[$CAB]
+    │                    ──┬─  
+    │                      ╰─── OAM sections can be between $fe00 and $fe9f, not $0cab
+────╯
+error: invalid address constraint for section
+    ╭─[ test.asm:15:22 ]
+    │
+ 15 │ SECTION "HRAM", HRAM[$BAD]
+    │                      ──┬─  
+    │                        ╰─── HRAM sections can be between $ff80 and $fffe, not $0bad
+────╯
+7 errors generated.
