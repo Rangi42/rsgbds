@@ -312,35 +312,35 @@ impl Display for NumberFormatter {
                 if self.pad_with_zeros {
                     write!(f, "{:0width$}", self.number as i32)
                 } else {
-                    write!(f, "{}", self.number as i32)
+                    write!(f, "{:width$}", self.number as i32)
                 }
             }
             FormatKind::Unsigned => {
                 if self.pad_with_zeros {
                     write!(f, "{:0width$}", self.number)
                 } else {
-                    write!(f, "{}", self.number)
+                    write!(f, "{:width$}", self.number)
                 }
             }
             FormatKind::LowerHex => {
                 if self.pad_with_zeros {
                     write!(f, "{:0width$x}", self.number)
                 } else {
-                    write!(f, "{:x}", self.number)
+                    write!(f, "{:width$x}", self.number)
                 }
             }
             FormatKind::UpperHex | FormatKind::Default => {
                 if self.pad_with_zeros {
                     write!(f, "{:0width$X}", self.number)
                 } else {
-                    write!(f, "{:X}", self.number)
+                    write!(f, "{:width$X}", self.number)
                 }
             }
             FormatKind::Binary => {
                 if self.pad_with_zeros {
                     write!(f, "{:0width$b}", self.number)
                 } else {
-                    write!(f, "{:b}", self.number)
+                    write!(f, "{:width$b}", self.number)
                 }
             }
             FormatKind::Octal => {
