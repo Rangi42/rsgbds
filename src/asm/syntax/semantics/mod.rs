@@ -18,6 +18,7 @@ mod macros;
 mod opt;
 mod print;
 mod section;
+mod string;
 mod symbols;
 
 type ParseError = lalrpop_util::ParseError<usize, TokenPayload, ()>;

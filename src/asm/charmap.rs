@@ -141,6 +141,10 @@ impl Charmap {
         }
     }
 
+    pub fn name(&self) -> Identifier {
+        self.name
+    }
+
     pub fn add_mapping(&mut self, string: &str, values: Vec<i32>) -> Option<()> {
         let mut chars = string.chars();
         let mut node_id = *self.root_node.entry(chars.next()?).or_insert_with(|| {
@@ -227,6 +231,32 @@ impl Charmap {
             options,
         }
     }
+    pub fn encode_one(&self, string: &str) -> Option<(CharMapping<'_>, usize)> {
+        // RGBASM matches charmaps using the common “leftmost-longest” scheme.
+        let chars = string.char_indices();
+
+        let mut children = &self.root_node;
+        let mut target_node = None;
+        // Read characters from the string, either until we reach a dead end, or exhaust the string.
+        for (offset, c) in chars {
+            let Some(&node_id) = children.get(&c) else {
+                break;
+            };
+            let node = &self.nodes[node_id];
+            if !node.mapping.is_empty() {
+                target_node = Some((&node.mapping, offset + c.len_utf8()));
+            }
+            children = &node.children;
+        }
+
+        if let Some((mapping, nb_bytes)) = target_node {
+            Some((CharMapping::Mapped(mapping), nb_bytes))
+        } else {
+            // Default identity mapping: just return one character.
+            let c = string.chars().next()?;
+            Some((CharMapping::Passthrough(c), c.len_utf8()))
+        }
+    }
 }
 #[derive(Debug)]
 struct Encoder<'charmap, 'a> {
@@ -242,40 +272,19 @@ impl<'charmap> Iterator for Encoder<'charmap, '_> {
     type Item = CharMapping<'charmap>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // RGBASM matches charmaps using the common “leftmost-longest” scheme.
-        let chars = self.string.char_indices();
-
-        let mut children = &self.charmap.root_node;
-        let mut target_node = None;
-        // Read characters from the string, either until we reach a dead end, or exhaust the string.
-        for (offset, c) in chars {
-            let Some(&node_id) = children.get(&c) else {
-                break;
-            };
-            let node = &self.charmap.nodes[node_id];
-            if !node.mapping.is_empty() {
-                target_node = Some((&node.mapping, offset + c.len_utf8()));
-            }
-            children = &node.children;
-        }
-
-        if let Some((mapping, nb_bytes)) = target_node {
-            self.string = &self.string[nb_bytes..];
-            Some(CharMapping::Mapped(mapping))
-        } else {
-            // Default identity mapping: just return one character.
-            let c = self.string.chars().next()?;
-            self.string = &self.string[c.len_utf8()..];
+        let (mapping, byte_len) = self.charmap.encode_one(self.string)?;
+        self.string = &self.string[byte_len..];
+        if let CharMapping::Passthrough(c) = &mapping {
             self.charmap.warn_on_passthrough(
-                c,
+                *c,
                 self.is_main_charmap,
                 self.string_span,
                 self.identifiers,
                 self.nb_errors_left,
                 self.options,
             );
-            Some(CharMapping::Passthrough(c))
         }
+        Some(mapping)
     }
 }
 #[derive(Debug, Clone, Copy)]

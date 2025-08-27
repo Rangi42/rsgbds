@@ -561,7 +561,21 @@ ExprAtomNoIdent: Expr = {
 	<l_span_idx:@L> "acos" "(" <expr:Expr> <prec:("," <Expr>)?> ")" <r_span_idx:@R> => ctx.fixpoint_acos(expr, prec, l_span_idx, r_span_idx),
 	<l_span_idx:@L> "atan" "(" <expr:Expr> <prec:("," <Expr>)?> ")" <r_span_idx:@R> => ctx.fixpoint_atan(expr, prec, l_span_idx, r_span_idx),
 	<l_span_idx:@L> "atan2" "(" <lhs:Expr> "," <rhs:Expr> <prec:("," <Expr>)?> ")" <r_span_idx:@R> => ctx.fixpoint_atan2(lhs, rhs, prec, l_span_idx, r_span_idx),
-	// TODO: string functions, character literals, and function calls
+	// String functions.
+	<l_span_idx:@L> "strcmp"    "(" <lhs:StringExpr> "," <rhs:StringExpr> ")" <r_span_idx:@R> =>   ctx.strcmp(lhs, rhs, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "strfind"   "(" <lhs:StringExpr> "," <rhs:StringExpr> ")" <r_span_idx:@R> =>  ctx.strfind(lhs, rhs, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "strrfind"  "(" <lhs:StringExpr> "," <rhs:StringExpr> ")" <r_span_idx:@R> => ctx.strrfind(lhs, rhs, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "strlen"    "(" <expr:StringExpr> ")" <r_span_idx:@R> =>    ctx.strlen(expr, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "bytelen"   "(" <expr:StringExpr> ")" <r_span_idx:@R> =>   ctx.bytelen(expr, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "charlen"   "(" <expr:StringExpr> ")" <r_span_idx:@R> =>   ctx.charlen(expr, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "incharmap" "(" <expr:StringExpr> ")" <r_span_idx:@R> => ctx.incharmap(expr, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "charcmp"   "(" <lhs:StringExpr> "," <rhs:StringExpr> ")" <r_span_idx:@R> => ctx.charcmp(lhs, rhs, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "charsize"  "(" <expr:StringExpr> ")" <r_span_idx:@R> => ctx.charsize(expr, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "charval"   "(" <string:StringExpr> ")" <r_span_idx:@R> => ctx.charval_single(string, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "charval"   "(" <string:StringExpr> "," <pos:Expr> ")" <r_span_idx:@R> =>  ctx.charval(string, pos, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "strbyte"   "(" <string:StringExpr> "," <pos:Expr> ")" <r_span_idx:@R> =>  ctx.strbyte(string, pos, l_span_idx, r_span_idx),
+	// TODO: character literals
+	// TODO: function calls
 };
 
 StringExpr: (CompactString, Span) = {
@@ -808,11 +822,9 @@ extern {
 		"strcmp" => TokenPayload::Strcmp,
 		"strfind" => TokenPayload::Strfind,
 		"strfmt" => TokenPayload::Strfmt,
-		"strin" => TokenPayload::Strin,
 		"strlen" => TokenPayload::Strlen,
 		"strlwr" => TokenPayload::Strlwr,
 		"strrfind" => TokenPayload::Strrfind,
-		"strrin" => TokenPayload::Strrin,
 		"strrpl" => TokenPayload::Strrpl,
 		"strslice" => TokenPayload::Strslice,
 		"strsub" => TokenPayload::Strsub,

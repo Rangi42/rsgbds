@@ -475,16 +475,12 @@ define_tokens! {
         Strfind,
         #[name = "strfmt", keyword()]
         Strfmt,
-        #[name = "strin", keyword()]
-        Strin,
         #[name = "strlen", keyword()]
         Strlen,
         #[name = "strlwr", keyword()]
         Strlwr,
         #[name = "strrfind", keyword()]
         Strrfind,
-        #[name = "strrin", keyword()]
-        Strrin,
         #[name = "strrpl", keyword()]
         Strrpl,
         #[name = "strslice", keyword()]
