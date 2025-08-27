@@ -1768,11 +1768,16 @@ impl Lexer {
     ) -> u32 {
         let mut overflowed = false;
 
+        let mut trailing_underscore = false;
         loop {
             match self.peek(params) {
-                Some('_') => self.consume(span), // TODO: disallow trailing underscores
+                Some('_') => {
+                    self.consume(span);
+                    trailing_underscore = true;
+                }
                 Some(ch) if ch.is_digit(radix) => {
                     self.consume(span);
+                    trailing_underscore = false;
 
                     let digit = ch.to_digit(radix).unwrap();
                     let (new_val, overflow) = value.overflowing_mul(radix);
@@ -1785,14 +1790,22 @@ impl Lexer {
             }
         }
 
+        let span = Span::Normal(span.clone());
         if overflowed {
-            let span = Span::Normal(span.clone());
             params.warn(warning!("large-constant"), &span, |warning| {
                 warning.set_message(format!("integer constant is larger than {}", u32::MAX));
                 warning.add_label(
                     diagnostics::warning_label(&span)
                         .with_message(format!("this was truncated to {value}")),
                 )
+            });
+        }
+        if trailing_underscore {
+            params.error(&span, |error| {
+                error.set_message("trailing underscores are not allowed");
+                error.add_label(
+                    diagnostics::error_label(&span).with_message("this number is invalid"),
+                );
             });
         }
 
@@ -1809,14 +1822,17 @@ impl Lexer {
         let mut divisor: u32 = 1;
         let mut underscore_after_dot = false;
         let mut too_many_digits = false;
+        let mut trailing_underscore = false;
         let first_nondigit = 'digits: loop {
             match self.peek(params) {
                 Some('_') => {
                     self.consume(span);
+                    trailing_underscore = true;
                     underscore_after_dot |= divisor == 1;
                 }
                 Some(digit @ '0'..='9') => {
                     self.consume(span);
+                    trailing_underscore = false;
                     match divisor.checked_mul(10) {
                         Some(new_divisor) => divisor = new_divisor,
                         None => {
@@ -1837,15 +1853,25 @@ impl Lexer {
         };
 
         let mut empty_precision = false;
+        let mut underscore_after_q = false;
         let precision_raw = if matches!(first_nondigit, Some('q' | 'Q')) {
             self.consume(span);
             // Allow `q1`, but also `q.1`.
-            let first_digit = match self.peek(params) {
+            let mut first_digit = match self.peek(params) {
                 Some('.') => {
                     self.consume(span);
                     self.peek(params)
                 }
                 ch => ch,
+            };
+            underscore_after_q = if matches!(first_digit, Some('_')) {
+                while matches!(first_digit, Some('_')) {
+                    self.consume(span);
+                    first_digit = self.peek(params);
+                }
+                true
+            } else {
+                false
             };
             if let Some(first_digit) = first_digit.and_then(|ch| ch.to_digit(10)) {
                 let mut precision = first_digit as i32;
@@ -1871,7 +1897,25 @@ impl Lexer {
         let span = Span::Normal(span.clone());
         if underscore_after_dot {
             params.error(&span, |error| {
+                error.set_message("expected a digit after '.', not an underscore");
+                error.add_label(
+                    diagnostics::error_label(&span)
+                        .with_message("this fixed-point constant is invalid"),
+                );
+            });
+        }
+        if underscore_after_q {
+            params.error(&span, |error| {
                 error.set_message("expected a digit after 'q', not an underscore");
+                error.add_label(
+                    diagnostics::error_label(&span)
+                        .with_message("this fixed-point constant is invalid"),
+                );
+            });
+        }
+        if trailing_underscore {
+            params.error(&span, |error| {
+                error.set_message("trailing underscores are not allowed");
                 error.add_label(
                     diagnostics::error_label(&span)
                         .with_message("this fixed-point constant is invalid"),

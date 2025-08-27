@@ -17,9 +17,9 @@ _1234::
 	db 123, 1_23, 1__23 ; decimal
 	dw 12_345 ; decimal
 	dw $ab_cd ; hex
-	db &2_0_0_ ; octal
+	db &2_0_0 ; octal
 	db %1111_0000, %1_0 ; binary
-	dl 6_._283_185 ; fixed point
+	dl 6.283_185 ; fixed point
 	dw `0123_3210, `00_33_22_11_ ; gfx
 
 ; underscores with custom digits
