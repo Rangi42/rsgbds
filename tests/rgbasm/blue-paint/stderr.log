@@ -1,181 +1,23 @@
-error: unexpected character after line continuation
-   ╭─[ <macro argument #1>:1:1 ]
-   │
- 1 │ \3
-   │ ┬  
-   │ ╰── there can only be whitespace between this backslash and the end of the line
-   │
-   ├─[ test.asm:7:2 ]
-   │
- 7 │     \1statement\2
-   │     ─┬  
-   │      ╰── expanded here
-   │ 
- 9 │ arg_to_arg \\3, \\4, \{, \}
-   │ ─────┬────  
-   │      ╰────── macro called here
-   │ 
-   │ Help: characters inside of macro args cannot start an expansion themselves
-───╯
-error: syntax error: unexpected number
-   ╭─[ <macro argument #1>:1:2 ]
-   │
- 1 │ \3
-   │  ┬  
-   │  ╰── expected an instruction or a directive here
-   │
-   ├─[ test.asm:7:2 ]
-   │
- 7 │     \1statement\2
-   │     ─┬  
-   │      ╰── expanded here
-   │ 
- 9 │ arg_to_arg \\3, \\4, \{, \}
-   │ ─────┬────  
-   │      ╰────── macro called here
-───╯
-error: unexpected character after line continuation
-   ╭─[ <macro argument #2>:1:1 ]
-   │
- 1 │ \4
-   │ ┬  
-   │ ╰── there can only be whitespace between this backslash and the end of the line
-   │
-   ├─[ test.asm:7:13 ]
-   │
- 7 │     \1statement\2
-   │                ─┬  
-   │                 ╰── expanded here
-   │ 
- 9 │ arg_to_arg \\3, \\4, \{, \}
-   │ ─────┬────  
-   │      ╰────── macro called here
-   │ 
-   │ Help: characters inside of macro args cannot start an expansion themselves
-───╯
-error: unexpected character '{'
-    ╭─[ <macro argument #1>:1:1 ]
-    │
-  1 │ {
-    │ ┬  
-    │ ╰── this character was not expected at this point
-    │
-    ├─[ test.asm:13:2 ]
-    │
- 13 │     \1statement\2
-    │     ─┬  
-    │      ╰── expanded here
-    │ 
- 15 │ arg_to_interp \{, \}
-    │ ──────┬──────  
-    │       ╰──────── macro called here
-    │ 
-    │ Help: characters inside of macro args cannot start an expansion themselves
-────╯
-error: `statement` is not a macro
-    ╭─[ test.asm:13:4 ]
-    │
-  3 │ DEF statement EQUS "println \"This is the song that never ends~\""
-    │ ─┬─  
-    │  ╰─── a symbol by this name was defined here
-    │ 
- 13 │     \1statement\2
-    │       ────┬────  
-    │           ╰────── Macro call here
-    │ 
- 15 │ arg_to_interp \{, \}
-    │ ──────┬──────  
-    │       ╰──────── macro called here
-────╯
-error: unterminated interpolation
-    ╭─[ open:1:2 ]
-    │
-  1 │ {
-    │  │ 
-    │  ╰─ no closing brace before this
-    │
-    ├─[ test.asm:20:1 ]
-    │
- 20 │ {open}statement{close}
-    │ ───┬──  
-    │    ╰──── interpolated here
-────╯
-error: `statement` is not a macro
-    ╭─[ test.asm:20:7 ]
-    │
-  3 │ DEF statement EQUS "println \"This is the song that never ends~\""
-    │ ─┬─  
-    │  ╰─── a symbol by this name was defined here
-    │ 
- 20 │ {open}statement{close}
-    │       ────┬────  
-    │           ╰────── Macro call here
-────╯
-error: unexpected character after line continuation
-    ╭─[ <macro argument #1>:1:1 ]
-    │
-  1 │ \1
-    │ ┬  
-    │ ╰── there can only be whitespace between this backslash and the end of the line
-    │
-    ├─[ test.asm:24:2 ]
-    │
- 24 │     \1
-    │     ─┬  
-    │      ╰── expanded here
-    │ 
- 26 │ endless \\1
-    │ ───┬───  
-    │    ╰───── macro called here
-    │ 
-    │ Help: characters inside of macro args cannot start an expansion themselves
-────╯
-error: syntax error: unexpected number
-    ╭─[ <macro argument #1>:1:2 ]
-    │
-  1 │ \1
-    │  ┬  
-    │  ╰── expected an instruction or a directive here
-    │
-    ├─[ test.asm:24:2 ]
-    │
- 24 │     \1
-    │     ─┬  
-    │      ╰── expanded here
-    │ 
- 26 │ endless \\1
-    │ ───┬───  
-    │    ╰───── macro called here
-────╯
-error: maximum recursion depth exceeded
-    ╭─[ infinite:1:1 ]
-    │
-  1 │ {infinite}
-    │ ─────┬────  
-    │      ╰────── depth is 5 contexts here, cannot enter a new one
-    │
-    ├─[ infinite:1:1 ]
-    │
-  1 │ {infinite}
-    │ ─────┬────  
-    │      ╰────── interpolated here
-    │
-    ├─[ infinite:1:1 ]
-    │
-  1 │ {infinite}
-    │ ─────┬────  
-    │      ╰────── interpolated here
-    │
-    ├─[ infinite:1:1 ]
-    │
-  1 │ {infinite}
-    │ ─────┬────  
-    │      ╰────── interpolated here
-    │
-    ├─[ test.asm:30:1 ]
-    │
- 30 │ {infinite}
-    │ ─────┬────  
-    │      ╰────── interpolated here
-────╯
-10 errors generated.
+error: Invalid character '3' after line continuation
+    at blue-paint.asm::arg_to_arg(7) <- blue-paint.asm(9)
+error: syntax error, unexpected number
+    at blue-paint.asm::arg_to_arg(7) <- blue-paint.asm(9)
+error: Invalid character '}'
+    at blue-paint.asm::arg_to_arg(7) <- blue-paint.asm(9)
+error: Invalid character '{'
+    at blue-paint.asm::arg_to_interp(13) <- blue-paint.asm(15)
+error: Invalid character '}'
+    at blue-paint.asm::arg_to_interp(13) <- blue-paint.asm(15)
+error: Invalid character '1' after line continuation
+    at blue-paint.asm::endless(24) <- blue-paint.asm(26)
+error: syntax error, unexpected number
+    at blue-paint.asm::endless(24) <- blue-paint.asm(26)
+FATAL: Recursion limit (5) exceeded
+    at blue-paint.asm(30)
+    while expanding symbol `infinite`
+    while expanding symbol `infinite`
+    while expanding symbol `infinite`
+    while expanding symbol `infinite`
+    while expanding symbol `infinite`
+    while expanding symbol `infinite`
+    while expanding symbol `infinite`
