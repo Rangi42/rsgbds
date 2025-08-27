@@ -6,10 +6,10 @@ error: cannot charmap an empty string
    │          ╰── this string shouldn't be empty
 ───╯
 error: syntax error: unexpected end of line
-   ╭─[ test.asm:2:20 ]
+   ╭─[ test.asm:2:19 ]
    │
  2 │ charmap "nonempty", ; nothing
-   │                    ┬  
-   │                    ╰── expected a number or an expression here
+   │                   ┬  
+   │                   ╰── expected "number", "identifier", "local identifier", "(", "+", "-", "!", ...36 others
 ───╯
 2 errors generated.
