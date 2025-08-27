@@ -16,8 +16,8 @@ use super::parse_ctx;
 impl parse_ctx!() {
     pub fn strcmp(
         &self,
-        (lhs, left_span): (CompactString, Span),
-        (rhs, right_span): (CompactString, Span),
+        (lhs, _left_span): (CompactString, Span),
+        (rhs, _right_span): (CompactString, Span),
         l_span_idx: usize,
         r_span_idx: usize,
     ) -> Expr {
@@ -32,8 +32,8 @@ impl parse_ctx!() {
 
     pub fn strfind(
         &self,
-        (lhs, left_span): (CompactString, Span),
-        (rhs, right_span): (CompactString, Span),
+        (lhs, _left_span): (CompactString, Span),
+        (rhs, _right_span): (CompactString, Span),
         l_span_idx: usize,
         r_span_idx: usize,
     ) -> Expr {
@@ -44,8 +44,8 @@ impl parse_ctx!() {
 
     pub fn strrfind(
         &self,
-        (lhs, left_span): (CompactString, Span),
-        (rhs, right_span): (CompactString, Span),
+        (lhs, _left_span): (CompactString, Span),
+        (rhs, _right_span): (CompactString, Span),
         l_span_idx: usize,
         r_span_idx: usize,
     ) -> Expr {
@@ -56,7 +56,7 @@ impl parse_ctx!() {
 
     pub fn strlen(
         &self,
-        (expr, span): (CompactString, Span),
+        (expr, _span): (CompactString, Span),
         l_span_idx: usize,
         r_span_idx: usize,
     ) -> Expr {
@@ -67,7 +67,7 @@ impl parse_ctx!() {
 
     pub fn bytelen(
         &self,
-        (expr, span): (CompactString, Span),
+        (expr, _span): (CompactString, Span),
         l_span_idx: usize,
         r_span_idx: usize,
     ) -> Expr {
@@ -98,12 +98,13 @@ impl parse_ctx!() {
 
     pub fn incharmap(
         &self,
-        (expr, span): (CompactString, Span),
+        (expr, _span): (CompactString, Span),
         l_span_idx: usize,
         r_span_idx: usize,
     ) -> Expr {
         let charmap = self.charmaps.active_charmap();
-        let value = if matches!(charmap.encode_one(&expr), Some((CharMapping::Mapped(_), _))) {
+        let value = if matches!(charmap.encode_one(&expr), Some((CharMapping::Mapped(_), byte_len)) if byte_len == expr.len())
+        {
             1
         } else {
             0
@@ -129,7 +130,7 @@ impl parse_ctx!() {
                 self.nb_errors_left,
                 self.options,
             )
-            .flat_map(|mapping| mapping);
+            .flatten();
         let mut right = charmap
             .encode(
                 (&rhs, &right_span),
@@ -138,7 +139,7 @@ impl parse_ctx!() {
                 self.nb_errors_left,
                 self.options,
             )
-            .flat_map(|mapping| mapping);
+            .flatten();
         let value = loop {
             match (left.next(), right.next()) {
                 (None, None) => break 0,
@@ -158,7 +159,7 @@ impl parse_ctx!() {
 
     pub fn charsize(
         &self,
-        (expr, span): (CompactString, Span),
+        (expr, _span): (CompactString, Span),
         l_span_idx: usize,
         r_span_idx: usize,
     ) -> Expr {
@@ -206,7 +207,7 @@ impl parse_ctx!() {
 
     pub fn charval_single(
         &self,
-        (string, span): (CompactString, Span),
+        (string, _span): (CompactString, Span),
         l_span_idx: usize,
         r_span_idx: usize,
     ) -> Expr {
@@ -286,7 +287,7 @@ impl parse_ctx!() {
 
     pub fn charval(
         &self,
-        (string, span): (CompactString, Span),
+        (string, _span): (CompactString, Span),
         expr: Expr,
         l_span_idx: usize,
         r_span_idx: usize,
@@ -304,7 +305,7 @@ impl parse_ctx!() {
                 });
                 Expr::nothing(span)
             }
-            Some((mapping, byte_len)) => {
+            Some((mapping, _byte_len)) => {
                 match self.logical_index_to_physical(
                     expr,
                     charmap
@@ -318,7 +319,7 @@ impl parse_ctx!() {
                         .count(),
                 ) {
                     None => Expr::nothing(span),
-                    Some((index, logical_idx)) => {
+                    Some((index, _logical_idx)) => {
                         fn get_nth_value<T: Copy + Into<i32>>(
                             slice: &[T],
                             index: usize,
@@ -336,7 +337,7 @@ impl parse_ctx!() {
                                         error.add_label(
                                             diagnostics::error_label(&span).with_message(format!(
                                                 "attempted to take the {} value, out of {}",
-                                                ordinal::Ordinal(index),
+                                                ordinal::Ordinal(index), // TODO: would it make more sense to report `logical_idx` instead?
                                                 slice.len(),
                                             )),
                                         )
@@ -380,7 +381,7 @@ impl parse_ctx!() {
 
     pub fn strbyte(
         &self,
-        (string, span): (CompactString, Span),
+        (string, _span): (CompactString, Span),
         expr: Expr,
         l_span_idx: usize,
         r_span_idx: usize,
