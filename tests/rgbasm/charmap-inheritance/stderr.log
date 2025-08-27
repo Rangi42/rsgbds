@@ -1,3 +1,8 @@
-error: charmap-inheritance.asm(26):
-    Base charmap 'eggs' doesn't exist
-Assembly aborted with 1 error!
+error: no charmap called "eggs" exists
+    ╭─[ test.asm:26:2 ]
+    │
+ 26 │     newcharmap spam, eggs
+    │     ─────┬────  
+    │          ╰────── requested here
+────╯
+1 error generated.
