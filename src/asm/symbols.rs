@@ -1,7 +1,7 @@
 use std::{cell::Cell, collections::hash_map::Entry};
 
 use chrono::prelude::*;
-use compact_str::CompactString;
+use compact_str::{CompactString, ToCompactString};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use string_interner::Symbol;
 
@@ -162,26 +162,19 @@ impl Symbols {
         });
         def_builtin(
             "__TIME__",
-            string(now.format("\"%H:%M:%S\"").to_string().into()),
+            string(now.format("\"%H:%M:%S\"").to_compact_string()),
         );
         def_builtin(
             "__DATE__",
-            string(now.format("\"%d %B %Y\"").to_string().into()),
+            string(now.format("\"%d %B %Y\"").to_compact_string()),
         );
         def_builtin(
             "__ISO_8601_LOCAL__",
-            string(
-                now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
-                    .into(),
-            ),
+            string(now.format("\"%Y-%m-%dT%H:%M:%S%z\"").to_compact_string()),
         );
         def_builtin(
             "__ISO_8601_UTC__",
-            string(
-                now_utc
-                    .to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
-                    .into(),
-            ),
+            string(now_utc.format("\"%Y-%m-%dT%H:%M:%SZ\"").to_compact_string()),
         );
         def_builtin("__UTC_YEAR__", numeric(now_utc.year(), false));
         def_builtin("__UTC_MONTH__", numeric(now_utc.month() as i32, false));
