@@ -1,6 +1,21 @@
-warning: Unmapped character 'A' not in `main` charmap [-Wunmapped-char]
-    at unmapped-char.asm(12)
-warning: Unmapped character 'A' [-Wunmapped-char]
-    at unmapped-char.asm(15)
-warning: Unmapped character 'A' [-Wunmapped-char]
-    at unmapped-char.asm(21)
+[-Wunmapped-char=2] warning: 'A' is not mapped in charmap "custom"
+    ╭─[ test.asm:12:6 ]
+    │
+ 12 │        db "A" ; unmapped in non-default empty charmap
+    │           ─┬─  
+    │            ╰─── in this string
+────╯
+[-Wunmapped-char=1] warning: 'A' is not mapped
+    ╭─[ test.asm:15:5 ]
+    │
+ 15 │     db "A" ; unmapped in non-empty charmap
+    │        ─┬─  
+    │         ╰─── in this string
+────╯
+[-Wunmapped-char=1] warning: 'A' is not mapped
+    ╭─[ test.asm:21:5 ]
+    │
+ 21 │     db "A" ; unmapped in non-empty charmap
+    │        ─┬─  
+    │         ╰─── in this string
+────╯

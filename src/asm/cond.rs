@@ -1,4 +1,4 @@
-use crate::{sources::Span, syntax::lexer::Lexer};
+use crate::sources::Span;
 
 #[derive(Debug)]
 pub struct Condition {

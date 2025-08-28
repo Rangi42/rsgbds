@@ -1,13 +1,37 @@
-error: `W` already defined as constant
-    at symbol-override.asm(6)
-    and also:
-    at symbol-override.asm(5)
-error: `X` already defined as constant
-    at symbol-override.asm(10)
-    and also:
-    at symbol-override.asm(9)
-error: `Y` already defined as label
-    at symbol-override.asm(14)
-    and also:
-    at symbol-override.asm(13)
-Assembly aborted with 3 errors!
+error: A symbol called "W" already exists
+   ╭─[ test.asm:6:7 ]
+   │
+ 5 │ def W equ 1
+   │       ─┬─  
+   │        ╰─── the name is defined here...
+ 6 │ def W = 0
+   │       ┬  
+   │       ╰── ...so it's not available for this definition
+   │ 
+   │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+───╯
+error: A symbol called "X" already exists
+    ╭─[ test.asm:10:7 ]
+    │
+  9 │ def X rb 0
+    │       ─┬  
+    │        ╰── the name is defined here...
+ 10 │ def X = 0
+    │       ┬  
+    │       ╰── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: A symbol called "Y" already exists
+    ╭─[ test.asm:14:7 ]
+    │
+ 13 │ Y:
+    │ ┬  
+    │ ╰── the name is defined here...
+ 14 │ def Y = 0
+    │       ┬  
+    │       ╰── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+3 errors generated.
