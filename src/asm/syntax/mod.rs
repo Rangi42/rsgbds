@@ -68,7 +68,7 @@ pub fn parse_file(
 
     let mut line_tokens = vec![];
     loop {
-        while !parse_ctx.lexer.top_context().is_empty() {
+        while !parse_ctx.lexer.top_context_mut().is_empty() {
             // Lex a line, and then parse it.
             // Since the lexing of line N+1 is dependent on the contents of line N,
             // such an incremental approach is required.
@@ -101,7 +101,9 @@ pub fn parse_file(
             match token.payload {
                 tok!("end of line") => {} // No more tokens on the line (but some may have been pushed earlier).
                 tok!("elif")
-                    if crate::cond::active_condition_mut(&mut parse_ctx.lexer)
+                    if parse_ctx
+                        .lexer
+                        .active_condition_mut()
                         .is_some_and(|cond| cond.entered_block) =>
                 {
                     parse_ctx.push_line_token(token, &mut line_tokens);

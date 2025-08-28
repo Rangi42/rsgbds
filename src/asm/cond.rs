@@ -15,11 +15,6 @@ pub fn enter_conditional(conditions: &mut Vec<Condition>, opening_span: Span, en
     });
 }
 
-pub fn active_condition_mut(lexer: &mut Lexer) -> Option<&mut Condition> {
-    let min_depth = lexer.top_context().cond_stack_depth;
-    lexer.cond_stack[min_depth..].last_mut()
-}
-
 #[must_use]
 pub fn exit_conditional(conditions: &mut Vec<Condition>) -> bool {
     conditions.pop().is_some()

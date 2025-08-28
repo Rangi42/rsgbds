@@ -207,6 +207,14 @@ impl Lexer {
             .find(|ctx| !ctx.is_empty() || !ctx.span.node.kind.ends_implicitly())
     }
 
+    pub fn top_context_mut(&mut self) -> &mut Context {
+        self.contexts
+            .iter_mut()
+            .rev()
+            .find(|ctx| !ctx.span.node.kind.ends_implicitly())
+            .expect("No active lexer context")
+    }
+
     fn push_context(
         &mut self,
         span: NormalSpan,
@@ -264,12 +272,6 @@ impl Lexer {
         } else {
             options.runtime_opts.recursion_depth = new_depth;
         }
-    }
-
-    pub fn top_context(&mut self) -> &mut Context {
-        let ctx = self.active_context().expect("No active lexer context");
-        debug_assert!(!ctx.span.node.kind.ends_implicitly());
-        ctx
     }
 
     pub fn reset_loop_context(&mut self, nb_errors_left: &Cell<usize>, options: &Options) {
@@ -350,6 +352,14 @@ impl Lexer {
         }
     }
 
+    pub fn active_condition_mut(&mut self) -> Option<&mut Condition> {
+        let min_depth = self
+            .active_context()
+            .expect("No active lexer context")
+            .cond_stack_depth;
+        self.cond_stack[min_depth..].last_mut()
+    }
+
     pub fn debug_check_done(&self) {
         debug_assert!(
             self.contexts.is_empty(),
@@ -360,7 +370,10 @@ impl Lexer {
     pub fn next_char_is_a_colon(&mut self) -> bool {
         // This is only meant to be used after lexing an identifier, which will have `peek`ed the next character;
         // so we can rely on expansions having been triggered.
-        self.top_context().remaining_text().starts_with(':')
+        self.active_context()
+            .expect("No active lexer context")
+            .remaining_text()
+            .starts_with(':')
     }
 
     fn peek(&mut self, params: &mut LexerParams) -> Option<char> {

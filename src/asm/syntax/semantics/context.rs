@@ -251,7 +251,7 @@ fn push_loop(
 
 impl parse_ctx!() {
     pub fn pop_context(&mut self) -> bool {
-        let ctx = self.lexer.top_context();
+        let ctx = self.lexer.top_context_mut();
         match &mut ctx.span.node.kind {
             SpanKind::File => self.lexer.pop_context(self.nb_errors_left, self.options),
 

@@ -47,7 +47,7 @@ impl parse_ctx!() {
                 if should_skip {
                     self.lexer.skip_conditional_block()
                 } else {
-                    if let Some(condition) = crate::cond::active_condition_mut(&mut self.lexer) {
+                    if let Some(condition) = self.lexer.active_condition_mut() {
                         condition.entered_block = true;
                     }
                     Ok(())
@@ -66,7 +66,7 @@ impl parse_ctx!() {
                 );
             });
             let _ = crate::cond::exit_conditional(&mut self.lexer.cond_stack); // Avoid reporting the error a second time.
-        } else if let Some(cond) = crate::cond::active_condition_mut(&mut self.lexer) {
+        } else if let Some(cond) = self.lexer.active_condition_mut() {
             if let Some(else_span) = &cond.else_span {
                 // Can't borrow all of `self`, so we must explicitly borrow the parts of `self`.
                 diagnostics::error(
@@ -95,7 +95,7 @@ impl parse_ctx!() {
     pub fn process_else(&mut self, span_idx: usize) {
         let span = self.nth_span(span_idx);
 
-        if let Some(cond) = crate::cond::active_condition_mut(&mut self.lexer) {
+        if let Some(cond) = self.lexer.active_condition_mut() {
             if let Some(else_span) = &cond.else_span {
                 diagnostics::error(
                     &span,
