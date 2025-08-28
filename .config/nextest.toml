@@ -1,0 +1,7 @@
+[profile.ci]
+# Log as many test failures as possible.
+fail-fast = false
+
+[profile.default]
+# Our tests are quite fast, so taking several seconds is unusual.
+slow-timeout = { period = "1s", terminate-after = 4 }
