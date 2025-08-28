@@ -1261,6 +1261,10 @@ impl Lexer {
                             self.consume(&mut span);
                             break token!("+=");
                         }
+                        Some('+') => {
+                            self.consume(&mut span);
+                            break token!("++");
+                        }
                         _ => break token!("+"),
                     }
                 }

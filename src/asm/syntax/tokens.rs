@@ -96,6 +96,8 @@ define_tokens! {
         Slash,
         #[name = "%"]
         Percent,
+        #[name = "++"]
+        DblPlus,
         #[name = "**"]
         DblAsterisk,
 

@@ -578,11 +578,17 @@ ExprAtomNoIdent: Expr = {
 	// TODO: function calls
 };
 
-StringExpr: (CompactString, Span) = {
-	<ident:"identifier"> => todo!(),
-	StringExprNoIdent
+StringExpr = StringExprConcat<StringExprAtom>;
+StringExprNoIdent = StringExprConcat<StringExprAtomNoIdent>;
+StringExprConcat<Atom>: (CompactString, Span) = {
+	<lhs:StringExprConcat<StringExprAtom>> "++" <rhs:StringExprAtom> => (lhs.0 + &rhs.0, lhs.1.merged_with(&rhs.1)),
+	<Atom>,
 };
-StringExprNoIdent: (CompactString, Span) = {
+StringExprAtom: (CompactString, Span) = {
+	<ident:"identifier"> => todo!(),
+	StringExprAtomNoIdent
+};
+StringExprAtomNoIdent: (CompactString, Span) = {
 	<span_idx:@L> <string:"string"> => (string, ctx.nth_span(span_idx)),
 	<l_span_idx:@L> "strcat" "(" <string:(<StrcatArgs> ","?)?> ")" <r_span_idx:@R> => {
 		(string.unwrap_or_default(), ctx.span_from_to(l_span_idx, r_span_idx))
@@ -590,10 +596,7 @@ StringExprNoIdent: (CompactString, Span) = {
 };
 StrcatArgs: CompactString = {
 	<StringExpr> => <>.0,
-	<mut acc:StrcatArgs> "," <string:StringExpr> => {
-		acc.push_str(&string.0);
-		acc
-	}
+	<mut acc:StrcatArgs> "," <string:StringExpr> => acc + &string.0
 };
 
 Identifier = { "identifier", "local identifier" };
@@ -638,6 +641,7 @@ extern {
 		"*" => TokenPayload::Asterisk,
 		"/" => TokenPayload::Slash,
 		"%" => TokenPayload::Percent,
+		"++" => TokenPayload::DblPlus,
 		"**" => TokenPayload::DblAsterisk,
 		"==" => TokenPayload::DblEqual,
 		"!=" => TokenPayload::NotEqu,
