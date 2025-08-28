@@ -60,7 +60,7 @@ pub enum FormatError {
     MissingChar { for_what: &'static str },
     /// missing number after '{0}'
     MissingNumber(char),
-    /// a {sym_kind} symbol cannot be formatted as {fmt_kind}
+    /// a {sym_kind} cannot be formatted as {fmt_kind}
     BadKind {
         sym_kind: &'static str,
         fmt_kind: FormatKind,
@@ -81,8 +81,9 @@ pub enum FormatError {
 }
 
 impl FormatSpec {
-    pub fn parse(src: &str, default_precision: u8) -> Result<Self, FormatError> {
-        let mut chars = src.chars().peekable();
+    pub fn parse(src: &str, default_precision: u8) -> Result<(Self, &str), FormatError> {
+        let mut fmt_chars = src.chars();
+        let mut chars = fmt_chars.by_ref().peekable();
 
         let force_sign = chars.next_if(|ch| matches!(ch, '+' | ' '));
         let be_exact = chars.next_if_eq(&'#').is_some();
@@ -115,22 +116,22 @@ impl FormatSpec {
                 if force_sign.is_some() {
                     Err(FormatError::IncompatibleFlag {
                         flag_name: "sign",
-                        sym_kind: "string",
+                        sym_kind: "string symbol",
                     })
                 } else if pad_with_zeros {
                     Err(FormatError::IncompatibleFlag {
                         flag_name: "zero-padding flag",
-                        sym_kind: "string",
+                        sym_kind: "string symbol",
                     })
                 } else if frac.is_some() {
                     Err(FormatError::IncompatibleFlag {
                         flag_name: "fractional width",
-                        sym_kind: "string",
+                        sym_kind: "string symbol",
                     })
                 } else if precision.is_some() {
                     Err(FormatError::IncompatibleFlag {
                         flag_name: "precision",
-                        sym_kind: "string",
+                        sym_kind: "string symbol",
                     })
                 } else {
                     Ok(FormatKind::String)
@@ -147,7 +148,7 @@ impl FormatSpec {
         }?;
 
         fn expect_decimal(
-            chars: &mut Peekable<Chars>,
+            chars: &mut Peekable<&mut Chars>,
             trigger_char: char,
         ) -> Result<usize, FormatError> {
             match chars.peek().and_then(|ch| ch.to_digit(10)) {
@@ -155,7 +156,7 @@ impl FormatSpec {
                 Some(first_digit) => Ok(parse_decimal(chars, first_digit as usize)),
             }
         }
-        fn parse_decimal(chars: &mut Peekable<Chars>, first_digit: usize) -> usize {
+        fn parse_decimal(chars: &mut Peekable<&mut Chars>, first_digit: usize) -> usize {
             let mut width = first_digit;
             loop {
                 chars.next();
@@ -166,12 +167,6 @@ impl FormatSpec {
             }
         }
 
-        if let Some(unexpected) = chars.next() {
-            return Err(FormatError::UnexpectedChar {
-                unexpected,
-                for_what: "after the print type",
-            });
-        }
         if !matches!(kind, FormatKind::FixedPoint) {
             if frac.is_some() {
                 return Err(FormatError::FractionalFlag {
@@ -205,16 +200,28 @@ impl FormatSpec {
             });
         }
 
-        Ok(Self {
-            force_sign,
-            be_exact,
-            align_left,
-            pad_with_zeros,
-            width,
-            frac,
-            precision: precision.unwrap_or(default_precision),
-            kind,
-        })
+        Ok((
+            Self {
+                force_sign,
+                be_exact,
+                align_left,
+                pad_with_zeros,
+                width,
+                frac,
+                precision: precision.unwrap_or(default_precision),
+                kind,
+            },
+            fmt_chars.as_str(),
+        ))
+    }
+    pub fn require_full_parse((this, rest): (Self, &str)) -> Result<Self, FormatError> {
+        if let Some(unexpected) = rest.chars().next() {
+            return Err(FormatError::UnexpectedChar {
+                unexpected,
+                for_what: "after the print type",
+            });
+        }
+        Ok(this)
     }
 }
 

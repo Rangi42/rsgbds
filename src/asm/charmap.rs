@@ -3,6 +3,7 @@ use std::{
     collections::{hash_map::Entry, HashMap},
 };
 
+use compact_str::CompactString;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::{
@@ -171,7 +172,7 @@ impl Charmap {
         self.nodes.is_empty()
     }
 
-    fn warn_on_passthrough(
+    pub fn warn_on_passthrough(
         &self,
         c: char,
         is_main_charmap: bool,
@@ -256,6 +257,40 @@ impl Charmap {
             let c = string.chars().next()?;
             Some((CharMapping::Passthrough(c), c.len_utf8()))
         }
+    }
+
+    pub fn find_mapping(&self, mapping: &[i32]) -> Option<(CompactString, Option<CompactString>)> {
+        debug_assert_ne!(mapping.len(), 0, "Cannot reverse an empty mapping");
+        let mut res = None;
+        for (node_idx, node) in self.nodes.iter().enumerate() {
+            if &node.mapping == mapping {
+                // Trace back the node through the tree.
+                // This is relatively expensive, but we only do it when finding a matching node, which is rare under normal circumstances.
+                let mut string = CompactString::default();
+                let mut target_idx = node_idx;
+                // Iterate on all nodes preceding this one to find its parent, since the node array is topologically sorted.
+                for idx in (0..node_idx).rev() {
+                    let candidate = &self.nodes[idx]; // Look for a node which has `target_idx` as its child.
+                    if let Some((ch, _idx)) = candidate
+                        .children
+                        .iter()
+                        .find(|(ch, node_idx)| **node_idx == target_idx)
+                    {
+                        target_idx = idx;
+                        string.insert(0, *ch); // FIXME: not great to be constantly copying characters...
+                    }
+                }
+
+                match res.as_mut() {
+                    None => res = Some((string, None)),
+                    Some((_str, other)) => {
+                        *other = Some(string);
+                        break; // We already have conflicting mappings, no need to compute more, as they'd be lost.
+                    }
+                }
+            }
+        }
+        res
     }
 }
 #[derive(Debug)]

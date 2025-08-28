@@ -868,7 +868,9 @@ impl Lexer {
                             options,
                         );
                     } else {
-                        match FormatSpec::parse(&name, options.runtime_opts.q_precision) {
+                        match FormatSpec::parse(&name, options.runtime_opts.q_precision)
+                            .and_then(FormatSpec::require_full_parse)
+                        {
                             Ok(spec) => fmt = Some(spec),
                             Err(err) => {
                                 let mut span = ctx.new_span();

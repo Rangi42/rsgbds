@@ -1,11 +1,14 @@
 use std::{cell::Cell, cmp::Ordering};
 
-use compact_str::CompactString;
+use compact_str::{CompactString, ToCompactString};
+use either::Either;
 
 use crate::{
     charmap::CharMapping,
+    common::S,
     diagnostics::{self, warning},
     expr::Expr,
+    format::FormatSpec,
     sources::Span,
     Options,
 };
@@ -411,7 +414,296 @@ impl parse_ctx!() {
             }
         }
     }
+}
 
+/// String functions which return strings.
+impl parse_ctx!() {
+    pub fn strslice(
+        &self,
+        (string, _span): (CompactString, Span),
+        start: Expr,
+        end: Option<Expr>,
+        l_span_idx: usize,
+        r_span_idx: usize,
+    ) -> (CompactString, Span) {
+        let span = self.span_from_to(l_span_idx, r_span_idx);
+
+        let string_len = string.chars().count();
+        let (start_idx, logical_start) = self
+            .logical_index_to_physical(start, string_len)
+            .unwrap_or((0, 0));
+        let (end_idx, logical_end) = end
+            .and_then(|expr| self.logical_index_to_physical(expr, string_len))
+            .unwrap_or((string_len, string_len as i32));
+        let nb_codepoints = end_idx.checked_sub(end_idx).unwrap_or_else(|| {
+            self.warn(warning!("builtin-args"), &span, |warning| {
+                warning.set_message("string slice range is backwards");
+                warning.add_label(diagnostics::warning_label(&span).with_message(format!(
+                    "skipping the first {start_idx} codepoints, stopping at {end_idx} codepoints",
+                )))
+            });
+            0
+        });
+
+        if start_idx > string_len {
+            self.warn(warning!("builtin-args"), &span, |warning| {
+                warning.set_message("start index is past the end of the string");
+                warning.add_label(diagnostics::warning_label(&span).with_message(
+                    "starting at {start_idx} codepoints, but the string only contains {string_len}",
+                ));
+            });
+        }
+        if end_idx > string_len {
+            self.warn(warning!("builtin-args"), &span, |warning| {
+                warning.set_message("stop index is past the end of the string");
+                warning.add_label(diagnostics::warning_label(&span).with_message(
+                    "stopping at {end_idx} codepoints, but the string only contains {string_len}",
+                ));
+            });
+        }
+
+        (
+            string.chars().skip(start_idx).take(nb_codepoints).collect(),
+            span,
+        )
+    }
+
+    pub fn strchar(
+        &self,
+        (string, span): (CompactString, Span),
+        idx: Expr,
+        l_span_idx: usize,
+        r_span_idx: usize,
+    ) -> (CompactString, Span) {
+        let span = self.span_from_to(l_span_idx, r_span_idx);
+
+        let charmap = self.charmaps.active_charmap();
+        let nb_charmap_units = charmap
+            .encode(
+                (&string, &span),
+                self.charmaps.is_main_charmap_active(),
+                self.identifiers,
+                self.nb_errors_left,
+                self.options,
+            )
+            .count();
+        let string = self
+            .logical_index_to_physical(idx, nb_charmap_units)
+            .and_then(|(start_idx, logical_idx)| {
+                let mut ofs = 0;
+                let mut start_ofs = 0;
+                for i in 0..=start_idx {
+                    let Some((mapping, nb_bytes)) = charmap.encode_one(&string[ofs..]) else {
+                        self.warn(warning!("builtin-args"), &span, |error| {
+                            error.set_message("index passed to `strchar` is larger than the string");
+                            error.add_label(diagnostics::warning_label(&span).with_message(format!(
+                                "attempting to get the {} charmap unit of a string that has only {i}",
+                                ordinal::Ordinal(start_idx),
+                            )));
+                        });
+                        return None;
+                    };
+                    start_ofs = ofs;
+                    ofs += nb_bytes;
+                }
+                Some((&string[start_ofs..ofs]).to_compact_string())
+            })
+            .unwrap_or_default();
+        (string, span)
+    }
+
+    pub fn revchar(
+        &self,
+        mapping: Vec<i32>,
+        l_span_idx: usize,
+        r_span_idx: usize,
+    ) -> (CompactString, Span) {
+        let span = self.span_from_to(l_span_idx, r_span_idx);
+
+        let charmap = self.charmaps.active_charmap();
+        let string = match charmap.find_mapping(&mapping) {
+            None => {
+                self.error(&span, |error| {
+                    error.set_message("reverse string mapping failed");
+                    error.add_label(diagnostics::error_label(&span).with_message(format!(
+                        "no mapping found in charmap `{}` for these values",
+                        self.identifiers.resolve(charmap.name()).unwrap(),
+                    )));
+                });
+                Default::default()
+            }
+            Some((string, other_string)) => {
+                if let Some(other) = other_string {
+                    self.error(&span, |error| {
+                        error.set_message("reverse string mapping found more than one result");
+                        error.add_label(diagnostics::error_label(&span).with_message(format!(
+                            "\"{string}\" matches in charmap `{}`, but so does \"{other}\"",
+                            self.identifiers.resolve(charmap.name()).unwrap(),
+                        )));
+                    });
+                }
+                string
+            }
+        };
+
+        (string, span)
+    }
+
+    // strcat is implemented directly in the parser, since it's trivial string concat.
+
+    pub fn strupr(
+        &self,
+        (mut string, _span): (CompactString, Span),
+        l_span_idx: usize,
+        r_span_idx: usize,
+    ) -> (CompactString, Span) {
+        string.as_mut_str().make_ascii_uppercase();
+        let span = self.span_from_to(l_span_idx, r_span_idx);
+        (string, span)
+    }
+
+    pub fn strlwr(
+        &self,
+        (mut string, _span): (CompactString, Span),
+        l_span_idx: usize,
+        r_span_idx: usize,
+    ) -> (CompactString, Span) {
+        string.as_mut_str().make_ascii_lowercase();
+        let span = self.span_from_to(l_span_idx, r_span_idx);
+        (string, span)
+    }
+
+    pub fn strrpl(
+        &self,
+        (string, _span): (CompactString, Span),
+        (needle, needle_span): (CompactString, Span),
+        (replacement, _replacement_span): (CompactString, Span),
+        l_span_idx: usize,
+        r_span_idx: usize,
+    ) -> (CompactString, Span) {
+        let span = self.span_from_to(l_span_idx, r_span_idx);
+
+        if needle.is_empty() {
+            self.warn(warning!("empty-strrpl"), &needle_span, |warning| {
+                warning.set_message("cannot search for an empty string");
+                warning.add_label(
+                    diagnostics::warning_label(&needle_span).with_message("this string is empty"),
+                );
+            });
+            return (string, span);
+        }
+
+        let mut input = string.as_str();
+        let mut output = CompactString::with_capacity(string.len());
+        while let Some(offset) = input.find(needle.as_str()) {
+            output.push_str(&input[..offset]);
+            output.push_str(&replacement);
+            input = &input[offset + needle.len()..];
+        }
+        output.push_str(input);
+
+        (output, span)
+    }
+
+    pub fn strfmt(
+        &self,
+        (fmt, fmt_span): (CompactString, Span),
+        args_vec: Vec<Either<Expr, (CompactString, Span)>>,
+        l_span_idx: usize,
+        r_span_idx: usize,
+    ) -> (CompactString, Span) {
+        let mut args = args_vec.iter();
+        let mut input = fmt.as_str();
+        let mut output = CompactString::default();
+        let mut nb_missing_args = 0;
+        let mut bad_format_string = false;
+        while let Some(ofs) = input.find('%') {
+            output.push_str(&input[..ofs]);
+            let after_percent = ofs + '%'.len_utf8();
+            if input[after_percent..].starts_with('%') {
+                output.push('%');
+                input = &input[after_percent + '%'.len_utf8()..];
+            } else {
+                let res = match FormatSpec::parse(
+                    &input[after_percent..],
+                    self.options.runtime_opts.q_precision,
+                ) {
+                    Err(err) => {
+                        input = &input[after_percent..]; // Process normally the entire (would-be) format spec, since we don't know how long it should be.
+                        output.push('%');
+                        bad_format_string = true;
+                        Err(err)
+                    }
+                    Ok((spec, rest)) => {
+                        input = rest;
+                        match args.next() {
+                            Some(Either::Left(expr)) => {
+                                match self.try_const_eval(expr) {
+                                    Err(err) => {
+                                        self.report_expr_error(err); // ...and don't add anything to the string.
+                                        Ok(()) // No *format* error.
+                                    }
+                                    Ok((value, _span)) => spec.write_number(
+                                        value as u32,
+                                        &mut output,
+                                        "numeric expression",
+                                    ),
+                                }
+                            }
+                            Some(Either::Right((string, _span))) => {
+                                spec.write_str(string, &mut output, "string expression")
+                            }
+                            None => {
+                                nb_missing_args += 1;
+                                Ok(())
+                            }
+                        }
+                    }
+                };
+                if let Err(err) = res {
+                    // SAFETY: `input` is derived from `fmt`.
+                    let idx = unsafe { input.as_ptr().offset_from(fmt.as_ptr()) } as usize;
+                    self.error(&fmt_span, |error| {
+                        error.set_message(&err);
+                        error.add_label(diagnostics::error_label(&fmt_span).with_message(format!(
+                            "bad format specifier {idx} byte{} into this format string",
+                            S::from(idx),
+                        )));
+                    });
+                }
+            }
+        }
+        output.push_str(input);
+
+        // If the format string was bad, we don't know for sure how many arguments were expected, so don't try to check.
+        if !bad_format_string {
+            if let remaining @ 1.. = args.as_slice().len() {
+                self.error(&fmt_span, |error| {
+                    error.set_message("not all arguments were used by the format string");
+                    error.add_label(diagnostics::error_label(&fmt_span).with_message(format!(
+                        "{remaining} argument{} remain unformatted",
+                        S::from(remaining)
+                    )));
+                });
+            } else if nb_missing_args != 0 {
+                self.error(&fmt_span, |error| {
+                    error.set_message("not enough arguments for the format string");
+                    error.add_label(diagnostics::error_label(&fmt_span).with_message(format!(
+                        "{} argument{} were supplied, {nb_missing_args} more {} missing",
+                        args_vec.len(),
+                        S::from(args_vec.len()),
+                        if nb_missing_args == 1 { "is" } else { "are" },
+                    )))
+                });
+            }
+        }
+
+        (output, self.span_from_to(l_span_idx, r_span_idx))
+    }
+}
+
+/// Utility function.
+impl parse_ctx!() {
     fn logical_index_to_physical(&self, logical: Expr, length: usize) -> Option<(usize, i32)> {
         match self.try_const_eval(&logical) {
             Ok((value, _span)) => Some((

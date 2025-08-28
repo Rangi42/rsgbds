@@ -468,8 +468,18 @@ OfsExpr: Expr = {
 
 // Places that don't handle strings and expressions together can use `Expr` directly.
 Expr = ExprLogicOr<ExprAtom>;
-// The point of all of these macros is to pass `Atom` as the expression's LHS all the way to `ExprExponent`,
+// The point of all of these productions being macros is to pass `Atom` as the expression's LHS all the way to `ExprExponent`,
 // so that leading identifiers can be excluded when they would be ambiguous with string expressions.
+// Note that they are only excluded when not part of an expression, since e.g. `this + that` is unambiguously a numeric expression,
+// and `this ++ that` is unambiguously a string expression.
+// (This does mean that the set of infix operators used for each expression kind must be distinct, but that's fine.)
+//
+// A note about associativity and precedence:
+//     LALRPOP, unlike Bison/YACC, does not support specifying associativity or precedence [1, 2], so it must be encoded manually.
+//     Please see [1] for an explanation; the gist of it is that each nonterminal corresponds to one precedence level,
+//     and associativity is encoded by which operand refers to the same nonterminal, and which one refers to the “inner” one.
+// [1]: https://lalrpop.github.io/lalrpop/tutorial/004_full_expressions.html
+// [2]: https://www.gnu.org/software/bison/manual/bison.html#Precedence
 ExprLogicOr<Atom>: Expr = {
 	<lhs:ExprLogicOr<ExprAtom>> <span_idx:@L> "||" <rhs:ExprLogicAnd<ExprAtom>> => lhs.binary_op(BinOp::LogicalOr, rhs, ctx.nth_span(span_idx)),
 	ExprLogicAnd<Atom>
@@ -590,8 +600,27 @@ StringExprAtom: (CompactString, Span) = {
 };
 StringExprAtomNoIdent: (CompactString, Span) = {
 	<span_idx:@L> <string:"string"> => (string, ctx.nth_span(span_idx)),
+	// TODO: readfile
+	<l_span_idx:@L> "strslice" "(" <string:StringExpr> "," <start:Expr> <end:("," <Expr>)?> ")" <r_span_idx:@R> => {
+		ctx.strslice(string, start, end, l_span_idx, r_span_idx)
+	},
+	<l_span_idx:@L> "strchar" "(" <string:StringExpr> "," <idx:Expr> ")" <r_span_idx:@R> => ctx.strchar(string, idx, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "revchar" "(" <mapping:NonEmptyCommaList<ConstExpr>> ")" <r_span_idx:@R> => {
+		ctx.revchar(mapping, l_span_idx, r_span_idx)
+	},
 	<l_span_idx:@L> "strcat" "(" <string:(<StrcatArgs> ","?)?> ")" <r_span_idx:@R> => {
 		(string.unwrap_or_default(), ctx.span_from_to(l_span_idx, r_span_idx))
+	},
+	<l_span_idx:@L> "strupr" "(" <string:StringExpr> ")" <r_span_idx:@R> => ctx.strupr(string, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "strlwr" "(" <string:StringExpr> ")" <r_span_idx:@R> => ctx.strlwr(string, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "strrpl" "(" <haystack:StringExpr> "," <needle:StringExpr> "," <replacement:StringExpr> ")" <r_span_idx:@R> => {
+		ctx.strrpl(haystack, needle, replacement, l_span_idx, r_span_idx)
+	},
+	<l_span_idx:@L> "strfmt" "(" <fmt:StringExpr> <args:("," <CommaList<StringOrExpr>>)?> ")" <r_span_idx:@R> => {
+		ctx.strfmt(fmt, args.unwrap_or_default(), l_span_idx, r_span_idx)
+	},
+	<l_span_idx:@L> "section" "(" <span_idx: @L> <sym:Identifier> ")" <r_span_idx:@R> => {
+		ctx.section_of((sym, &ctx.line_spans[span_idx]), l_span_idx, r_span_idx)
 	},
 };
 StrcatArgs: CompactString = {

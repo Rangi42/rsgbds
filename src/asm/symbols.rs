@@ -774,13 +774,13 @@ impl SymbolData {
                         "constant"
                     }
                 }
-                SymbolKind::String(_) => "string",
+                SymbolKind::String(_) => "string symbol",
                 SymbolKind::Macro(_) => "macro",
                 SymbolKind::Label { .. } => "label",
             },
             SymbolData::Pc => "label",
             SymbolData::Narg => "constant",
-            SymbolData::Dot | SymbolData::DotDot => "string",
+            SymbolData::Dot | SymbolData::DotDot => "string symbol",
             SymbolData::Deleted(_) => "deleted",
         }
     }
