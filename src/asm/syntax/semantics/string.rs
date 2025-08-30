@@ -619,6 +619,8 @@ impl parse_ctx!() {
         let mut bad_format_string = false;
         while let Some(ofs) = input.find('%') {
             output.push_str(&input[..ofs]);
+            // SAFETY: `input` is derived from `fmt`.
+            let idx = unsafe { input.as_ptr().offset_from(fmt.as_ptr()) } as usize + ofs;
             let after_percent = ofs + '%'.len_utf8();
             if input[after_percent..].starts_with('%') {
                 output.push('%');
@@ -661,8 +663,6 @@ impl parse_ctx!() {
                     }
                 };
                 if let Err(err) = res {
-                    // SAFETY: `input` is derived from `fmt`.
-                    let idx = unsafe { input.as_ptr().offset_from(fmt.as_ptr()) } as usize;
                     self.error(&fmt_span, |error| {
                         error.set_message(&err);
                         error.add_label(diagnostics::error_label(&fmt_span).with_message(format!(
