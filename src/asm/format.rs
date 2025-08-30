@@ -95,10 +95,13 @@ impl FormatSpec {
             .map_or(0, |first_digit| {
                 parse_decimal(&mut chars, first_digit as usize)
             });
-        let frac = chars
-            .next_if_eq(&'.')
-            .map(|_ch| expect_decimal(&mut chars, '.'))
-            .transpose()?;
+        let frac =
+            chars
+                .next_if_eq(&'.')
+                .map(|_ch| match chars.peek().and_then(|ch| ch.to_digit(10)) {
+                    Some(first_digit) => parse_decimal(&mut chars, first_digit as usize),
+                    None => 0,
+                });
         let precision = chars
             .next_if_eq(&'q')
             .map(|_ch| expect_decimal(&mut chars, 'q'))
