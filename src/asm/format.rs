@@ -5,7 +5,7 @@ use compact_str::CompactString;
 #[derive(Debug)]
 pub struct FormatSpec {
     force_sign: Option<char>,
-    be_exact: bool,
+    exact_prefix: Option<char>,
     align_left: bool,
     pad_with_zeros: bool,
     width: usize,
@@ -38,7 +38,7 @@ impl Default for FormatSpec {
     fn default() -> Self {
         Self {
             force_sign: None,
-            be_exact: false,
+            exact_prefix: FormatKind::Default.exact_prefix(), // By default, print the '$' prefix. (This is guaranteed to be `Some`.)
             align_left: false,
             pad_with_zeros: false,
             width: 0,
@@ -199,11 +199,19 @@ impl FormatSpec {
                 sym_kind: "left-aligned",
             });
         }
+        let exact_prefix = be_exact
+            .then(|| {
+                kind.exact_prefix().ok_or(FormatError::IncompatibleFlag {
+                    flag_name: "exact prefix",
+                    sym_kind: "this kind of",
+                })
+            })
+            .transpose()?;
 
         Ok((
             Self {
                 force_sign,
-                be_exact,
+                exact_prefix,
                 align_left,
                 pad_with_zeros,
                 width,
@@ -235,8 +243,9 @@ impl FormatKind {
             FormatKind::UpperHex => Some('$'),
             FormatKind::Binary => Some('%'),
             FormatKind::Octal => Some('&'),
+            // Those won't be printed, but must be `Some` to indicate that the flag is accepted.
             FormatKind::FixedPoint => Some('\0'),
-            FormatKind::String => Some('\0'), // Will never be printed, but must be `Some` to indicate that the flag is accepted.
+            FormatKind::String => Some('\0'),
         }
     }
 }
@@ -262,7 +271,7 @@ impl FormatSpec {
                 let fmt = NumberFormatter {
                     number,
                     force_sign: self.force_sign,
-                    be_exact: self.be_exact || matches!(self.kind, FormatKind::Default),
+                    exact_prefix: self.exact_prefix,
                     precision: self.precision,
                     frac: self.frac.unwrap_or(5), // 5 digits is enough for the default Q16.16
                     width: self.width,
@@ -295,7 +304,7 @@ impl FormatSpec {
 struct NumberFormatter {
     number: u32,
     force_sign: Option<char>,
-    be_exact: bool,
+    exact_prefix: Option<char>,
     precision: u8,
     frac: usize,
     width: usize,
@@ -305,8 +314,8 @@ struct NumberFormatter {
 impl Display for NumberFormatter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut width = self.width;
-        if self.be_exact && !matches!(self.kind, FormatKind::FixedPoint) {
-            if let Some(prefix) = self.kind.exact_prefix() {
+        if let Some(prefix) = self.exact_prefix {
+            if !matches!(self.kind, FormatKind::FixedPoint) {
                 debug_assert_ne!(prefix, '\0');
                 write!(f, "{prefix}")?;
 
@@ -360,7 +369,7 @@ impl Display for NumberFormatter {
                     self.frac,
                     self.number as i32 as f64 / (1u32 << self.precision) as f64,
                 )?;
-                if self.be_exact {
+                if self.exact_prefix.is_some() {
                     write!(f, "q{}", self.precision)?;
                 }
                 Ok(())
@@ -389,7 +398,7 @@ impl FormatSpec {
                         align_left: self.align_left,
                         inner: StringFormatter {
                             string,
-                            escape: self.be_exact
+                            escape: self.exact_prefix.is_some()
                         }
                     }
                 )
