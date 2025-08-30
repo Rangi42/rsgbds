@@ -1,31 +1,106 @@
-error: STRFMT: Invalid format spec for argument 2
-    at invalid-format.asm(1)
-error: STRFMT: Invalid format spec for argument 2
-    at invalid-format.asm(2)
-error: STRFMT: Invalid format spec for argument 2
-    at invalid-format.asm(3)
-error: STRFMT: Invalid format spec for argument 2
-    at invalid-format.asm(4)
-error: Fixed-point constant precision 0 invalid, defaulting to 16
-    at invalid-format.asm(5)
-error: STRFMT: Invalid format spec for argument 2
-    at invalid-format.asm(5)
-error: Invalid format spec "5d5"
-    at invalid-format.asm(8)
-error: Invalid format spec "xx"
-    at invalid-format.asm(9)
-error: Formatting string with sign flag '+'
-    at invalid-format.asm(11)
-error: Formatting string with padding flag '0'
-    at invalid-format.asm(12)
-error: Formatting string with fractional width
-    at invalid-format.asm(13)
-error: Formatting string with fractional precision
-    at invalid-format.asm(14)
-error: Formatting type 'd' with exact flag '#'
-    at invalid-format.asm(16)
-error: Formatting type 'd' with fractional width
-    at invalid-format.asm(17)
-error: Formatting type 'd' with fractional precision
-    at invalid-format.asm(18)
-Assembly aborted with 15 errors!
+error: unexpected character '+' as a print type
+   ╭─[ test.asm:1:16 ]
+   │
+ 1 │ println STRFMT("%+d %++d", 42, 42)
+   │                ─────┬────  
+   │                     ╰────── bad format specifier 4 bytes into this format string
+───╯
+error: unexpected character '#' as a print type
+   ╭─[ test.asm:2:16 ]
+   │
+ 2 │ println STRFMT("%#x %##x", 42, 42)
+   │                ─────┬────  
+   │                     ╰────── bad format specifier 4 bytes into this format string
+───╯
+error: unexpected character '-' as a print type
+   ╭─[ test.asm:3:16 ]
+   │
+ 3 │ println STRFMT("%-4d %--4d", 42, 42)
+   │                ──────┬─────  
+   │                      ╰─────── bad format specifier 5 bytes into this format string
+───╯
+error: unexpected character '.' as a print type
+   ╭─[ test.asm:4:16 ]
+   │
+ 4 │ println STRFMT("%.f %..f", 42.0, 42.0)
+   │                ─────┬────  
+   │                     ╰────── bad format specifier 4 bytes into this format string
+───╯
+error: missing number after 'q'
+   ╭─[ test.asm:5:16 ]
+   │
+ 5 │ println STRFMT("%qf %q.16f", 42.0, 42.0)
+   │                ──────┬─────  
+   │                      ╰─────── bad format specifier 0 bytes into this format string
+───╯
+error: missing number after 'q'
+   ╭─[ test.asm:5:16 ]
+   │
+ 5 │ println STRFMT("%qf %q.16f", 42.0, 42.0)
+   │                ──────┬─────  
+   │                      ╰─────── bad format specifier 4 bytes into this format string
+───╯
+error: unexpected character '5' after the print type
+   ╭─[ test.asm:8:18 ]
+   │
+ 8 │ println "{5d:N} {5d5:N}"
+   │                  ─┬─  
+   │                   ╰─── error parsing this format specification
+───╯
+error: unexpected character 'x' after the print type
+   ╭─[ test.asm:9:17 ]
+   │
+ 9 │ println "{x:N} {xx:N}"
+   │                 ─┬  
+   │                  ╰── error parsing this format specification
+───╯
+error: a sign is incompatible with string symbol formatting
+    ╭─[ test.asm:11:16 ]
+    │
+ 11 │ println STRFMT("%+s", "hello")
+    │                ──┬──  
+    │                  ╰──── bad format specifier 0 bytes into this format string
+────╯
+error: a zero-padding flag is incompatible with string symbol formatting
+    ╭─[ test.asm:12:16 ]
+    │
+ 12 │ println STRFMT("%0s", "hello")
+    │                ──┬──  
+    │                  ╰──── bad format specifier 0 bytes into this format string
+────╯
+error: a fractional width is incompatible with string symbol formatting
+    ╭─[ test.asm:13:16 ]
+    │
+ 13 │ println STRFMT("%.5s", "hello")
+    │                ───┬──  
+    │                   ╰──── bad format specifier 0 bytes into this format string
+────╯
+error: a precision is incompatible with string symbol formatting
+    ╭─[ test.asm:14:16 ]
+    │
+ 14 │ println STRFMT("%q16s", "hello")
+    │                ───┬───  
+    │                   ╰───── bad format specifier 0 bytes into this format string
+────╯
+error: a exact prefix is incompatible with this kind of formatting
+    ╭─[ test.asm:16:16 ]
+    │
+ 16 │ println STRFMT("%#d", 42)
+    │                ──┬──  
+    │                  ╰──── bad format specifier 0 bytes into this format string
+────╯
+error: a fractional width can only be used with fractional formatting
+    ╭─[ test.asm:17:16 ]
+    │
+ 17 │ println STRFMT("%.5d", 42)
+    │                ───┬──  
+    │                   ╰──── bad format specifier 0 bytes into this format string
+────╯
+error: a fractional precision can only be used with fractional formatting
+    ╭─[ test.asm:18:16 ]
+    │
+ 18 │ println STRFMT("%q5d", 42)
+    │                ───┬──  
+    │                   ╰──── bad format specifier 0 bytes into this format string
+────╯
+15 errors generated.
