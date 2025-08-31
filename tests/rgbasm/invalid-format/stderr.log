@@ -54,7 +54,7 @@ error: unexpected character 'x' after the print type
    │                 ─┬  
    │                  ╰── error parsing this format specification
 ───╯
-error: a sign is incompatible with string symbol formatting
+error: a sign is only applicable to signed or fixed-point formatting
     ╭─[ test.asm:11:16 ]
     │
  11 │ println STRFMT("%+s", "hello")
@@ -68,7 +68,7 @@ error: a zero-padding flag is incompatible with string symbol formatting
     │                ──┬──  
     │                  ╰──── bad format specifier 0 bytes into this format string
 ────╯
-error: a fractional width is incompatible with string symbol formatting
+error: a fixed-point width is incompatible with string symbol formatting
     ╭─[ test.asm:13:16 ]
     │
  13 │ println STRFMT("%.5s", "hello")
@@ -89,14 +89,14 @@ error: a exact prefix is incompatible with this kind of formatting
     │                ──┬──  
     │                  ╰──── bad format specifier 0 bytes into this format string
 ────╯
-error: a fractional width can only be used with fractional formatting
+error: a fixed-point width can only be used with fixed-point formatting
     ╭─[ test.asm:17:16 ]
     │
  17 │ println STRFMT("%.5d", 42)
     │                ───┬──  
     │                   ╰──── bad format specifier 0 bytes into this format string
 ────╯
-error: a fractional precision can only be used with fractional formatting
+error: a fixed-point precision can only be used with fixed-point formatting
     ╭─[ test.asm:18:16 ]
     │
  18 │ println STRFMT("%q5d", 42)

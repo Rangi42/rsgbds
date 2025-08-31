@@ -4,8 +4,8 @@ use compact_str::CompactString;
 
 #[derive(Debug)]
 pub struct FormatSpec {
-    force_sign: Option<char>,
-    exact_prefix: Option<char>,
+    force_sign: Option<&'static str>,
+    exact_prefix: Option<&'static str>,
     align_left: bool,
     pad_with_zeros: bool,
     width: usize,
@@ -70,9 +70,11 @@ pub enum FormatError {
         flag_name: &'static str,
         sym_kind: &'static str,
     },
-    /// a {flag_name} can only be used with fractional formatting
+    /// a sign is only applicable to signed or fixed-point formatting
+    SignOnUnsigned,
+    /// a {flag_name} can only be used with fixed-point formatting
     FractionalFlag { flag_name: &'static str },
-    /// fractional width cannot be more than 255
+    /// fixed-point width cannot be more than 255
     FracWidthOver255,
     /// fixed-point precision cannot be 0
     FixPointZero,
@@ -85,7 +87,17 @@ impl FormatSpec {
         let mut fmt_chars = src.chars();
         let mut chars = fmt_chars.by_ref().peekable();
 
-        let force_sign = chars.next_if(|ch| matches!(ch, '+' | ' '));
+        let force_sign = match chars.peek() {
+            Some('+') => {
+                chars.next();
+                Some("+")
+            }
+            Some(' ') => {
+                chars.next();
+                Some(" ")
+            }
+            _ => None,
+        };
         let be_exact = chars.next_if_eq(&'#').is_some();
         let align_left = chars.next_if_eq(&'-').is_some();
         let pad_with_zeros = chars.next_if_eq(&'0').is_some();
@@ -116,19 +128,14 @@ impl FormatSpec {
             Some('f') => Ok(FormatKind::FixedPoint),
 
             Some('s') => {
-                if force_sign.is_some() {
-                    Err(FormatError::IncompatibleFlag {
-                        flag_name: "sign",
-                        sym_kind: "string symbol",
-                    })
-                } else if pad_with_zeros {
+                if pad_with_zeros {
                     Err(FormatError::IncompatibleFlag {
                         flag_name: "zero-padding flag",
                         sym_kind: "string symbol",
                     })
                 } else if frac.is_some() {
                     Err(FormatError::IncompatibleFlag {
-                        flag_name: "fractional width",
+                        flag_name: "fixed-point width",
                         sym_kind: "string symbol",
                     })
                 } else if precision.is_some() {
@@ -171,14 +178,17 @@ impl FormatSpec {
         }
 
         if !matches!(kind, FormatKind::FixedPoint) {
+            if !matches!(kind, FormatKind::Signed) && force_sign.is_some() {
+                return Err(FormatError::SignOnUnsigned);
+            }
             if frac.is_some() {
                 return Err(FormatError::FractionalFlag {
-                    flag_name: "fractional width",
+                    flag_name: "fixed-point width",
                 });
             }
             if precision.is_some() {
                 return Err(FormatError::FractionalFlag {
-                    flag_name: "fractional precision",
+                    flag_name: "fixed-point precision",
                 });
             }
         }
@@ -237,18 +247,18 @@ impl FormatSpec {
 }
 
 impl FormatKind {
-    fn exact_prefix(&self) -> Option<char> {
+    fn exact_prefix(&self) -> Option<&'static str> {
         match self {
-            FormatKind::Default => Some('$'),
+            FormatKind::Default => Some("$"),
             FormatKind::Signed => None,
             FormatKind::Unsigned => None,
-            FormatKind::LowerHex => Some('$'),
-            FormatKind::UpperHex => Some('$'),
-            FormatKind::Binary => Some('%'),
-            FormatKind::Octal => Some('&'),
+            FormatKind::LowerHex => Some("$"),
+            FormatKind::UpperHex => Some("$"),
+            FormatKind::Binary => Some("%"),
+            FormatKind::Octal => Some("&"),
             // Those won't be printed, but must be `Some` to indicate that the flag is accepted.
-            FormatKind::FixedPoint => Some('\0'),
-            FormatKind::String => Some('\0'),
+            FormatKind::FixedPoint => Some("\0"),
+            FormatKind::String => Some("\0"),
         }
     }
 }
@@ -277,27 +287,16 @@ impl FormatSpec {
                     exact_prefix: self.exact_prefix,
                     precision: self.precision,
                     frac: self.frac.unwrap_or(5), // 5 digits is enough for the default Q16.16
-                    width: self.width,
-                    pad_with_zeros: self.pad_with_zeros,
                     kind: self.kind,
                 };
                 if self.pad_with_zeros {
-                    // Padding will be processed internally.
-                    debug_assert!(!self.align_left);
-                    write!(buf, "{fmt}")
+                    write!(buf, "{fmt:#0width$}", width = self.width)
+                } else if self.align_left {
+                    write!(buf, "{fmt:<#width$}", width = self.width)
                 } else {
-                    write!(
-                        buf,
-                        "{}",
-                        Padding {
-                            width: self.width,
-                            align_left: self.align_left,
-                            inner: fmt
-                        }
-                    )
+                    write!(buf, "{fmt:>#width$}", width = self.width)
                 }
                 .unwrap();
-
                 Ok(())
             }
             fmt_kind => Err(FormatError::BadKind { sym_kind, fmt_kind }),
@@ -306,65 +305,24 @@ impl FormatSpec {
 }
 struct NumberFormatter {
     number: u32,
-    force_sign: Option<char>,
-    exact_prefix: Option<char>,
+    force_sign: Option<&'static str>,
+    exact_prefix: Option<&'static str>,
     precision: u8,
     frac: usize,
-    width: usize,
-    pad_with_zeros: bool,
     kind: FormatKind,
 }
 impl Display for NumberFormatter {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut width = self.width;
-        if let Some(prefix) = self.exact_prefix {
-            if !matches!(self.kind, FormatKind::FixedPoint) {
-                debug_assert_ne!(prefix, '\0');
-                write!(f, "{prefix}")?;
-
-                width = width.saturating_sub(1);
-            }
-        }
-
-        match self.kind {
-            FormatKind::Signed => {
-                if self.pad_with_zeros {
-                    write!(f, "{:0width$}", self.number as i32)
-                } else {
-                    write!(f, "{:width$}", self.number as i32)
-                }
-            }
-            FormatKind::Unsigned => {
-                if self.pad_with_zeros {
-                    write!(f, "{:0width$}", self.number)
-                } else {
-                    write!(f, "{:width$}", self.number)
-                }
-            }
-            FormatKind::LowerHex => {
-                if self.pad_with_zeros {
-                    write!(f, "{:0width$x}", self.number)
-                } else {
-                    write!(f, "{:width$x}", self.number)
-                }
-            }
-            FormatKind::UpperHex | FormatKind::Default => {
-                if self.pad_with_zeros {
-                    write!(f, "{:0width$X}", self.number)
-                } else {
-                    write!(f, "{:width$X}", self.number)
-                }
-            }
-            FormatKind::Binary => {
-                if self.pad_with_zeros {
-                    write!(f, "{:0width$b}", self.number)
-                } else {
-                    write!(f, "{:width$b}", self.number)
-                }
-            }
-            FormatKind::Octal => {
-                todo!();
-            }
+        static LOWERCASE_DIGITS: &[u8] = &[
+            b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'a', b'b', b'c', b'd',
+            b'e', b'f',
+        ];
+        static UPPERCASE_DIGITS: &[u8] = &[
+            b'0', b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'A', b'B', b'C', b'D',
+            b'E', b'F',
+        ];
+        let digits = match self.kind {
+            FormatKind::String => unreachable!(),
             FormatKind::FixedPoint => {
                 write!(
                     f,
@@ -375,10 +333,49 @@ impl Display for NumberFormatter {
                 if self.exact_prefix.is_some() {
                     write!(f, "q{}", self.precision)?;
                 }
-                Ok(())
+                return Ok(());
             }
-            FormatKind::String => unreachable!(),
+            FormatKind::Signed | FormatKind::Unsigned => &LOWERCASE_DIGITS[..10],
+            FormatKind::Binary => &LOWERCASE_DIGITS[..2],
+            FormatKind::Octal => &LOWERCASE_DIGITS[..8],
+            FormatKind::LowerHex => LOWERCASE_DIGITS,
+            FormatKind::Default | FormatKind::UpperHex => UPPERCASE_DIGITS,
+        };
+        let mut buf = [0; 32]; // 32 bits.
+        let mut idx = buf.len();
+        let mut number = self.number;
+        let base = digits.len() as u32;
+        loop {
+            // This must run at least once, so that 0 prints one digit.
+            idx -= 1;
+            buf[idx] = digits[(number % base) as usize];
+            number /= base;
+            if number == 0 {
+                break;
+            }
         }
+
+        let (is_negative, prefix) = if let Some(prefix) = self.exact_prefix {
+            debug_assert_eq!(self.force_sign, None);
+            debug_assert_ne!(prefix, "\0");
+            (false, prefix)
+        } else if matches!(self.kind, FormatKind::Signed) {
+            if (self.number as i32) < 0 {
+                (true, "")
+            } else if let Some(prefix) = self.force_sign {
+                (false, prefix)
+            } else {
+                (false, "")
+            }
+        } else {
+            (false, "")
+        };
+
+        f.pad_integral(
+            !is_negative,
+            prefix,
+            std::str::from_utf8(&buf[idx..]).unwrap(),
+        )
     }
 }
 
