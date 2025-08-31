@@ -317,10 +317,11 @@ impl parse_ctx!() {
                         .count(),
                 ) {
                     None => Expr::nothing(span),
-                    Some((index, _logical_idx)) => {
+                    Some((index, logical_idx)) => {
                         fn get_nth_value<T: Copy + Into<i32>>(
                             slice: &[T],
                             index: usize,
+                            logical_idx: i32,
                             span: Span,
                             nb_errors_left: &Cell<usize>,
                             options: &Options,
@@ -335,7 +336,7 @@ impl parse_ctx!() {
                                         error.add_label(
                                             diagnostics::error_label(&span).with_message(format!(
                                                 "attempted to take the {} value, out of {}",
-                                                ordinal::Ordinal(index), // TODO: would it make more sense to report `logical_idx` instead?
+                                                ordinal::Ordinal(logical_idx),
                                                 slice.len(),
                                             )),
                                         )
@@ -347,9 +348,14 @@ impl parse_ctx!() {
                             }
                         }
                         match mapping {
-                            CharMapping::Mapped(slice) => {
-                                get_nth_value(slice, index, span, self.nb_errors_left, self.options)
-                            }
+                            CharMapping::Mapped(slice) => get_nth_value(
+                                slice,
+                                index,
+                                logical_idx,
+                                span,
+                                self.nb_errors_left,
+                                self.options,
+                            ),
                             CharMapping::Passthrough(string) => {
                                 // TODO: maybe such a case can be intentional
                                 self.error(&span, |error| {
@@ -364,6 +370,7 @@ impl parse_ctx!() {
                                 get_nth_value(
                                     string.as_bytes(),
                                     index,
+                                    logical_idx,
                                     span,
                                     self.nb_errors_left,
                                     self.options,
@@ -465,17 +472,17 @@ impl parse_ctx!() {
         let span = self.span_from_to(l_span_idx, r_span_idx);
 
         let string_len = string.chars().count();
-        let (start_idx, _logical_start) = self
+        let (start_idx, logical_start) = self
             .logical_index_to_physical(start, string_len)
             .unwrap_or((0, 0));
-        let (end_idx, _logical_end) = end
+        let (end_idx, logical_end) = end
             .and_then(|expr| self.logical_index_to_physical(expr, string_len))
             .unwrap_or((string_len, string_len as i32));
         let nb_codepoints = end_idx.checked_sub(end_idx).unwrap_or_else(|| {
             self.warn(warning!("builtin-args"), &span, |warning| {
                 warning.set_message("string slice range is backwards");
                 warning.add_label(diagnostics::warning_label(&span).with_message(format!(
-                    "skipping the first {start_idx} codepoints, stopping at {end_idx} codepoints",
+                    "skipping the first {logical_start} codepoints, stopping at {logical_end} codepoints",
                 )))
             });
             0
@@ -484,17 +491,17 @@ impl parse_ctx!() {
         if start_idx > string_len {
             self.warn(warning!("builtin-args"), &span, |warning| {
                 warning.set_message("start index is past the end of the string");
-                warning.add_label(diagnostics::warning_label(&span).with_message(
-                    "starting at {start_idx} codepoints, but the string only contains {string_len}",
-                ));
+                warning.add_label(diagnostics::warning_label(&span).with_message(format!(
+                    "starting at {logical_start} codepoints, but the string only contains {string_len}",
+                )));
             });
         }
         if end_idx > string_len {
             self.warn(warning!("builtin-args"), &span, |warning| {
                 warning.set_message("stop index is past the end of the string");
-                warning.add_label(diagnostics::warning_label(&span).with_message(
-                    "stopping at {end_idx} codepoints, but the string only contains {string_len}",
-                ));
+                warning.add_label(diagnostics::warning_label(&span).with_message(format!(
+                    "stopping at {logical_end} codepoints, but the string only contains {string_len}",
+                )));
             });
         }
 
@@ -525,7 +532,7 @@ impl parse_ctx!() {
             .count();
         let string = self
             .logical_index_to_physical(idx, nb_charmap_units)
-            .and_then(|(start_idx, _logical_idx)| {
+            .and_then(|(start_idx, logical_idx)| {
                 let mut ofs = 0;
                 let mut start_ofs = 0;
                 for i in 0..=start_idx {
@@ -534,7 +541,7 @@ impl parse_ctx!() {
                             error.set_message("index passed to `strchar` is larger than the string");
                             error.add_label(diagnostics::warning_label(&span).with_message(format!(
                                 "attempting to get the {} charmap unit of a string that has only {i}",
-                                ordinal::Ordinal(start_idx),
+                                ordinal::Ordinal(logical_idx),
                             )));
                         });
                         return None;

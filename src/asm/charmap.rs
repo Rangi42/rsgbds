@@ -7,7 +7,6 @@ use compact_str::CompactString;
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::{
-    common::Captures,
     diagnostics::{self, warning},
     sources::Span,
     Identifier, Identifiers, Options,

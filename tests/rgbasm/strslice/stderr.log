@@ -1,20 +1,110 @@
-warning: STRSLICE: Start index 4 is past the end of the string [-Wbuiltin-args]
-    at strslice.asm::xstrslice(2) <- strslice.asm(14)
-warning: STRSLICE: Index starts at 0 [-Wbuiltin-args]
-    at strslice.asm::xstrslice(2) <- strslice.asm(15)
-warning: STRSLICE: Stop index 31 is past the end of the string [-Wbuiltin-args]
-    at strslice.asm::xstrslice(2) <- strslice.asm(18)
-warning: STRSLICE: Stop index 300 is past the end of the string [-Wbuiltin-args]
-    at strslice.asm::xstrslice(2) <- strslice.asm(19)
-warning: STRSLICE: Index starts at 0 [-Wbuiltin-args]
-    at strslice.asm::xstrslice(2) <- strslice.asm(20)
-warning: STRSLICE: Stop index 300 is past the end of the string [-Wbuiltin-args]
-    at strslice.asm::xstrslice(2) <- strslice.asm(20)
-warning: STRSLICE: Start index 4 is past the end of the string [-Wbuiltin-args]
-    at strslice.asm::xstrslice(2) <- strslice.asm(22)
-warning: STRSLICE: Stop index 4 is past the end of the string [-Wbuiltin-args]
-    at strslice.asm::xstrslice(2) <- strslice.asm(22)
-warning: STRSLICE: Stop index 4 is past the end of the string [-Wbuiltin-args]
-    at strslice.asm::xstrslice(2) <- strslice.asm(23)
-warning: STRSLICE: Stop index 12 is past the end of the string [-Wbuiltin-args]
-    at strslice.asm::xstrslice(2) <- strslice.asm(26)
+[-Wbuiltin-args] warning: start index is past the end of the string
+    ╭─[ test.asm:2:28 ]
+    │
+  2 │     PRINTLN "STRSLICE(\#): ", STRSLICE(\#)
+    │                               ──────┬─────  
+    │                                     ╰─────── starting at 4 codepoints, but the string only contains 3
+    │ 
+ 14 │     xstrslice "ABC", 4
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+[-Wbuiltin-args] warning: start index is past the end of the string
+    ╭─[ test.asm:2:28 ]
+    │
+  2 │     PRINTLN "STRSLICE(\#): ", STRSLICE(\#)
+    │                               ──────┬─────  
+    │                                     ╰─────── starting at -4 codepoints, but the string only contains 3
+    │ 
+ 15 │     xstrslice "ABC", -4
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+[-Wbuiltin-args] warning: stop index is past the end of the string
+    ╭─[ test.asm:2:28 ]
+    │
+  2 │     PRINTLN "STRSLICE(\#): ", STRSLICE(\#)
+    │                               ──────┬─────  
+    │                                     ╰─────── stopping at 31 codepoints, but the string only contains 3
+    │ 
+ 18 │     xstrslice "ABC", 1, 31
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+[-Wbuiltin-args] warning: stop index is past the end of the string
+    ╭─[ test.asm:2:28 ]
+    │
+  2 │     PRINTLN "STRSLICE(\#): ", STRSLICE(\#)
+    │                               ──────┬─────  
+    │                                     ╰─────── stopping at 300 codepoints, but the string only contains 3
+    │ 
+ 19 │     xstrslice "ABC", 1, 300
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+[-Wbuiltin-args] warning: start index is past the end of the string
+    ╭─[ test.asm:2:28 ]
+    │
+  2 │     PRINTLN "STRSLICE(\#): ", STRSLICE(\#)
+    │                               ──────┬─────  
+    │                                     ╰─────── starting at -4 codepoints, but the string only contains 3
+    │ 
+ 20 │     xstrslice "ABC", -4, 300
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+[-Wbuiltin-args] warning: stop index is past the end of the string
+    ╭─[ test.asm:2:28 ]
+    │
+  2 │     PRINTLN "STRSLICE(\#): ", STRSLICE(\#)
+    │                               ──────┬─────  
+    │                                     ╰─────── stopping at 300 codepoints, but the string only contains 3
+    │ 
+ 20 │     xstrslice "ABC", -4, 300
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+[-Wbuiltin-args] warning: start index is past the end of the string
+    ╭─[ test.asm:2:28 ]
+    │
+  2 │     PRINTLN "STRSLICE(\#): ", STRSLICE(\#)
+    │                               ──────┬─────  
+    │                                     ╰─────── starting at 4 codepoints, but the string only contains 3
+    │ 
+ 22 │     xstrslice "ABC", 4, 4
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+[-Wbuiltin-args] warning: stop index is past the end of the string
+    ╭─[ test.asm:2:28 ]
+    │
+  2 │     PRINTLN "STRSLICE(\#): ", STRSLICE(\#)
+    │                               ──────┬─────  
+    │                                     ╰─────── stopping at 4 codepoints, but the string only contains 3
+    │ 
+ 22 │     xstrslice "ABC", 4, 4
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+[-Wbuiltin-args] warning: stop index is past the end of the string
+    ╭─[ test.asm:2:28 ]
+    │
+  2 │     PRINTLN "STRSLICE(\#): ", STRSLICE(\#)
+    │                               ──────┬─────  
+    │                                     ╰─────── stopping at 4 codepoints, but the string only contains 3
+    │ 
+ 23 │     xstrslice "ABC", 3, 4
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+[-Wbuiltin-args] warning: stop index is past the end of the string
+    ╭─[ test.asm:2:28 ]
+    │
+  2 │     PRINTLN "STRSLICE(\#): ", STRSLICE(\#)
+    │                               ──────┬─────  
+    │                                     ╰─────── stopping at 12 codepoints, but the string only contains 4
+    │ 
+ 26 │     xstrslice "カタカナ", 2, 12
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
