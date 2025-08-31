@@ -478,7 +478,16 @@ impl parse_ctx!() {
         let (end_idx, logical_end) = end
             .and_then(|expr| self.logical_index_to_physical(expr, string_len))
             .unwrap_or((string_len, string_len as i32));
-        let nb_codepoints = end_idx.checked_sub(end_idx).unwrap_or_else(|| {
+        let nb_codepoints = if start_idx > string_len {
+            self.warn(warning!("builtin-args"), &span, |warning| {
+                warning.set_message("start index is past the end of the string");
+                warning.add_label(diagnostics::warning_label(&span).with_message(format!(
+                    "starting at {logical_start} codepoints, but the string only contains {string_len}",
+                )));
+            });
+            0
+        } else {
+            end_idx.checked_sub(start_idx).unwrap_or_else(|| {
             self.warn(warning!("builtin-args"), &span, |warning| {
                 warning.set_message("string slice range is backwards");
                 warning.add_label(diagnostics::warning_label(&span).with_message(format!(
@@ -486,16 +495,9 @@ impl parse_ctx!() {
                 )))
             });
             0
-        });
+        })
+        };
 
-        if start_idx > string_len {
-            self.warn(warning!("builtin-args"), &span, |warning| {
-                warning.set_message("start index is past the end of the string");
-                warning.add_label(diagnostics::warning_label(&span).with_message(format!(
-                    "starting at {logical_start} codepoints, but the string only contains {string_len}",
-                )));
-            });
-        }
         if end_idx > string_len {
             self.warn(warning!("builtin-args"), &span, |warning| {
                 warning.set_message("stop index is past the end of the string");

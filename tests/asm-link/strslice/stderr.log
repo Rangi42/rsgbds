@@ -1,3 +1,14 @@
+[-Wbuiltin-args] warning: string slice range is backwards
+    ╭─[ test.asm:2:28 ]
+    │
+  2 │     PRINTLN "STRSLICE(\#): ", STRSLICE(\#)
+    │                               ──────┬─────  
+    │                                     ╰─────── skipping the first -1 codepoints, stopping at 0 codepoints
+    │ 
+ 10 │     xstrslice "ABC", -1, -0 ; lol
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
 [-Wbuiltin-args] warning: start index is past the end of the string
     ╭─[ test.asm:2:28 ]
     │
