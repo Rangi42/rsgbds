@@ -221,7 +221,7 @@ impl Charmap {
         identifiers: &'a Identifiers,
         nb_errors_left: &'a Cell<usize>,
         options: &'a Options,
-    ) -> impl Iterator<Item = CharMapping<'_>> + Captures<&'a ()> {
+    ) -> impl Iterator<Item = CharMapping<'_, 'a>> {
         Encoder {
             charmap: self,
             string,
@@ -232,7 +232,10 @@ impl Charmap {
             options,
         }
     }
-    pub fn encode_one(&self, string: &str) -> Option<(CharMapping<'_>, usize)> {
+    pub fn encode_one<'string>(
+        &self,
+        string: &'string str,
+    ) -> Option<(CharMapping<'_, 'string>, usize)> {
         // RGBASM matches charmaps using the common “leftmost-longest” scheme.
         let chars = string.char_indices();
 
@@ -255,7 +258,10 @@ impl Charmap {
         } else {
             // Default identity mapping: just return one character.
             let c = string.chars().next()?;
-            Some((CharMapping::Passthrough(c), c.len_utf8()))
+            Some((
+                CharMapping::Passthrough(&string[..c.len_utf8()]),
+                c.len_utf8(),
+            ))
         }
     }
 
@@ -263,7 +269,7 @@ impl Charmap {
         debug_assert_ne!(mapping.len(), 0, "Cannot reverse an empty mapping");
         let mut res = None;
         for (node_idx, node) in self.nodes.iter().enumerate() {
-            if &node.mapping == mapping {
+            if node.mapping == mapping {
                 // Trace back the node through the tree.
                 // This is relatively expensive, but we only do it when finding a matching node, which is rare under normal circumstances.
                 let mut string = CompactString::default();
@@ -274,7 +280,7 @@ impl Charmap {
                     if let Some((ch, _idx)) = candidate
                         .children
                         .iter()
-                        .find(|(ch, node_idx)| **node_idx == target_idx)
+                        .find(|(_ch, node_idx)| **node_idx == target_idx)
                     {
                         target_idx = idx;
                         string.insert(0, *ch); // FIXME: not great to be constantly copying characters...
@@ -303,15 +309,15 @@ struct Encoder<'charmap, 'a> {
     nb_errors_left: &'a Cell<usize>,
     options: &'a Options,
 }
-impl<'charmap> Iterator for Encoder<'charmap, '_> {
-    type Item = CharMapping<'charmap>;
+impl<'charmap, 'a> Iterator for Encoder<'charmap, 'a> {
+    type Item = CharMapping<'charmap, 'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let (mapping, byte_len) = self.charmap.encode_one(self.string)?;
         self.string = &self.string[byte_len..];
-        if let CharMapping::Passthrough(c) = &mapping {
+        if let CharMapping::Passthrough(s) = &mapping {
             self.charmap.warn_on_passthrough(
-                *c,
+                s.chars().next().unwrap(),
                 self.is_main_charmap,
                 self.string_span,
                 self.identifiers,
@@ -323,42 +329,42 @@ impl<'charmap> Iterator for Encoder<'charmap, '_> {
     }
 }
 #[derive(Debug, Clone, Copy)]
-pub enum CharMapping<'charmap> {
+pub enum CharMapping<'charmap, 'string> {
     Mapped(&'charmap [i32]),
-    Passthrough(char),
+    Passthrough(&'string str),
 }
-impl<'charmap> IntoIterator for CharMapping<'charmap> {
-    type IntoIter = CharValues<'charmap>;
+impl<'charmap, 'string> IntoIterator for CharMapping<'charmap, 'string> {
+    type IntoIter = CharValues<'charmap, 'string>;
     type Item = i32;
     fn into_iter(self) -> Self::IntoIter {
         match self {
             CharMapping::Mapped(slice) => CharValues::Mapped(slice.iter()),
-            CharMapping::Passthrough(ch) => CharValues::Passthrough(Some(ch)),
+            CharMapping::Passthrough(string) => CharValues::Passthrough(string.bytes()),
         }
     }
 }
 #[derive(Debug)]
-pub enum CharValues<'charmap> {
+pub enum CharValues<'charmap, 'string> {
     Mapped(std::slice::Iter<'charmap, i32>),
-    Passthrough(Option<char>),
+    Passthrough(std::str::Bytes<'string>),
 }
-impl Iterator for CharValues<'_> {
+impl Iterator for CharValues<'_, '_> {
     type Item = i32;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Mapped(iter) => iter.next().copied(),
-            Self::Passthrough(opt) => opt.take().map(|ch| ch as u32 as i32),
+            Self::Passthrough(bytes) => bytes.next().map(|byte| byte as i32),
         }
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.len(), Some(self.len()))
     }
 }
-impl ExactSizeIterator for CharValues<'_> {
+impl ExactSizeIterator for CharValues<'_, '_> {
     fn len(&self) -> usize {
         match self {
             Self::Mapped(values) => values.len(),
-            Self::Passthrough(_) => 1,
+            Self::Passthrough(bytes) => bytes.len(),
         }
     }
 }

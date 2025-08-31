@@ -191,7 +191,7 @@ impl parse_ctx!() {
                 }
                 let value = match mapping {
                     CharMapping::Mapped(slice) => slice.len(),
-                    CharMapping::Passthrough(c) => {
+                    CharMapping::Passthrough(string) => {
                         // TODO: maybe such a case can be intentional
                         self.error(&span, |error| {
                             error.set_message("string passed to `charsize` isn't mapped");
@@ -200,7 +200,7 @@ impl parse_ctx!() {
                                 self.identifiers.resolve(charmap.name()).unwrap(),
                             )));
                         });
-                        c.len_utf8()
+                        string.len()
                     }
                 };
                 Expr::number(value as i32, span)
@@ -266,7 +266,7 @@ impl parse_ctx!() {
                     CharMapping::Mapped(slice) => {
                         get_only_value(slice, span, self.nb_errors_left, self.options)
                     }
-                    CharMapping::Passthrough(c) => {
+                    CharMapping::Passthrough(string) => {
                         // TODO: maybe such a case can be intentional
                         self.error(&span, |error| {
                             error.set_message("string passed to `charval` isn't mapped");
@@ -275,13 +275,7 @@ impl parse_ctx!() {
                                 self.identifiers.resolve(charmap.name()).unwrap(),
                             )));
                         });
-                        let mut buf = [0; 4];
-                        get_only_value(
-                            c.encode_utf8(&mut buf).as_bytes(),
-                            span,
-                            self.nb_errors_left,
-                            self.options,
-                        )
+                        get_only_value(string.as_bytes(), span, self.nb_errors_left, self.options)
                     }
                 }
             }
@@ -355,7 +349,7 @@ impl parse_ctx!() {
                             CharMapping::Mapped(slice) => {
                                 get_nth_value(slice, index, span, self.nb_errors_left, self.options)
                             }
-                            CharMapping::Passthrough(c) => {
+                            CharMapping::Passthrough(string) => {
                                 // TODO: maybe such a case can be intentional
                                 self.error(&span, |error| {
                                     error.set_message("string passed to `charval` isn't mapped");
@@ -366,9 +360,8 @@ impl parse_ctx!() {
                                         ),
                                     ));
                                 });
-                                let mut buf = [0; 4];
                                 get_nth_value(
-                                    c.encode_utf8(&mut buf).as_bytes(),
+                                    string.as_bytes(),
                                     index,
                                     span,
                                     self.nb_errors_left,
