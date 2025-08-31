@@ -23,4 +23,4 @@ DEF x = BANK(Label)
 
 Label2::
 PURGE Label2
-DEF x EQUS SECTION(Label2) ; fatal
+DEF x EQUS SECTION(Label2)

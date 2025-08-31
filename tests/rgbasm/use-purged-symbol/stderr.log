@@ -61,11 +61,11 @@ error: the symbol `Label` was deleted
     │       ───┬──  
     │          ╰──── deleting `Label2` here
 ────╯
-error: syntax error: unexpected section
-    ╭─[ test.asm:26:12 ]
+error: `Label2` does not belong to a section
+    ╭─[ test.asm:26:20 ]
     │
- 26 │ DEF x EQUS SECTION(Label2) ; fatal
-    │            ───┬───  
-    │               ╰───── expected "string", "identifier", or "strcat"
+ 26 │ DEF x EQUS SECTION(Label2)
+    │                    ───┬──  
+    │                       ╰──── deleted symbols do not belong to any section
 ────╯
 7 errors generated.
