@@ -38,7 +38,7 @@ impl Default for FormatSpec {
     fn default() -> Self {
         Self {
             force_sign: None,
-            exact_prefix: FormatKind::Default.exact_prefix(), // By default, print the '$' prefix. (This is guaranteed to be `Some`.)
+            exact_prefix: None, // By default, print the '$' prefix. (This is guaranteed to be `Some`.)
             align_left: false,
             pad_with_zeros: false,
             width: 0,
@@ -249,7 +249,7 @@ impl FormatSpec {
 impl FormatKind {
     fn exact_prefix(&self) -> Option<&'static str> {
         match self {
-            FormatKind::Default => Some("$"),
+            FormatKind::Default => unreachable!(),
             FormatKind::Signed => None,
             FormatKind::Unsigned => None,
             FormatKind::LowerHex => Some("$"),
@@ -284,7 +284,11 @@ impl FormatSpec {
                 let fmt = NumberFormatter {
                     number,
                     force_sign: self.force_sign,
-                    exact_prefix: self.exact_prefix,
+                    exact_prefix: if matches!(self.kind, FormatKind::Default) {
+                        Some("$")
+                    } else {
+                        self.exact_prefix
+                    },
                     precision: self.precision,
                     frac: self.frac.unwrap_or(5), // 5 digits is enough for the default Q16.16
                     kind: self.kind,
