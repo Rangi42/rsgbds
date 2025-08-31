@@ -1464,12 +1464,20 @@ impl Lexer {
                     match self.peek(&mut params) {
                         Some('x' | 'X') => {
                             self.consume(&mut span);
+                            if matches!(self.peek(&mut params), Some('_')) {
+                                self.consume(&mut span);
+                            }
                             if let Some(first_digit) =
                                 self.peek(&mut params).and_then(|ch| ch.to_digit(16))
                             {
                                 self.consume(&mut span);
-                                let value =
-                                    self.read_number(16, first_digit, &mut span, &mut params);
+                                let value = self.read_number(
+                                    16,
+                                    first_digit,
+                                    false,
+                                    &mut span,
+                                    &mut params,
+                                );
                                 break token!("number"(value));
                             } else {
                                 let err_span = Span::Normal(span.clone());
@@ -1488,12 +1496,15 @@ impl Lexer {
                         }
                         Some('o' | 'O') => {
                             self.consume(&mut span);
+                            if matches!(self.peek(&mut params), Some('_')) {
+                                self.consume(&mut span);
+                            }
                             if let Some(first_digit) =
                                 self.peek(&mut params).and_then(|ch| ch.to_digit(8))
                             {
                                 self.consume(&mut span);
                                 let value =
-                                    self.read_number(8, first_digit, &mut span, &mut params);
+                                    self.read_number(8, first_digit, false, &mut span, &mut params);
                                 break token!("number"(value));
                             } else {
                                 let err_span = Span::Normal(span.clone());
@@ -1510,6 +1521,9 @@ impl Lexer {
                         }
                         Some('b' | 'B') => {
                             self.consume(&mut span);
+                            if matches!(self.peek(&mut params), Some('_')) {
+                                self.consume(&mut span);
+                            }
                             if let Some(first_digit) = self.peek(&mut params).and_then(|ch| {
                                 params
                                     .options
@@ -1521,6 +1535,7 @@ impl Lexer {
                                 self.consume(&mut span);
                                 let value = self.read_bin_number(
                                     first_digit as u32,
+                                    false,
                                     &mut span,
                                     &mut params,
                                 );
@@ -1538,8 +1553,8 @@ impl Lexer {
                                 span.bytes.end = span.bytes.start;
                             }
                         }
-                        Some('0'..='9' | '.') => {
-                            let mut value = self.read_number(10, 0, &mut span, &mut params);
+                        Some('0'..='9' | '.' | '_') => {
+                            let mut value = self.read_number(10, 0, false, &mut span, &mut params);
                             if let Some('.') = self.peek(&mut params) {
                                 self.consume(&mut span);
                                 value = self.read_fractional_part(value, &mut span, &mut params);
@@ -1552,7 +1567,7 @@ impl Lexer {
                 Some(ch @ '1'..='9') => {
                     self.consume(&mut span);
                     let value = ch.to_digit(10).unwrap();
-                    let mut value = self.read_number(10, value, &mut span, &mut params);
+                    let mut value = self.read_number(10, value, false, &mut span, &mut params);
                     if let Some('.') = self.peek(&mut params) {
                         self.consume(&mut span);
                         value = self.read_fractional_part(value, &mut span, &mut params);
@@ -1570,11 +1585,20 @@ impl Lexer {
                             self.consume(&mut span);
                             break token!("&&");
                         }
+                        Some('_') => {
+                            self.consume(&mut span);
+                            let value = self.read_number(8, 0, true, &mut span, &mut params);
+                            break Token {
+                                payload: tok!("number"(value)),
+                                span: Span::Normal(span),
+                            };
+                        }
                         Some(ch @ '0'..='7') => {
                             self.consume(&mut span);
                             let value = self.read_number(
                                 8,
                                 ch.to_digit(8).unwrap(),
+                                false,
                                 &mut span,
                                 &mut params,
                             );
@@ -1593,6 +1617,14 @@ impl Lexer {
                             self.consume(&mut span);
                             break token!("%=");
                         }
+                        Some('_') => {
+                            self.consume(&mut span);
+                            let value = self.read_bin_number(0, true, &mut span, &mut params);
+                            break Token {
+                                payload: tok!("number"(value)),
+                                span: Span::Normal(span),
+                            };
+                        }
                         Some(ch) if params.options.runtime_opts.binary_digits.contains(&ch) => {
                             self.consume(&mut span);
                             let first_digit = params
@@ -1602,8 +1634,12 @@ impl Lexer {
                                 .iter()
                                 .position(|&digit| digit == ch)
                                 .unwrap();
-                            let value =
-                                self.read_bin_number(first_digit as u32, &mut span, &mut params);
+                            let value = self.read_bin_number(
+                                first_digit as u32,
+                                false,
+                                &mut span,
+                                &mut params,
+                            );
                             break token!("number"(value));
                         }
                         _ => break token!("%"),
@@ -1612,11 +1648,20 @@ impl Lexer {
                 Some('$') => {
                     self.consume(&mut span);
                     match self.peek(&mut params) {
+                        Some('_') => {
+                            self.consume(&mut span);
+                            let value = self.read_number(8, 0, true, &mut span, &mut params);
+                            break Token {
+                                payload: tok!("number"(value)),
+                                span: Span::Normal(span),
+                            };
+                        }
                         Some(ch @ ('0'..='9' | 'A'..='F' | 'a'..='f')) => {
                             self.consume(&mut span);
                             let value = self.read_number(
                                 16,
                                 ch.to_digit(16).unwrap(),
+                                false,
                                 &mut span,
                                 &mut params,
                             );
@@ -1644,9 +1689,25 @@ impl Lexer {
                 Some('`') => {
                     self.consume(&mut span);
                     match self.peek(&mut params) {
+                        Some('_') => {
+                            self.consume(&mut span);
+                            let value = self.read_gfx_constant(0, true, &mut span, &mut params);
+                            break Token {
+                                payload: tok!("number"(value)),
+                                span: Span::Normal(span),
+                            };
+                        }
                         Some(ch) if params.options.runtime_opts.gfx_chars.contains(&ch) => {
                             self.consume(&mut span);
-                            let value = self.read_gfx_constant(ch, &mut span, &mut params);
+                            let first_digit = params
+                                .options
+                                .runtime_opts
+                                .gfx_chars
+                                .iter()
+                                .position(|&digit| digit == ch)
+                                .unwrap() as u8;
+                            let value =
+                                self.read_gfx_constant(first_digit, false, &mut span, &mut params);
                             break Token {
                                 payload: tok!("number"(value)),
                                 span: Span::Normal(span),
@@ -1782,21 +1843,23 @@ impl Lexer {
         &mut self,
         radix: u32,
         mut value: u32,
+        mut prev_underscore: bool,
         span: &mut NormalSpan,
         params: &mut LexerParams,
     ) -> u32 {
         let mut overflowed = false;
 
-        let mut trailing_underscore = false;
+        let mut consecutive_underscores = false;
         loop {
             match self.peek(params) {
                 Some('_') => {
                     self.consume(span);
-                    trailing_underscore = true;
+                    consecutive_underscores |= prev_underscore;
+                    prev_underscore = true;
                 }
                 Some(ch) if ch.is_digit(radix) => {
                     self.consume(span);
-                    trailing_underscore = false;
+                    prev_underscore = false;
 
                     let digit = ch.to_digit(radix).unwrap();
                     let (new_val, overflow) = value.overflowing_mul(radix);
@@ -1819,7 +1882,15 @@ impl Lexer {
                 )
             });
         }
-        if trailing_underscore {
+        if consecutive_underscores {
+            params.error(&span, |error| {
+                error.set_message("consecutive underscores are not allowed");
+                error.add_label(
+                    diagnostics::error_label(&span).with_message("this number is invalid"),
+                );
+            });
+        }
+        if prev_underscore {
             params.error(&span, |error| {
                 error.set_message("trailing underscores are not allowed");
                 error.add_label(
@@ -1841,17 +1912,19 @@ impl Lexer {
         let mut divisor: u32 = 1;
         let mut underscore_after_dot = false;
         let mut too_many_digits = false;
-        let mut trailing_underscore = false;
+        let mut prev_underscore = false;
+        let mut consecutive_underscores = false;
         let first_nondigit = 'digits: loop {
             match self.peek(params) {
                 Some('_') => {
                     self.consume(span);
-                    trailing_underscore = true;
+                    consecutive_underscores |= prev_underscore;
+                    prev_underscore = true;
                     underscore_after_dot |= divisor == 1;
                 }
                 Some(digit @ '0'..='9') => {
                     self.consume(span);
-                    trailing_underscore = false;
+                    prev_underscore = false;
                     match divisor.checked_mul(10) {
                         Some(new_divisor) => divisor = new_divisor,
                         None => {
@@ -1932,9 +2005,18 @@ impl Lexer {
                 );
             });
         }
-        if trailing_underscore {
+        if prev_underscore {
             params.error(&span, |error| {
                 error.set_message("trailing underscores are not allowed");
+                error.add_label(
+                    diagnostics::error_label(&span)
+                        .with_message("this fixed-point constant is invalid"),
+                );
+            });
+        }
+        if consecutive_underscores {
+            params.error(&span, |error| {
+                error.set_message("consecutive underscores are not allowed");
                 error.add_label(
                     diagnostics::error_label(&span)
                         .with_message("this fixed-point constant is invalid"),
@@ -1985,18 +2067,25 @@ impl Lexer {
     fn read_bin_number(
         &mut self,
         mut value: u32,
+        mut was_underscore: bool,
         span: &mut NormalSpan,
         params: &mut LexerParams,
     ) -> u32 {
         let mut overflowed = false;
+        let mut consecutive_underscores = false;
 
         loop {
             let next_up = self.peek(params);
             let digits = params.options.runtime_opts.binary_digits;
             match next_up {
-                Some('_') => self.consume(span), // TODO: disallow trailing underscores
+                Some('_') => {
+                    self.consume(span);
+                    consecutive_underscores |= was_underscore;
+                    was_underscore = true;
+                }
                 Some(ch) if digits.contains(&ch) => {
                     self.consume(span);
+                    was_underscore = false;
 
                     let digit = digits.iter().position(|&digit| digit == ch).unwrap() as u32;
                     let (new_val, overflow) = value.overflowing_mul(2);
@@ -2017,7 +2106,25 @@ impl Lexer {
                     diagnostics::warning_label(&span)
                         .with_message(format!("this was truncated to {value}")),
                 )
-            })
+            });
+        }
+        if was_underscore {
+            let span = Span::Normal(span.clone());
+            params.error(&span, |error| {
+                error.set_message("trailing underscores are not allowed");
+                error.add_label(
+                    diagnostics::error_label(&span).with_message("this number is invalid"),
+                );
+            });
+        }
+        if consecutive_underscores {
+            let span = Span::Normal(span.clone());
+            params.error(&span, |error| {
+                error.set_message("consecutive underscores are not allowed");
+                error.add_label(
+                    diagnostics::error_label(&span).with_message("this number is invalid"),
+                );
+            });
         }
 
         value
@@ -2025,7 +2132,8 @@ impl Lexer {
 
     fn read_gfx_constant(
         &mut self,
-        first_char: char,
+        value: u8,
+        mut was_underscore: bool,
         span: &mut NormalSpan,
         params: &mut LexerParams,
     ) -> u32 {
@@ -2038,18 +2146,23 @@ impl Lexer {
                 .position(|&digit| digit == ch)
                 .unwrap() as u8
         }
-        let value = value_of(first_char, params);
         let mut low_bitplane = value & 1;
         let mut high_bitplane = value >> 1;
 
         let mut overflowed = false;
+        let mut consecutive_underscores = false;
         loop {
             let next_up = self.peek(params);
             let digits = params.options.runtime_opts.gfx_chars;
             match next_up {
-                Some('_') => self.consume(span), // TODO: disallow trailing underscores
+                Some('_') => {
+                    self.consume(span);
+                    consecutive_underscores |= was_underscore;
+                    was_underscore = true;
+                }
                 Some(ch) if digits.contains(&ch) => {
                     self.consume(span);
+                    was_underscore = false;
 
                     let value = value_of(ch, params);
                     overflowed |= low_bitplane & 0x80 != 0 || high_bitplane & 0x80 != 0;
@@ -2068,7 +2181,25 @@ impl Lexer {
                     diagnostics::warning_label(&span)
                         .with_message(format!("this was truncated to ${value:04X}")),
                 )
-            })
+            });
+        }
+        if was_underscore {
+            let span = Span::Normal(span.clone());
+            params.error(&span, |error| {
+                error.set_message("trailing underscores are not allowed");
+                error.add_label(
+                    diagnostics::error_label(&span).with_message("this number is invalid"),
+                );
+            });
+        }
+        if consecutive_underscores {
+            let span = Span::Normal(span.clone());
+            params.error(&span, |error| {
+                error.set_message("consecutive underscores are not allowed");
+                error.add_label(
+                    diagnostics::error_label(&span).with_message("this number is invalid"),
+                );
+            });
         }
 
         (high_bitplane as u32) << 8 | low_bitplane as u32
