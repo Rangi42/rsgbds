@@ -4,9 +4,9 @@ use snapbox::{cmd::Command, data::DataFormat, Assert, Data};
 use tempfile::NamedTempFile;
 
 datatest_stable::harness! {
-    { test = run_test, root = "tests/rgbasm", pattern = r"/test\.asm$" },
+    { test = rgbasm_rgblink, root = "tests/asm-link", pattern = r"/test\.asm$" },
     // Intentionally testing opening a file that doesn't exist.
-    { test = run_notexist_test, root = "tests/rgbasm", pattern = r"notexist/stderr\.log$" },
+    { test = rgbasm_notexist, root = "tests/asm-link", pattern = r"notexist/stderr\.log$" },
     // TODO: `version.asm`, other special tests in `test.sh`
 }
 
@@ -18,11 +18,11 @@ const ACTION_ENV_VAR_NAME: &str = "SNAPSHOTS_ASM";
 // Game Boy release date, 1989-04-21T12:34:56Z (for reproducible test results)
 const TIMESTAMP: &str = "609165296";
 
-fn run_notexist_test(err_path: &Utf8Path) -> datatest_stable::Result<()> {
-    run_test(&err_path.with_file_name("test.asm"))
+fn rgbasm_notexist(err_path: &Utf8Path) -> datatest_stable::Result<()> {
+    rgbasm_rgblink(&err_path.with_file_name("test.asm"))
 }
 
-fn run_test(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
+fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
     // We need to pass the path to `rgbasm`, but we don't really care for security.
     let obj_file = NamedTempFile::new().context("Unable to create temp obj file")?;
 

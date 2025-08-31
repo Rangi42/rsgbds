@@ -162,12 +162,12 @@ path = "src/gfx/main.rs"
 required-features = ["rgbgfx"]
 
 [[test]]
-name = "rgbasm"
+name = "asm-link"
 harness = false
-required-features = ["rgbasm"]
+required-features = ["rgbasm", "rgblink"]
 
 [[test]]
-name = "rgbgfx"
+name = "gfx"
 harness = false
 required-features = ["rgbgfx"]
 

@@ -13,7 +13,7 @@ use plumers::{image::ImageFormat, prelude::*};
 use snapbox::{cmd::Command, data::DataFormat, dir::DirRoot, Assert, Data, Redactions};
 
 const RGBGFX_PATH: &str = env!("CARGO_BIN_EXE_rgbgfx");
-const TESTS_DIR: &str = "tests/rgbgfx";
+const TESTS_DIR: &str = "tests/gfx";
 
 fn main() -> ExitCode {
     let arguments = Arguments::from_args();
