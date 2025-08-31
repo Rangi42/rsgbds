@@ -595,7 +595,7 @@ StringExprConcat<Atom>: (CompactString, Span) = {
 	<Atom>,
 };
 StringExprAtom: (CompactString, Span) = {
-	<ident:"identifier"> => todo!(),
+	<span_idx:@L> <ident:"identifier"> => ctx.string_symbol(ident, span_idx),
 	StringExprAtomNoIdent
 };
 StringExprAtomNoIdent: (CompactString, Span) = {

@@ -708,6 +708,8 @@ pub enum SymbolError<'name, 'sym> {
     NotConst(&'name str),
     /// `{0}` is not a numeric symbol
     NotNumeric(&'name str),
+    /// `{0}` is not a string symbol
+    NotString(&'name str),
     /// PC doesn't have a {0} outside of a section
     PcOutsideSect(&'static str),
     /// `_NARG` doesn't have a value outside of a macro

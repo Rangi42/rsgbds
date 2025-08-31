@@ -10,7 +10,8 @@ use crate::{
     expr::Expr,
     format::FormatSpec,
     sources::Span,
-    Options,
+    symbols::SymbolError,
+    Identifier, Options,
 };
 
 use super::parse_ctx;
@@ -411,6 +412,48 @@ impl parse_ctx!() {
 
 /// String functions which return strings.
 impl parse_ctx!() {
+    pub fn string_symbol(&self, name: Identifier, span_idx: usize) -> (CompactString, Span) {
+        let span = &self.line_spans[span_idx]; // If this span is the last one in the line, it could be used by enclosing scopes, so don't take it.
+        let Some(symbol) = self.symbols.find(&name) else {
+            self.error(span, |error| {
+                error.set_message(SymbolError::NotFound(
+                    self.identifiers.resolve(name).unwrap(),
+                ));
+                error.add_label(
+                    diagnostics::error_label(span).with_message("this symbol is invalid"),
+                );
+            });
+            return (Default::default(), span.clone());
+        };
+        let Some(res) = symbol.get_string(
+            self.symbols.global_scope,
+            self.symbols.local_scope,
+            self.identifiers,
+        ) else {
+            self.error(span, |error| {
+                error.set_message(SymbolError::NotString(
+                    self.identifiers.resolve(name).unwrap(),
+                ));
+                error.add_label(
+                    diagnostics::error_label(span).with_message("this symbol is invalid"),
+                );
+            });
+            return (Default::default(), span.clone());
+        };
+        match res {
+            Ok(string) => (string, span.clone()),
+            Err(err) => {
+                self.error(span, |error| {
+                    error.set_message(err);
+                    error.add_label(
+                        diagnostics::error_label(span).with_message("this symbol is invalid"),
+                    );
+                });
+                (Default::default(), span.clone())
+            }
+        }
+    }
+
     pub fn strslice(
         &self,
         (string, _span): (CompactString, Span),
@@ -422,10 +465,10 @@ impl parse_ctx!() {
         let span = self.span_from_to(l_span_idx, r_span_idx);
 
         let string_len = string.chars().count();
-        let (start_idx, logical_start) = self
+        let (start_idx, _logical_start) = self
             .logical_index_to_physical(start, string_len)
             .unwrap_or((0, 0));
-        let (end_idx, logical_end) = end
+        let (end_idx, _logical_end) = end
             .and_then(|expr| self.logical_index_to_physical(expr, string_len))
             .unwrap_or((string_len, string_len as i32));
         let nb_codepoints = end_idx.checked_sub(end_idx).unwrap_or_else(|| {
@@ -463,7 +506,7 @@ impl parse_ctx!() {
 
     pub fn strchar(
         &self,
-        (string, span): (CompactString, Span),
+        (string, _span): (CompactString, Span),
         idx: Expr,
         l_span_idx: usize,
         r_span_idx: usize,
@@ -482,11 +525,11 @@ impl parse_ctx!() {
             .count();
         let string = self
             .logical_index_to_physical(idx, nb_charmap_units)
-            .and_then(|(start_idx, logical_idx)| {
+            .and_then(|(start_idx, _logical_idx)| {
                 let mut ofs = 0;
                 let mut start_ofs = 0;
                 for i in 0..=start_idx {
-                    let Some((mapping, nb_bytes)) = charmap.encode_one(&string[ofs..]) else {
+                    let Some((_mapping, nb_bytes)) = charmap.encode_one(&string[ofs..]) else {
                         self.warn(warning!("builtin-args"), &span, |error| {
                             error.set_message("index passed to `strchar` is larger than the string");
                             error.add_label(diagnostics::warning_label(&span).with_message(format!(
