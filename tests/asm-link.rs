@@ -13,7 +13,7 @@ datatest_stable::harness! {
 const RGBASM_PATH: &str = env!("CARGO_BIN_EXE_rgbasm");
 const RGBLINK_PATH: &str = "rgblink"; // TODO: use rsgblink when it's complete
 
-const ACTION_ENV_VAR_NAME: &str = "SNAPSHOTS_ASM";
+const ACTION_ENV_VAR_NAME: &str = "SNAPSHOTS_ASM_LINK";
 
 // Game Boy release date, 1989-04-21T12:34:56Z (for reproducible test results)
 const TIMESTAMP: &str = "609165296";
@@ -60,7 +60,7 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
         // Note that the presence of a stderr log does not indicate failure is expected;
         // possibly the log contains only warnings.
         result.stderr_eq(
-            Data::try_read_from(err_file_path.as_std_path(), Some(DataFormat::Text))
+            Data::try_read_from(err_file_path.as_std_path(), None)
                 .context("Error reading errput")?,
         )
     } else {
@@ -70,7 +70,7 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
     let out_file_path = asm_path.with_file_name("stdout.log");
     if out_file_path.exists() {
         result.stdout_eq(
-            Data::try_read_from(out_file_path.as_std_path(), Some(DataFormat::Text))
+            Data::try_read_from(out_file_path.as_std_path(), None)
                 .context("Error reading output")?,
         );
     } else {
