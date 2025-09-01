@@ -155,7 +155,7 @@ impl Sections {
     ) {
         self.emit_data(
             "byte",
-            1,
+            Self::string_size(string, charmap),
             keyword_span,
             identifiers,
             nb_errors_left,
@@ -202,7 +202,7 @@ impl Sections {
     ) {
         self.emit_data(
             "word",
-            2,
+            Self::string_size(string, charmap) * 2,
             keyword_span,
             identifiers,
             nb_errors_left,
@@ -249,7 +249,7 @@ impl Sections {
     ) {
         self.emit_data(
             "long word",
-            4,
+            Self::string_size(string, charmap) * 4,
             keyword_span,
             identifiers,
             nb_errors_left,
@@ -431,12 +431,7 @@ impl Sections {
                         },
                     );
                 } else {
-                    match &mut data_sect.bytes {
-                        Contents::Data(data) => {
-                            data.resize(MAX_SECTION_SIZE, options.runtime_opts.pad_byte)
-                        }
-                        Contents::NoData(len) => *len = MAX_SECTION_SIZE,
-                    }
+                    data.resize(MAX_SECTION_SIZE, options.runtime_opts.pad_byte);
                 }
             }
 
@@ -466,12 +461,7 @@ impl Sections {
                     );
                     *len += nb_bytes;
                 } else {
-                    match &mut data_sect.bytes {
-                        Contents::Data(data) => {
-                            data.resize(MAX_SECTION_SIZE, options.runtime_opts.pad_byte)
-                        }
-                        Contents::NoData(len) => *len = MAX_SECTION_SIZE,
-                    }
+                    *len = MAX_SECTION_SIZE;
                 }
             }
         }
@@ -688,6 +678,16 @@ impl Sections {
                 ctx.data.extend_from_slice(&value.to_le_bytes());
             }
         }
+    }
+
+    fn string_size(mut string: &str, charmap: &Charmap) -> usize {
+        // Not using `encode` because we don't want to report passthrough characters.
+        let mut size = 0;
+        while let Some((mapping, byte_len)) = charmap.encode_one(string) {
+            size += mapping.into_iter().len();
+            string = &string[byte_len..];
+        }
+        size
     }
 }
 
