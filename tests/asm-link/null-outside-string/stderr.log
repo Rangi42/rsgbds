@@ -1,17 +1,57 @@
-error: Invalid character '0' after line continuation
-    at null-outside-string.asm(3)
-error: syntax error, unexpected number
-    at null-outside-string.asm(3)
-error: Invalid character '0' after line continuation
-    at null-outside-string.asm(4)
-error: syntax error, unexpected number
-    at null-outside-string.asm(4)
-error: Invalid character 'X' after line continuation
-    at null-outside-string.asm(6)
-error: syntax error, unexpected symbol
-    at null-outside-string.asm(6)
-error: Invalid character 'X' after line continuation
-    at null-outside-string.asm(7)
-error: syntax error, unexpected symbol
-    at null-outside-string.asm(7)
-Assembly aborted with 8 errors!
+error: unexpected character after line continuation
+   ╭─[ test.asm:3:9 ]
+   │
+ 3 │     DEF foo\0qux EQU 42
+   │            ┬  
+   │            ╰── there can only be whitespace between this backslash and the end of the line
+───╯
+error: syntax error: unexpected number
+   ╭─[ test.asm:3:10 ]
+   │
+ 3 │     DEF foo\0qux EQU 42
+   │             ┬  
+   │             ╰── expected "=", "+=", "-=", "*=", "/=", "%=", "&=", ...10 others
+───╯
+error: unexpected character after line continuation
+   ╭─[ test.asm:4:8 ]
+   │
+ 4 │     db foo\0qux
+   │           ┬  
+   │           ╰── there can only be whitespace between this backslash and the end of the line
+───╯
+error: syntax error: unexpected number
+   ╭─[ test.asm:4:9 ]
+   │
+ 4 │     db foo\0qux
+   │            ┬  
+   │            ╰── expected ",", "::", "+", "-", "*", "/", "%", ...16 others
+───╯
+error: unexpected character after line continuation
+   ╭─[ test.asm:6:10 ]
+   │
+ 6 │     DEF spam\Xeggs EQU 69
+   │             ┬  
+   │             ╰── there can only be whitespace between this backslash and the end of the line
+───╯
+error: syntax error: unexpected identifier
+   ╭─[ test.asm:6:11 ]
+   │
+ 6 │     DEF spam\Xeggs EQU 69
+   │              ──┬──  
+   │                ╰──── expected "=", "+=", "-=", "*=", "/=", "%=", "&=", ...10 others
+───╯
+error: unexpected character after line continuation
+   ╭─[ test.asm:7:9 ]
+   │
+ 7 │     db spam\Xeggs
+   │            ┬  
+   │            ╰── there can only be whitespace between this backslash and the end of the line
+───╯
+error: syntax error: unexpected identifier
+   ╭─[ test.asm:7:10 ]
+   │
+ 7 │     db spam\Xeggs
+   │             ──┬──  
+   │               ╰──── expected ",", "::", "+", "-", "*", "/", "%", ...16 others
+───╯
+8 errors generated.
