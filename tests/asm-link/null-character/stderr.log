@@ -1,2 +1,7 @@
-warning: Unmapped character '\0' [-Wunmapped-char]
-    at null-character.asm(12)
+[-Wunmapped-char=1] warning: '\u{0}' is not mapped
+    ╭─[ test.asm:12:5 ]
+    │
+ 12 │     db "a\0b\0"
+    │        ────┬───  
+    │            ╰───── in this string
+────╯
