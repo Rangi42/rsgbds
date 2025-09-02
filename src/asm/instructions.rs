@@ -420,7 +420,7 @@ impl Instruction {
     }
 
     pub fn bit(bit: Expr, reg: Reg8, span: Span, instr_span: Span) -> Self {
-        let second_byte = bit.bit_check(0x40 | reg.id() << 3, instr_span);
+        let second_byte = bit.bit_check(0x40 | reg.id(), instr_span);
         Self {
             span,
             bytes: [0xCB, Default::default()].into_iter().collect(),
@@ -432,7 +432,7 @@ impl Instruction {
         }
     }
     pub fn res(bit: Expr, reg: Reg8, span: Span, instr_span: Span) -> Self {
-        let second_byte = bit.bit_check(0x80 | reg.id() << 3, instr_span);
+        let second_byte = bit.bit_check(0x80 | reg.id(), instr_span);
         Self {
             span,
             bytes: [0xCB, Default::default()].into_iter().collect(),
@@ -444,7 +444,7 @@ impl Instruction {
         }
     }
     pub fn set(bit: Expr, reg: Reg8, span: Span, instr_span: Span) -> Self {
-        let second_byte = bit.bit_check(0xC0 | reg.id() << 3, instr_span);
+        let second_byte = bit.bit_check(0xC0 | reg.id(), instr_span);
         Self {
             span,
             bytes: [0xCB, Default::default()].into_iter().collect(),
