@@ -60,7 +60,7 @@ pub struct Error {
 pub enum ErrKind {
     SymNotFound(Identifier),
     SymDeleted(Identifier, Span),
-    NonNumericSym(Identifier, &'static str),
+    NonNumericSym(Identifier, &'static str, Span),
     SymError(SymbolError<'static, 'static>),
     // The boolean indicates whether the expression contains just the symbol,
     //   or if the error has bubbled up at least once.
@@ -288,7 +288,11 @@ impl Expr {
                         }),
                         None => Err(Error {
                             span: op.span.clone(),
-                            kind: ErrKind::NonNumericSym(name, sym.kind_name()),
+                            kind: ErrKind::NonNumericSym(
+                                name,
+                                sym.kind_name(),
+                                sym.def_span().clone(),
+                            ),
                         }),
                     },
                 },
@@ -502,6 +506,7 @@ impl Expr {
                                                     kind: ErrKind::NonNumericSym(
                                                         *name,
                                                         sym.kind_name(),
+                                                        sym.def_span().clone(),
                                                     ),
                                                 })
                                             }
@@ -914,15 +919,17 @@ impl ErrKind {
                 ]);
             }
             // TODO: highlight its definition point
-            Self::NonNumericSym(ident, kind_name) => {
+            Self::NonNumericSym(ident, kind_name, span) => {
                 error.set_message(format!(
                     "the symbol `{}` isn't numeric",
                     identifiers.resolve(*ident).unwrap(),
                 ));
-                error.add_label(
+                error.add_labels([
                     diagnostics::error_label(err_span)
+                        .with_message("referenced in a numeric expression here"),
+                    diagnostics::note_label(span)
                         .with_message(format!("defined as {kind_name} here")),
-                );
+                ]);
             }
             Self::SymError(err) => {
                 error.set_message(format!("{err}"));
