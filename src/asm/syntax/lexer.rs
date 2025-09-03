@@ -463,14 +463,8 @@ impl Lexer {
                         text,
                         ctx,
                         &mut contents,
-                        params.identifiers,
-                        params.symbols,
-                        &mut params.macro_args,
-                        params.unique_id,
-                        params.sections,
                         depth,
-                        params.nb_errors_left,
-                        params.options,
+                        params,
                     );
 
                     // `chars.offset()` is not stable yet.
@@ -746,14 +740,8 @@ impl Lexer {
         text: &str,
         ctx: &Context,
         output: &mut CompactString,
-        identifiers: &Identifiers,
-        symbols: &Symbols,
-        macro_args: &mut Option<&mut MacroArgs>,
-        unique_id: &mut UniqueId,
-        sections: &Sections,
         cur_depth: usize,
-        nb_errors_left: &Cell<usize>,
-        options: &Options,
+        params: &mut LexerParams,
     ) -> Result<Identifier, ()> {
         let mut name = CompactString::default();
         let mut fmt = None;
@@ -768,23 +756,23 @@ impl Lexer {
                     if let Some(res) = Self::read_macro_arg(
                         &mut macro_chars,
                         text,
-                        identifiers,
-                        symbols,
-                        macro_args,
-                        unique_id,
-                        sections,
+                        params.identifiers,
+                        params.symbols,
+                        &mut params.macro_args,
+                        params.unique_id,
+                        params.sections,
                     ) {
                         *chars = macro_chars; // Consume the macro's contents.
 
-                        if cur_depth == options.runtime_opts.recursion_depth {
+                        if cur_depth == params.options.runtime_opts.recursion_depth {
                             let mut span = ctx.new_span();
                             span.bytes.start += ofs;
                             span.bytes.end = span.bytes.start + ch.len_utf8();
                             Self::report_depth_overflow(
                                 cur_depth,
                                 &Span::Normal(span),
-                                nb_errors_left,
-                                options,
+                                params.nb_errors_left,
+                                params.options,
                             );
                             return Err(());
                         } else {
@@ -810,8 +798,8 @@ impl Lexer {
                                                 error.set_help(help_msg);
                                             }
                                         },
-                                        nb_errors_left,
-                                        options,
+                                        params.nb_errors_left,
+                                        params.options,
                                     );
                                     return Err(());
                                 }
@@ -820,15 +808,15 @@ impl Lexer {
                     }
                 }
                 '{' => {
-                    if cur_depth == options.runtime_opts.recursion_depth {
+                    if cur_depth == params.options.runtime_opts.recursion_depth {
                         let mut span = ctx.new_span();
                         span.bytes.start += ofs;
                         span.bytes.end = span.bytes.start + ch.len_utf8();
                         Self::report_depth_overflow(
                             cur_depth,
                             &Span::Normal(span),
-                            nb_errors_left,
-                            options,
+                            params.nb_errors_left,
+                            params.options,
                         );
                         return Err(());
                     } else {
@@ -838,14 +826,8 @@ impl Lexer {
                             text,
                             ctx,
                             &mut name,
-                            identifiers,
-                            symbols,
-                            macro_args,
-                            unique_id,
-                            sections,
                             cur_depth + 1,
-                            nb_errors_left,
-                            options,
+                            params,
                         )?;
                     }
                 }
@@ -864,11 +846,11 @@ impl Lexer {
                                         .with_message("this ':' is invalid"),
                                 );
                             },
-                            nb_errors_left,
-                            options,
+                            params.nb_errors_left,
+                            params.options,
                         );
                     } else {
-                        match FormatSpec::parse(&name, options.runtime_opts.q_precision)
+                        match FormatSpec::parse(&name, params.options.runtime_opts.q_precision)
                             .and_then(FormatSpec::require_full_parse)
                         {
                             Ok(spec) => fmt = Some(spec),
@@ -887,8 +869,8 @@ impl Lexer {
                                             ),
                                         );
                                     },
-                                    nb_errors_left,
-                                    options,
+                                    params.nb_errors_left,
+                                    params.options,
                                 );
                                 // Still, continue parsing the interpolation.
                             }
@@ -899,7 +881,7 @@ impl Lexer {
                 }
                 '}' => {
                     let ident = if let Some(raw_name) = name.strip_prefix('#') {
-                        identifiers.get(raw_name)
+                        params.identifiers.get(raw_name)
                     } else if KEYWORDS.contains_key(&UniCase::ascii(&name)) {
                         let mut span = ctx.new_span();
                         span.bytes.start += first_ofs.unwrap();
@@ -916,21 +898,21 @@ impl Lexer {
                                     "add a `#` prefix to use the name as a symbol anyway",
                                 );
                             },
-                            nb_errors_left,
-                            options,
+                            params.nb_errors_left,
+                            params.options,
                         );
                         return Err(());
                     } else {
-                        identifiers.get(&name)
+                        params.identifiers.get(&name)
                     };
-                    if let Err(err) = symbols.format_as(
+                    if let Err(err) = params.symbols.format_as(
                         ident,
                         &name,
                         &fmt.unwrap_or_default(),
                         output,
-                        macro_args.as_deref(),
-                        identifiers,
-                        sections,
+                        params.macro_args.as_deref(),
+                        params.identifiers,
+                        params.sections,
                     ) {
                         let mut span = ctx.new_span();
                         span.bytes.start += first_ofs.unwrap();
@@ -945,8 +927,8 @@ impl Lexer {
                                         .with_message("this interpolation is invalid"),
                                 );
                             },
-                            nb_errors_left,
-                            options,
+                            params.nb_errors_left,
+                            params.options,
                         );
                     }
                     return ident.ok_or(());
@@ -970,8 +952,8 @@ impl Lexer {
                         .with_message("no closing brace matches this one"),
                 );
             },
-            nb_errors_left,
-            options,
+            params.nb_errors_left,
+            params.options,
         );
         Err(())
     }
@@ -2401,14 +2383,8 @@ impl Lexer {
                         text,
                         ctx,
                         &mut expanded,
-                        params.identifiers,
-                        params.symbols,
-                        &mut params.macro_args,
-                        params.unique_id,
-                        params.sections,
                         ctx_depth,
-                        params.nb_errors_left,
-                        params.options,
+                        params,
                     );
                     for ch in expanded.chars() {
                         for escaped in Self::escape_character_for_string(&ch) {
@@ -2602,14 +2578,8 @@ impl Lexer {
                             text,
                             ctx,
                             &mut string,
-                            params.identifiers,
-                            params.symbols,
-                            &mut params.macro_args,
-                            params.unique_id,
-                            params.sections,
                             depth,
-                            params.nb_errors_left,
-                            params.options,
+                            &mut params,
                         );
                         match string
                             .char_indices()
@@ -2760,14 +2730,8 @@ impl Lexer {
                             text,
                             ctx,
                             &mut string,
-                            params.identifiers,
-                            params.symbols,
-                            &mut params.macro_args,
-                            params.unique_id,
-                            params.sections,
                             depth,
-                            params.nb_errors_left,
-                            params.options,
+                            &mut params,
                         );
                         !string[len_before_interpolation..]
                             .contains(|ch| !matches!(ch, chars!(whitespace)))
