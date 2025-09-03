@@ -2455,6 +2455,9 @@ impl Lexer {
             Some((_ofs, 't')) => Some('\t'),
             Some((_ofs, '0')) => Some('\0'),
 
+            Some((_ofs, chars!(newline))) => None, // The newline has already been consumed, the line continuation is already complete.
+            // `line_cont` contains `newline`, which is intentionally handled above.
+            #[allow(unreachable_patterns)]
             Some((_ofs, chars!(line_cont))) => {
                 if let Err(err) = Self::read_line_continuation(chars) {
                     let mut span = ctx.new_span();
