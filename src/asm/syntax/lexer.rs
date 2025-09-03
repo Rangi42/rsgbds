@@ -2733,7 +2733,7 @@ impl Lexer {
                             }
                         } else {
                             chars = backup; // `read_macro_arg` may spuriously consume characters.
-                            let ch = chars.peek().copied(); // Do not consume the character; if it's a newline, `get_char_escape` needs it.
+                            let ch = chars.next();
                             if matches!(ch, Some((_, ','))) {
                                 // This escape is only valid in raw contexts.
                                 chars.next(); // Consume the comma.
