@@ -1,9 +1,22 @@
-error: Illegal character escape 'w'
-    at string-literal-macro-arg.asm(6)
-error: Illegal character escape '\' at end of input
-    at string-literal-macro-arg.asm(11)
-error: Unterminated string
-    at string-literal-macro-arg.asm(11)
-error: Unterminated string
-    at string-literal-macro-arg.asm::mac(4) <- string-literal-macro-arg.asm(11)
-Assembly aborted with 4 errors!
+error: invalid character escape
+   ╭─[ test.asm:6:2 ]
+   │
+ 6 │  \wor\
+   │  ─┬  
+   │   ╰── cannot escape this character
+───╯
+error: invalid character escape
+    ╭─[ test.asm:11:6 ]
+    │
+ 11 │ mac "\
+    │      ┬  
+    │      ╰── no character to escape
+────╯
+error: unterminated string literal
+    ╭─[ test.asm:11:4 ]
+    │
+ 11 │ mac "\
+    │    ─┬─  
+    │     ╰─── no closing quote before the end of the line
+────╯
+3 errors generated.

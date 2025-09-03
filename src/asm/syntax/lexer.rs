@@ -512,7 +512,7 @@ impl Lexer {
 
     fn consume(&mut self, span: &mut NormalSpan) {
         // This check is nice, but breaks down in the presence of empty expansions.
-        #[cfg(never)]
+        #[cfg(any())]
         if Rc::ptr_eq(&span.src, &self.contexts.last().unwrap().span.src) {
             debug_assert_eq!(span.bytes.end, self.active_context().unwrap().cur_byte);
         }
@@ -2266,7 +2266,16 @@ impl Lexer {
             if chars.next_if(is_quote).is_none() {
                 return 0; // Not a string.
             }
-            Self::read_string_inner(&mut string, raw, &mut chars, ctx, depth, text, params)
+            Self::read_string_inner(
+                &mut string,
+                raw,
+                false, // Not passthrough.
+                &mut chars,
+                ctx,
+                depth,
+                text,
+                params,
+            )
         });
 
         (!span.bytes.is_empty()).then_some(tok!("string"(string)))
@@ -2275,6 +2284,7 @@ impl Lexer {
     fn read_string_inner(
         string: &mut CompactString,
         raw: bool,
+        passthrough: bool,
         chars: &mut Peekable<CharIndices>,
         ctx: &Context,
         ctx_depth: usize,
@@ -2285,11 +2295,21 @@ impl Lexer {
             ch == '"'
         }
 
+        // If passthrough, make sure to add the string's opening quotes.
+        if passthrough {
+            string.push('"');
+        }
         let multiline = if let Some((ofs, quote)) = chars.next_if(is_quote) {
+            if passthrough {
+                string.push('"');
+            }
             // We have two consecutive quotes: if there are only two, then we have an empty string;
             //                                 if there are three, we have a multi-line string.
             if chars.next_if(is_quote).is_none() {
                 return ofs + quote.len_utf8();
+            }
+            if passthrough {
+                string.push('"');
             }
             true
         } else {
@@ -2305,6 +2325,11 @@ impl Lexer {
                         if let Some((_ofs, _quote)) = chars.next_if(is_quote) {
                             // Two in a row...
                             if let Some((ofs, _quote)) = chars.next_if(is_quote) {
+                                if passthrough {
+                                    string.push('"');
+                                    string.push('"');
+                                    string.push('"');
+                                }
                                 // Three in a row! Winner winner chicken dinner
                                 return ofs + ch.len_utf8();
                             }
@@ -2312,6 +2337,9 @@ impl Lexer {
                         }
                         string.push('"');
                     } else {
+                        if passthrough {
+                            string.push('"');
+                        }
                         return ofs + ch.len_utf8();
                     }
                 }
@@ -2340,13 +2368,7 @@ impl Lexer {
                         params.sections,
                     ) {
                         match res {
-                            Ok((_kind, src)) => {
-                                for ch in src.contents.text().chars() {
-                                    for escaped in Self::escape_character_for_string(&ch) {
-                                        string.push(*escaped)
-                                    }
-                                }
-                            }
+                            Ok((_kind, src)) => string.push_str(src.contents.text()),
                             Err(err) => {
                                 let macro_arg_len = match macro_chars.peek() {
                                     Some(&(ofs, _ch)) => ofs,
@@ -2369,10 +2391,19 @@ impl Lexer {
                         }
 
                         *chars = macro_chars; // Consume all characters implicated in the macro arg.
-                    } else if let Some(value) =
-                        Self::get_char_escape(chars.next(), ofs, ctx, text, chars, params)
-                    {
-                        string.push(value);
+                    } else {
+                        let escaped = chars.next();
+                        if let Some(value) =
+                            Self::get_char_escape(escaped, ofs, ctx, text, chars, params)
+                        {
+                            // If passthrough, pass the escaped character as-is, but only if it is escapable.
+                            if passthrough {
+                                string.push('\\');
+                                string.push(escaped.unwrap().1);
+                            } else {
+                                string.push(value);
+                            }
+                        }
                     }
                 }
                 '{' if !raw => {
@@ -2386,11 +2417,7 @@ impl Lexer {
                         ctx_depth,
                         params,
                     );
-                    for ch in expanded.chars() {
-                        for escaped in Self::escape_character_for_string(&ch) {
-                            string.push(*escaped)
-                        }
-                    }
+                    string.push_str(&expanded);
                 }
                 '}' if !raw => {
                     let mut span = ctx.new_span();
@@ -2423,21 +2450,16 @@ impl Lexer {
             )))
         });
 
-        end_ofs
-    }
-
-    fn escape_character_for_string(ch: &char) -> &[char] {
-        match ch {
-            // Not `"`, since it is implicitly escaped in a string.
-            '\\' => &['\\', '\\'],
-            '{' => &['\\', '{'],
-            '}' => &['\\', '}'],
-            '\n' => &['\\', 'n'],
-            '\r' => &['\\', 'r'],
-            '\t' => &['\\', 't'],
-            '\0' => &['\\', '0'],
-            _ => std::array::from_ref(ch),
+        // If passthrough, close the string, so that the error doesn't occur again at expansion time.
+        if passthrough {
+            string.push('"');
+            if multiline {
+                string.push('"');
+                string.push('"');
+            }
         }
+
+        end_ofs
     }
 
     fn get_char_escape(
@@ -2488,7 +2510,7 @@ impl Lexer {
                     );
                 });
 
-                Some(ch)
+                None // Avoid returning a character, so passthrough strings don't report the bad escape twice.
             }
             None => {
                 let mut span = ctx.new_span();
@@ -2607,34 +2629,32 @@ impl Lexer {
 
                 let was_blank = match ch {
                     '"' => {
-                        string.push('"');
                         let _len = Self::read_string_inner(
                             &mut string,
-                            false,
+                            false, // Not raw.
+                            true,  // Passthrough.
                             &mut chars,
                             ctx,
                             depth,
                             text,
                             &mut params,
                         );
-                        string.push('"');
                         last_char = Some('"'); // The terminating quote.
                         false
                     }
                     '#' => {
                         string.push('#');
                         if chars.next_if(|&(_ofs, ch)| ch == '"').is_some() {
-                            string.push('"');
                             let _len = Self::read_string_inner(
                                 &mut string,
-                                true,
+                                true, // Raw.
+                                true, // Passthrough.
                                 &mut chars,
                                 ctx,
                                 depth,
                                 text,
                                 &mut params,
                             );
-                            string.push('"');
                             last_char = Some('"'); // The terminating quote.
                         }
                         false
