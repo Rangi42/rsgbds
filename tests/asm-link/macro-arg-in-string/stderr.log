@@ -1,3 +1,8 @@
-error: Illegal character escape '!'
-    at macro-arg-in-string.asm(12)
-Assembly aborted with 1 error!
+error: invalid character escape
+    ╭─[ test.asm:12:10 ]
+    │
+ 12 │     print1 E\!F ; illegal character escape
+    │             ─┬  
+    │              ╰── cannot escape this character
+────╯
+1 error generated.
