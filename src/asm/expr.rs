@@ -5,7 +5,7 @@ use either::Either;
 
 use crate::{
     common::section::MemRegion,
-    diagnostics,
+    diagnostics::{self, ReportBuilder},
     macro_args::MacroArgs,
     section::{SectionKind, Sections},
     sources::Span,
@@ -840,9 +840,7 @@ impl Error {
         diagnostics::error(
             &self.span,
             |error| {
-                let (message, label_message) = self.kind.messages(identifiers);
-                error.set_message(message);
-                error.add_label(diagnostics::error_label(&self.span).with_message(label_message))
+                self.kind.report(identifiers, error, &self.span);
             },
             nb_errors_left,
             options,
@@ -893,86 +891,150 @@ impl ErrKind {
             | Self::NoExpr => false,
         }
     }
-    fn messages(&self, identifiers: &Identifiers) -> (String, String) {
+    fn report<'span>(
+        &'span self,
+        identifiers: &Identifiers,
+        error: &mut ReportBuilder<'span>,
+        err_span: &'span Span,
+    ) {
         match self {
-            Self::SymNotFound(ident) => (
-                format!(
+            Self::SymNotFound(ident) => {
+                error.set_message(format!(
                     "no symbol called `{}`",
                     identifiers.resolve(*ident).unwrap(),
-                ),
-                "no symbol by this name exists at this point".into(),
-            ),
-            // TODO: add a label that highlights `span`
-            Self::SymDeleted(ident, span) => (
-                format!(
+                ));
+                error.add_label(
+                    diagnostics::error_label(err_span)
+                        .with_message("no symbol by this name exists at this point"),
+                );
+            }
+            Self::SymDeleted(ident, span) => {
+                error.set_message(format!(
                     "the symbol `{}` was deleted",
                     identifiers.resolve(*ident).unwrap(),
-                ),
-                "no symbol by this name exists at this point".into(),
-            ),
+                ));
+                error.add_labels([
+                    diagnostics::error_label(err_span)
+                        .with_message("no symbol by this name exists at this point"),
+                    diagnostics::note_label(span).with_message("it has been deleted here"),
+                ]);
+            }
             // TODO: highlight its definition point
-            Self::NonNumericSym(ident, kind_name) => (
-                format!(
+            Self::NonNumericSym(ident, kind_name) => {
+                error.set_message(format!(
                     "the symbol `{}` isn't numeric",
                     identifiers.resolve(*ident).unwrap(),
-                ),
-                format!("defined as {kind_name} here"),
-            ),
-            Self::SymError(err) => (format!("{err}"), "this symbol is invalid".into()),
+                ));
+                error.add_label(
+                    diagnostics::error_label(err_span)
+                        .with_message(format!("defined as {kind_name} here")),
+                );
+            }
+            Self::SymError(err) => {
+                error.set_message(format!("{err}"));
+                error.add_label(
+                    diagnostics::error_label(err_span).with_message("this symbol is invalid"),
+                );
+            }
             // TODO: suggest that difference between symbols and/or alignment can be constant?
-            Self::SymNotConst { name, .. } => (
-                format!("`{}` is not constant", identifiers.resolve(*name).unwrap()),
-                "this symbol's value is not known at this point".into(),
-            ),
+            Self::SymNotConst { name, .. } => {
+                error.set_message(format!(
+                    "`{}` is not constant",
+                    identifiers.resolve(*name).unwrap()
+                ));
+                error.add_label(
+                    diagnostics::error_label(err_span)
+                        .with_message("this symbol's value is not known at this point"),
+                );
+            }
             // TODO: likewise
-            Self::SectAddrNotConst { name, .. } => (
-                format!("\"{name}\"'s address is not constant"),
-                "this section's address is not known at this point".into(),
-            ),
-            Self::SymBankNotConst(name) => (
-                format!(
+            Self::SectAddrNotConst { name, .. } => {
+                error.set_message(format!("\"{name}\"'s address is not constant"));
+                error.add_label(
+                    diagnostics::error_label(err_span)
+                        .with_message("this section's address is not known at this point"),
+                );
+            }
+            Self::SymBankNotConst(name) => {
+                error.set_message(format!(
                     "the bank of `{}` is not constant",
                     identifiers.resolve(*name).unwrap(),
-                ),
-                "this symbol's bank is not known at this point".into(),
-            ),
-            ErrKind::BankOfNonLabel(name, kind_name) => (
-                format!(
+                ));
+                error.add_label(
+                    diagnostics::error_label(err_span)
+                        .with_message("this symbol's bank is not known at this point"),
+                );
+            }
+            ErrKind::BankOfNonLabel(name, kind_name) => {
+                error.set_message(format!(
                     "requested the bank of `{}`, which is not a label",
                     identifiers.resolve(*name).unwrap(),
-                ),
-                format!("this symbol is a {kind_name}"),
-            ),
-            Self::SectBankNotConst(name) => (
-                format!("the bank of \"{name}\" is not constant",),
-                "this section's bank is not known at this point".into(),
-            ),
+                ));
+                error.add_label(
+                    diagnostics::error_label(err_span)
+                        .with_message(format!("this symbol is a {kind_name}")),
+                );
+            }
+            Self::SectBankNotConst(name) => {
+                error.set_message(format!("the bank of \"{name}\" is not constant"));
+                error.add_label(
+                    diagnostics::error_label(err_span)
+                        .with_message("this section's bank is not known at this point"),
+                );
+            }
             // TODO: if the section is active, suggest `endsection`
-            Self::SizeOfSectNotConst(name) => (
-                format!("\"{name}\"'s size is not constant"),
-                "rgbasm can only know the size of non-active normal sections".into(),
-            ),
-            Self::SizeOfRegion => (
-                "the size of memory regions are not constant".into(),
-                "this can depend on linker settings".into(),
-            ),
-            Self::StartOfRegion => (
-                "the start of memory regions are not constant".into(),
-                "this can depend on linker settings".into(),
-            ),
-            Self::DivBy0 => ("division by zero".into(), "this is equal to zero".into()),
-            Self::RstRange(value) => (
-                format!("destination address ${value:04X} is not valid for `rst`"),
-                "this must be one of $00, $08, $10, $18, $20, $28, $30, or $38".into(),
-            ),
-            ErrKind::LdhRange(value) => (
-                format!("${value:04X} is not a valid address for `ldh`"),
-                "this must be between $FF00 and $FFFF inclusive".into(),
-            ),
-            ErrKind::BitRange(value) => (
-                format!("{value} is not a valid bit number"),
-                "this must be between 0 and 7 inclusive".into(),
-            ),
+            Self::SizeOfSectNotConst(name) => {
+                error.set_message(format!("\"{name}\"'s size is not constant"));
+                error.add_label(
+                    diagnostics::error_label(err_span).with_message(
+                        "rgbasm can only know the size of non-active normal sections",
+                    ),
+                );
+            }
+            Self::SizeOfRegion => {
+                error.set_message("the size of memory regions are not constant");
+                error.add_label(
+                    diagnostics::error_label(err_span)
+                        .with_message("this can depend on linker settings"),
+                );
+            }
+            Self::StartOfRegion => {
+                error.set_message("the start of memory regions are not constant");
+                error.add_label(
+                    diagnostics::error_label(err_span)
+                        .with_message("this can depend on linker settings"),
+                );
+            }
+            Self::DivBy0 => {
+                error.set_message("division by zero");
+                error.add_label(
+                    diagnostics::error_label(err_span).with_message("this is equal to zero"),
+                );
+            }
+            Self::RstRange(value) => {
+                error.set_message(format!(
+                    "destination address ${value:04X} is not valid for `rst`"
+                ));
+                error.add_label(
+                    diagnostics::error_label(err_span).with_message(
+                        "this must be one of $00, $08, $10, $18, $20, $28, $30, or $38",
+                    ),
+                );
+            }
+            ErrKind::LdhRange(value) => {
+                error.set_message(format!("${value:04X} is not a valid address for `ldh`"));
+                error.add_label(
+                    diagnostics::error_label(err_span)
+                        .with_message("this must be between $FF00 and $FFFF inclusive"),
+                );
+            }
+            ErrKind::BitRange(value) => {
+                error.set_message(format!("{value} is not a valid bit number"));
+                error.add_label(
+                    diagnostics::error_label(err_span)
+                        .with_message("this must be between 0 and 7 inclusive"),
+                );
+            }
             Self::NoExpr => unreachable!(),
         }
     }

@@ -22,6 +22,10 @@ error: the symbol `argi` was deleted
 error: the symbol `argi` was deleted
     ╭─[ test.asm:15:11 ]
     │
+ 12 │     PURGE argi
+    │           ──┬─  
+    │             ╰─── it has been deleted here
+    │ 
  15 │ DEF n EQU argi
     │           ──┬─  
     │             ╰─── no symbol by this name exists at this point
@@ -43,6 +47,9 @@ error: the symbol `argi` was deleted
 error: the symbol `Label` was deleted
     ╭─[ test.asm:21:9 ]
     │
+ 20 │ PURGE Label
+    │       ──┬──  
+    │         ╰──── it has been deleted here
  21 │ DEF x = Label
     │         ──┬──  
     │           ╰──── no symbol by this name exists at this point
@@ -50,6 +57,10 @@ error: the symbol `Label` was deleted
 error: the symbol `Label` was deleted
     ╭─[ test.asm:22:9 ]
     │
+ 20 │ PURGE Label
+    │       ──┬──  
+    │         ╰──── it has been deleted here
+    │ 
  22 │ DEF x = BANK(Label)
     │         ─────┬─────  
     │              ╰─────── no symbol by this name exists at this point
