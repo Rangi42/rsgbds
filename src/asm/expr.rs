@@ -529,12 +529,6 @@ impl Expr {
         }
     }
 
-    pub fn first_span(&self) -> &Span {
-        &self.payload[0].span
-    }
-    pub fn last_span(&self) -> &Span {
-        &self.payload.last().unwrap().span
-    }
     pub fn overall_span(&self) -> Span {
         match self.payload.as_slice() {
             // Attempting to merge a span with itself would fail.
