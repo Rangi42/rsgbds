@@ -293,54 +293,58 @@ impl parse_ctx!() {
 
     pub fn section_of(
         &self,
-        (name, span): (Identifier, &Span),
+        (name, span): (Option<Identifier>, &Span),
         l_span_idx: usize,
         r_span_idx: usize,
     ) -> (CompactString, Span) {
-        let opt = match self.symbols.find(&name) {
-            None => {
-                self.error(span, |error| {
-                    error.set_message(format!(
-                        "no symbol called `{}`",
-                        self.identifiers.resolve(name).unwrap(),
-                    ));
-                    error.add_label(
-                        diagnostics::error_label(span)
-                            .with_message("cannot get the section of that symbol"),
-                    );
-                });
-                None
-            }
-            Some(SymbolData::User {
-                kind: SymbolKind::Label { section_id, .. },
-                ..
-            }) => Some(*section_id),
-            Some(SymbolData::Pc) => match self.sections.active_section.as_ref() {
+        let opt = if let Some(ident) = name {
+            match self.symbols.find(&ident) {
                 None => {
                     self.error(span, |error| {
-                        error.set_message("PC does not belong to any section here");
+                        error.set_message(format!(
+                            "no symbol called `{}`",
+                            self.identifiers.resolve(ident).unwrap(),
+                        ));
                         error.add_label(
                             diagnostics::error_label(span)
-                                .with_message("no section is active at this point"),
+                                .with_message("cannot get the section of that symbol"),
                         );
                     });
                     None
                 }
-                Some(active) => Some(active.sym_section.id),
-            },
-            Some(kind) => {
-                self.error(span, |error| {
-                    error.set_message(format!(
-                        "`{}` does not belong to a section",
-                        self.identifiers.resolve(name).unwrap(),
-                    ));
-                    error.add_label(diagnostics::error_label(span).with_message(format!(
-                        "{} symbols do not belong to any section",
-                        kind.kind_name(),
-                    )));
-                });
-                None
+                Some(SymbolData::User {
+                    kind: SymbolKind::Label { section_id, .. },
+                    ..
+                }) => Some(*section_id),
+                Some(SymbolData::Pc) => match self.sections.active_section.as_ref() {
+                    None => {
+                        self.error(span, |error| {
+                            error.set_message("PC does not belong to any section here");
+                            error.add_label(
+                                diagnostics::error_label(span)
+                                    .with_message("no section is active at this point"),
+                            );
+                        });
+                        None
+                    }
+                    Some(active) => Some(active.sym_section.id),
+                },
+                Some(kind) => {
+                    self.error(span, |error| {
+                        error.set_message(format!(
+                            "`{}` does not belong to a section",
+                            self.identifiers.resolve(ident).unwrap(),
+                        ));
+                        error.add_label(diagnostics::error_label(span).with_message(format!(
+                            "{} symbols do not belong to any section",
+                            kind.kind_name(),
+                        )));
+                    });
+                    None
+                }
             }
+        } else {
+            None
         };
         let string = opt.map_or_else(Default::default, |section_id| {
             self.sections

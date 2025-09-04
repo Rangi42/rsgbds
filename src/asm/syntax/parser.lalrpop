@@ -621,7 +621,7 @@ StringExprAtomNoIdent: (CompactString, Span) = {
 	<l_span_idx:@L> "strfmt" "(" <fmt:StringExpr> <args:("," <CommaList<StringOrExpr>>)?> ")" <r_span_idx:@R> => {
 		ctx.strfmt(fmt, args.unwrap_or_default(), l_span_idx, r_span_idx)
 	},
-	<l_span_idx:@L> "section" "(" <span_idx: @L> <sym:Identifier> ")" <r_span_idx:@R> => {
+	<l_span_idx:@L> "section" "(" <span_idx: @L> <sym:IdentOrAnon> ")" <r_span_idx:@R> => {
 		ctx.section_of((sym, &ctx.line_spans[span_idx]), l_span_idx, r_span_idx)
 	},
 };
