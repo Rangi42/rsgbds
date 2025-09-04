@@ -147,8 +147,8 @@ impl parse_ctx!() {
         let value = loop {
             match (left.next(), right.next()) {
                 (None, None) => break 0,
-                (None, Some(_)) => break 1,
-                (Some(_), None) => break -1,
+                (None, Some(_)) => break -1,
+                (Some(_), None) => break 1,
                 (Some(left_value), Some(right_value)) => match left_value.cmp(&right_value) {
                     Ordering::Less => break -1,
                     Ordering::Greater => break 1,
