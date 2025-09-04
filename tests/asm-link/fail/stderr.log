@@ -3,6 +3,6 @@ error: oops
    │
  1 │ fail "oops"
    │ ──┬─  
-   │   ╰─── assembly aborted because of this
+   │   ╰─── assembly aborted due to this
 ───╯
 1 error generated.

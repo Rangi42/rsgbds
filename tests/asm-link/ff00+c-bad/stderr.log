@@ -1,7 +1,15 @@
-error: Base value must be equal to $FF00 for [$FF00+C]
-    at ff00+c-bad.asm(8)
-error: Expected constant expression: undefined symbol `xyz`
-    at ff00+c-bad.asm(9)
-error: Base value must be equal to $FF00 for [$FF00+C]
-    at ff00+c-bad.asm(9)
-Assembly aborted with 3 errors!
+error: expression is not equal to $ff00
+   ╭─[ test.asm:8:9 ]
+   │
+ 8 │     ld a, [$ff01 + c]
+   │            ──┬──  
+   │              ╰──── this evaluates to $ff01
+───╯
+error: no symbol called `xyz`
+   ╭─[ test.asm:9:6 ]
+   │
+ 9 │     ld [xyz + c], a
+   │         ─┬─  
+   │          ╰─── no symbol by this name exists at this point
+───╯
+2 errors generated.

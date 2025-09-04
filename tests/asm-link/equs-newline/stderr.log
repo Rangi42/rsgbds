@@ -1,7 +1,33 @@
-warning: First [-Wuser]
-    at equs-newline.asm(3)
-    while expanding symbol `ACT`
-warning: Second [-Wuser]
-    at equs-newline.asm(3)
-warning: Third [-Wuser]
-    at equs-newline.asm(4)
+[-Wuser] warning: First
+   ╭─[ ACT:1:1 ]
+   │
+ 1 │ WARN "First"
+   │ ──┬─  
+   │   ╰─── triggered here
+   │
+   ├─[ test.asm:3:2 ]
+   │
+ 3 │     {ACT}
+   │     ──┬──  
+   │       ╰──── interpolated here
+───╯
+[-Wuser] warning: Second
+   ╭─[ ACT:2:1 ]
+   │
+ 2 │ WARN "Second"
+   │ ──┬─  
+   │   ╰─── triggered here
+   │
+   ├─[ test.asm:3:2 ]
+   │
+ 3 │     {ACT}
+   │     ──┬──  
+   │       ╰──── interpolated here
+───╯
+[-Wuser] warning: Third
+   ╭─[ test.asm:4:2 ]
+   │
+ 4 │     WARN "Third"
+   │     ──┬─  
+   │       ╰─── triggered here
+───╯
