@@ -1,12 +1,12 @@
 error: unclosed `union`
-   ╭─[ test.asm:3:9 ]
+   ╭─[ test.asm:3:1 ]
    │
  2 │ UNION
    │ ──┬──  
    │   ╰──── this `union doesn't have a matching `endu`...
  3 │ SECTION "inner", WRAM0
-   │         ───┬───  
-   │            ╰───── ...before this
+   │ ───┬───  
+   │    ╰───── ...before this
 ───╯
 error: `nextu` used outside of a union
    ╭─[ test.asm:4:1 ]

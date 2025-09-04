@@ -1,2 +1,17 @@
-FATAL: Section "A" is already on the stack
-    at new-pushed-section.asm(4)
+error: cannot switch to a section currently in the stack
+   ╭─[ test.asm:4:1 ]
+   │
+ 4 │ SECTION FRAGMENT "A", ROM0
+   │ ───┬───  
+   │    ╰───── "A" is in the section stack at this point
+───╯
+error: byte emitted outside of a section
+   ╭─[ test.asm:5:2 ]
+   │
+ 5 │     db 2
+   │     ─┬  
+   │      ╰── no section is active at this point
+   │ 
+   │ Help: consider popping a section with `pops` before this
+───╯
+2 errors generated.

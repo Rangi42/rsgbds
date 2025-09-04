@@ -152,7 +152,7 @@ Directive: () = {
 	<span_idx:@L> "load" <attrs:SectionAttrs> => ctx.set_symbol_section(attrs, span_idx),
 	<span_idx:@L> "pushs" <attrs:SectionAttrs?> => ctx.push_section(attrs, span_idx),
 	<span_idx:@L> "pops" => ctx.pop_section(span_idx),
-	"section" <SectionAttrs> => ctx.create_section(<>),
+	<span_idx:@L> "section" <attrs:SectionAttrs> => ctx.create_section(span_idx, attrs),
 	// `symbol.rs`
 	<export:(<@L> "export")?> <redef:Def> <name:"identifier"> <span_idx:@L> "equs" <value:StringExpr> => {
 		ctx.define_string(export, redef, name, value, span_idx)

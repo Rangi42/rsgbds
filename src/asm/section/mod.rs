@@ -310,6 +310,53 @@ impl Sections {
             )
         }
     }
+    pub fn switch_to(
+        &mut self,
+        new_active: ActiveSection,
+        keyword_span: &Span,
+        keyword_name: &str,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        self.reject_active_union(keyword_span, nb_errors_left, options);
+
+        if self.is_in_stack(new_active.id) {
+            diagnostics::error(
+                keyword_span,
+                |error| {
+                    error.set_message("cannot switch to a section currently in the stack");
+                    error.add_label(diagnostics::error_label(keyword_span).with_message(format!(
+                        "\"{}\" is in the section stack at this point",
+                        self.sections.get_index(new_active.id).unwrap().0,
+                    )));
+                },
+                nb_errors_left,
+                options,
+            );
+        } else {
+            if self
+                .active_section
+                .as_ref()
+                .is_some_and(|active| active.is_load_block_active())
+            {
+                diagnostics::warn(
+                    warning!("unterminated-load"),
+                    keyword_span,
+                    |error| {
+                        error.set_message(format!("`load` block terminated by `{keyword_name}`"));
+                        error.add_label(
+                            diagnostics::warning_label(keyword_span)
+                                .with_message("no `endl` before this point"),
+                        );
+                    },
+                    nb_errors_left,
+                    options,
+                );
+            }
+
+            self.active_section = Some(ActiveSections::new(new_active));
+        }
+    }
 
     pub fn is_active_or_in_stack(&self, section_id: usize) -> bool {
         let refs_section = |opt: &Option<ActiveSections>| {
@@ -321,6 +368,15 @@ impl Sections {
                 .section_stack
                 .iter()
                 .any(|entry| refs_section(&entry.active_section))
+    }
+    fn is_in_stack(&self, section_id: usize) -> bool {
+        let refs_section = |opt: &Option<ActiveSections>| {
+            opt.as_ref()
+                .is_some_and(|active| active.is_section_active(section_id))
+        };
+        self.section_stack
+            .iter()
+            .any(|entry| refs_section(&entry.active_section))
     }
     pub fn push_active_section(&mut self, pushs_span: Span, symbols: &mut Symbols) {
         let entry = SectionStackEntry {

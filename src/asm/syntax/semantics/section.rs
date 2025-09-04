@@ -266,6 +266,21 @@ impl parse_ctx!() {
         let span = &self.line_spans[span_idx];
 
         if let Some(active) = self.sections.active_section.as_mut() {
+            if active.is_load_block_active() {
+                diagnostics::warn(
+                    warning!("unterminated-load"),
+                    span,
+                    |error| {
+                        error.set_message("`load` block terminated by another `load`");
+                        error.add_label(
+                            diagnostics::warning_label(span)
+                                .with_message("no `endl` before this point"),
+                        );
+                    },
+                    self.nb_errors_left,
+                    self.options,
+                );
+            }
             if active.is_section_active(new_active_section.id) {
                 self.error(span, |error| {
                     error.set_message("`load` cannot designate the active section");
@@ -294,11 +309,25 @@ impl parse_ctx!() {
         opt: Option<(SectionAttrs, (CompactString, Span))>,
         span_idx: usize,
     ) {
-        let pushs_span = self.nth_span(span_idx);
-        self.sections.push_active_section(pushs_span, self.symbols);
+        let pushs_span = &self.line_spans[span_idx];
+        self.sections
+            .push_active_section(pushs_span.clone(), self.symbols);
 
-        if let Some(stuff) = opt {
-            self.create_section(stuff);
+        if let Some((attrs, (name, span))) = opt {
+            let active_section = self.sections.create_if_not_exists(
+                name,
+                attrs,
+                span,
+                self.nb_errors_left,
+                self.options,
+            );
+            self.sections.switch_to(
+                active_section,
+                pushs_span,
+                "pushs",
+                self.nb_errors_left,
+                self.options,
+            );
         }
         self.symbols.end_scope();
     }
@@ -314,34 +343,16 @@ impl parse_ctx!() {
             self.error(span, |error| {
                 error.set_message("no entries in the section stack");
                 error.add_label(diagnostics::error_label(span).with_message("cannot pop"));
-            })
+            });
         }
     }
 
-    pub fn create_section(&mut self, (attrs, (name, span)): (SectionAttrs, (CompactString, Span))) {
-        self.sections
-            .reject_active_union(&span, self.nb_errors_left, self.options);
-
-        if self
-            .sections
-            .active_section
-            .as_ref()
-            .is_some_and(|active| active.is_load_block_active())
-        {
-            diagnostics::warn(
-                warning!("unterminated-load"),
-                &span,
-                |error| {
-                    error.set_message("`load` block terminated by `section`");
-                    error.add_label(
-                        diagnostics::warning_label(&span)
-                            .with_message("no `endl` before this point"),
-                    );
-                },
-                self.nb_errors_left,
-                self.options,
-            );
-        }
+    pub fn create_section(
+        &mut self,
+        span_idx: usize,
+        (attrs, (name, span)): (SectionAttrs, (CompactString, Span)),
+    ) {
+        let keyword_span = &self.line_spans[span_idx];
 
         let active_section = self.sections.create_if_not_exists(
             name,
@@ -350,7 +361,13 @@ impl parse_ctx!() {
             self.nb_errors_left,
             self.options,
         );
-        self.sections.active_section = Some(ActiveSections::new(active_section));
+        self.sections.switch_to(
+            active_section,
+            keyword_span,
+            "section",
+            self.nb_errors_left,
+            self.options,
+        );
         self.symbols.end_scope();
     }
 }
