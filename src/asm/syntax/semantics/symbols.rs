@@ -37,6 +37,43 @@ impl parse_ctx!() {
         }
     }
 
+    pub fn define_anon_label(&mut self, def_span_id: usize) {
+        let def_span = self.nth_span(def_span_id);
+
+        if let Some(active) = self.sections.active_section.as_ref() {
+            active.sym_section.define_label(
+                self.symbols.cur_anon_label(self.identifiers),
+                self.symbols,
+                self.identifiers,
+                def_span,
+                false, // Anonymous labels are never exported.
+                self.macro_args.last(),
+                self.nb_errors_left,
+                self.options,
+            );
+            self.symbols.defined_anon_label();
+        } else {
+            self.error(&def_span, |error| {
+                error.set_message("label defined outside of a section");
+                error.add_label(
+                    diagnostics::error_label(&def_span)
+                        .with_message("no section is active at this point"),
+                );
+            });
+        }
+    }
+
+    pub fn anon_label_name(&mut self, offset: i32, span_idx: usize) -> Option<Identifier> {
+        let span = &self.line_spans[span_idx];
+        self.symbols.anon_label_name(
+            offset,
+            self.identifiers,
+            span,
+            self.nb_errors_left,
+            self.options,
+        )
+    }
+
     pub fn string_or_numeric_sym(
         &mut self,
         name: Identifier,
@@ -230,11 +267,11 @@ impl parse_ctx!() {
         );
     }
 
-    pub fn delete_symbols(&mut self, names: Vec<(usize, Identifier)>) {
-        for (span_idx, name) in names {
+    pub fn delete_symbol(&mut self, name: Option<Identifier>, span_idx: usize) {
+        if let Some(ident) = name {
             let span = self.nth_span(span_idx);
             self.symbols.delete(
-                name,
+                ident,
                 span,
                 self.identifiers,
                 self.nb_errors_left,

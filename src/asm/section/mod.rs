@@ -25,7 +25,7 @@ pub struct Sections {
     section_stack: Vec<SectionStackEntry>,
     pub assertions: Vec<Assertion>,
 }
-type SectionId = usize; // Index into the `IndexMap`.
+pub type SectionId = usize; // Index into the `IndexMap`.
 #[derive(Debug)]
 pub struct ActiveSections {
     /// The ID of the section to which bytes are emitted.

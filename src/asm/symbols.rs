@@ -1,15 +1,16 @@
 use std::{cell::Cell, collections::hash_map::Entry};
 
 use chrono::prelude::*;
-use compact_str::{CompactString, ToCompactString};
+use compact_str::{format_compact, CompactString, ToCompactString};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use string_interner::Symbol;
 
 use crate::{
+    common::S,
     diagnostics::{self, warning},
     format::{FormatError, FormatSpec},
     macro_args::MacroArgs,
-    section::{ActiveSection, Sections},
+    section::{ActiveSection, SectionId, Sections},
     sources::{NormalSpan, Span},
     Identifier, Identifiers, Options,
 };
@@ -22,6 +23,7 @@ pub struct Symbols {
     pub symbols: SymMap,
     pub global_scope: Option<Identifier>,
     pub local_scope: Option<Identifier>,
+    anon_label_idx: u32,
 }
 
 #[derive(Debug)]
@@ -46,10 +48,16 @@ pub enum SymbolData {
 
 #[derive(Debug)]
 pub enum SymbolKind {
-    Numeric { value: i32, mutable: bool },
+    Numeric {
+        value: i32,
+        mutable: bool,
+    },
     String(CompactString),
     Macro(NormalSpan),
-    Label { section_id: usize, offset: usize },
+    Label {
+        section_id: SectionId,
+        offset: usize,
+    },
 }
 
 impl Symbols {
@@ -63,6 +71,7 @@ impl Symbols {
             symbols: FxHashMap::with_hasher(FxBuildHasher),
             global_scope: None,
             local_scope: None,
+            anon_label_idx: 0,
         };
 
         let mut def_builtin = |name, kind| {
@@ -692,6 +701,43 @@ impl Symbols {
                 }
             }
         }
+    }
+
+    fn anon_label_ident(identifiers: &mut Identifiers, idx: u32) -> Identifier {
+        let name = format_compact!("<anonymous label {idx}>");
+        identifiers.get_or_intern(&name)
+    }
+    pub fn cur_anon_label(&self, identifiers: &mut Identifiers) -> Identifier {
+        Self::anon_label_ident(identifiers, self.anon_label_idx)
+    }
+    pub fn defined_anon_label(&mut self) {
+        self.anon_label_idx += 1;
+    }
+    pub fn anon_label_name(
+        &self,
+        offset: i32,
+        identifiers: &mut Identifiers,
+        span: &Span,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) -> Option<Identifier> {
+        let Some(idx) = self.anon_label_idx.checked_add_signed(offset) else {
+            diagnostics::error(
+                span,
+                |error| {
+                    error.set_message("anonymous label offset out of range");
+                    error.add_label(diagnostics::error_label(span).with_message(format!(
+                        "{} anonymous label{} have been defined thus far",
+                        self.anon_label_idx,
+                        S::from(self.anon_label_idx),
+                    )));
+                },
+                nb_errors_left,
+                options,
+            );
+            return None;
+        };
+        Some(Self::anon_label_ident(identifiers, idx))
     }
 }
 

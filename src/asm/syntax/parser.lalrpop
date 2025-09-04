@@ -51,7 +51,7 @@ LabelDef: () = {
 	<span_idx:@L> <name:"local identifier"> ":"? => ctx.define_label(name, span_idx, false),
 	<span_idx:@L> <name:"identifier"> ":" => ctx.define_label(name, span_idx, false),
 	<span_idx:@L> <name:Identifier> "::" => ctx.define_label(name, span_idx, true),
-	<span_idx:@L> ":" => todo!(),
+	<span_idx:@L> ":" => ctx.define_anon_label(span_idx),
 };
 
 // Capturing `Instruction_Emit` as the "focus" of the repetition makes it return a `Vec<()>`, which does not allocate.
@@ -166,8 +166,8 @@ Directive: () = {
 	<export:(<@L> "export")?> <redef:Def> <name:"identifier"> <span_idx:@L> <stride:RsKindKeyword> <value:Expr?> => {
 		ctx.define_rs(export, redef, name, stride, value, span_idx)
 	},
-	"export" NonEmptyCommaList<Export> => (),
-	"purge" <NonEmptyCommaList<(@L Identifier)>> => ctx.delete_symbols(<>), // Symbols are buffered to enable `PURGE string, {string}`.
+	"export" NonEmptyCommaList<ExportArg> => (),
+	"purge" NonEmptyCommaList<PurgeArg> => (),
 	"rsreset" => ctx.reset_rs(),
 	"rsset" <Expr> => ctx.set_rs(<>),
 };
@@ -175,7 +175,8 @@ PrintArg: () = StringOrExpr => ctx.print(<>);
 Option: () = <span_idx:@L> <string:"string"> => ctx.process_option(&string, span_idx);
 Def: bool = { "def" => false, "redef" => true };
 NumDefKeyword: bool = { "equ" => false, "=" => true };
-Export: () = <span_idx:@L> <name:Identifier> => ctx.export_symbol(name, span_idx);
+ExportArg: () = <span_idx:@L> <name:Identifier> => ctx.export_symbol(name, span_idx);
+PurgeArg: () = <span_idx:@L> <name:IdentOrAnon> => ctx.delete_symbol(name, span_idx);
 
 // This is necessary so that the options are pushed before the first `Option` is reduced (and thus options altered).
 Pusho: () = {
@@ -538,6 +539,7 @@ ExprAtom: Expr = {
 ExprAtomNoIdent: Expr = {
 	"(" <Expr> ")",
 	<span_idx:@L> <ident:"local identifier"> => Expr::symbol(ident, ctx.line_spans[span_idx].clone()),
+	<span_idx:@L> <ident:AnonLabelRef> => ctx.anon_label_ref(ident, span_idx),
 	<span_idx:@L> <number:"number"> => Expr::number(number as i32, ctx.line_spans[span_idx].clone()),
 	// Arithmetic functions.
 	<l_span_idx:@L> "high" "(" <expr:Expr> ")" <r_span_idx:@R> => expr.high(ctx.span_from_to(l_span_idx, r_span_idx)),
@@ -546,8 +548,8 @@ ExprAtomNoIdent: Expr = {
 	<l_span_idx:@L> "tzcount"  "(" <expr:Expr> ")" <r_span_idx:@R> => expr.tzcount(ctx.span_from_to(l_span_idx, r_span_idx)),
 	// Symbol and section functions.
 	<l_span_idx:@L> "isconst" "(" <expr:Expr> ")" <r_span_idx:@R> => ctx.is_expr_constant(expr, l_span_idx, r_span_idx),
-	<l_span_idx:@L> "def" "(" <ident:Identifier> ")" <r_span_idx:@R> => ctx.expr_def_of_symbol(ident, l_span_idx, r_span_idx),
-	<l_span_idx:@L> "bank" "(" <ident:(@L Identifier)>  ")" <r_span_idx:@R> => ctx.bank_of_ident(ident, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "def" "(" <ident:IdentOrAnon> ")" <r_span_idx:@R> => ctx.expr_def_of_symbol(ident, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "bank" "(" <ident:(@L IdentOrAnon)>  ")" <r_span_idx:@R> => ctx.bank_of_ident(ident, l_span_idx, r_span_idx),
 	<l_span_idx:@L> "bank" "(" <sect:StringExprNoIdent> ")" <r_span_idx:@R> => Expr::bank_of_section(sect.0, ctx.span_from_to(l_span_idx, r_span_idx)),
 	<l_span_idx:@L> "sizeof" "(" <sect:StringExpr>  ")" <r_span_idx:@R> => Expr::size_of_section(sect.0, ctx.span_from_to(l_span_idx, r_span_idx)),
 	<l_span_idx:@L> "sizeof" "(" <region:MemRegion> ")" <r_span_idx:@R> =>  Expr::size_of_region(region, ctx.span_from_to(l_span_idx, r_span_idx)),
@@ -629,6 +631,13 @@ StrcatArgs: CompactString = {
 };
 
 Identifier = { "identifier", "local identifier" };
+AnonLabelRef: Option<Identifier> = {
+	<span_idx:@L> <offset:"anonymous label reference"> => ctx.anon_label_name(offset, span_idx)
+};
+IdentOrAnon: Option<Identifier> = {
+	<Identifier> => Some(<>),
+	<AnonLabelRef>
+};
 
 // A list of comma-separated elements, optionally with a trailing comma.
 CommaList<T>: Vec<T> = <mut list:(<T> ",")*> <last:T?> => match last {
