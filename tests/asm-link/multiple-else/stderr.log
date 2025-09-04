@@ -1,2 +1,45 @@
-FATAL: Found `ELSE` after an `ELSE` block
-    at multiple-else.asm(11)
+error: `else` found after another `else`
+   ╭─[ test.asm:9:2 ]
+   │
+ 7 │     else
+   │     ──┬─  
+   │       ╰─── ...cannot be after this `else`
+   │ 
+ 9 │     else
+   │     ──┬─  
+   │       ╰─── this `else`...
+───╯
+error: `else` found after another `else`
+    ╭─[ test.asm:11:2 ]
+    │
+  9 │     else
+    │     ──┬─  
+    │       ╰─── ...cannot be after this `else`
+    │ 
+ 11 │     else
+    │     ──┬─  
+    │       ╰─── this `else`...
+────╯
+error: `else` found after another `else`
+    ╭─[ test.asm:14:1 ]
+    │
+  3 │ else
+    │ ──┬─  
+    │   ╰─── ...cannot be after this `else`
+    │ 
+ 14 │ else
+    │ ──┬─  
+    │   ╰─── this `else`...
+────╯
+error: `else` found after another `else`
+    ╭─[ test.asm:16:1 ]
+    │
+ 14 │ else
+    │ ──┬─  
+    │   ╰─── ...cannot be after this `else`
+    │ 
+ 16 │ else
+    │ ──┬─  
+    │   ╰─── this `else`...
+────╯
+4 errors generated.

@@ -1,4 +1,4 @@
-error: `endc` found outside of a conditional block
+error: `else` found outside of a conditional block
    ╭─[ test.asm:1:1 ]
    │
  1 │ ELSE
