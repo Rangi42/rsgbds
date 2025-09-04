@@ -1,7 +1,34 @@
-error: Macro argument `\1` not defined
-    at skip-expansions.asm::mac2(21) <- skip-expansions.asm(31)
-error: syntax error, unexpected (
-    at skip-expansions.asm::mac2(21) <- skip-expansions.asm(31)
-error: Macro argument `\2` not defined
-    at skip-expansions.asm::mac2(21) <- skip-expansions.asm(31)
-Assembly aborted with 3 errors!
+error: macro argument #1 doesn't exist
+    ╭─[ test.asm:21:2 ]
+    │
+ 21 │     \1 (\2) == 42  ; if the `if` is not taken, this is not expanded!
+    │     ─┬  
+    │      ╰── 0 macro arguments are available
+    │ 
+ 31 │     mac2 ; this prints "args:" *and* "forty-two!" since it doesn't create an `elif`
+    │     ──┬─  
+    │       ╰─── macro called here
+────╯
+error: macro argument #2 doesn't exist
+    ╭─[ test.asm:21:6 ]
+    │
+ 21 │     \1 (\2) == 42  ; if the `if` is not taken, this is not expanded!
+    │         ─┬  
+    │          ╰── 0 macro arguments are available
+    │ 
+ 31 │     mac2 ; this prints "args:" *and* "forty-two!" since it doesn't create an `elif`
+    │     ──┬─  
+    │       ╰─── macro called here
+────╯
+error: syntax error: unexpected (
+    ╭─[ test.asm:21:5 ]
+    │
+ 21 │     \1 (\2) == 42  ; if the `if` is not taken, this is not expanded!
+    │        ┬  
+    │        ╰── expected "identifier", "local identifier", ":", "+", "-", "adc", "add", ...89 others
+    │ 
+ 31 │     mac2 ; this prints "args:" *and* "forty-two!" since it doesn't create an `elif`
+    │     ──┬─  
+    │       ╰─── macro called here
+────╯
+3 errors generated.

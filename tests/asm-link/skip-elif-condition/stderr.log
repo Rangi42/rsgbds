@@ -1,2 +1,12 @@
-FATAL: Division by zero
-    at skip-elif-condition.asm::mac(6) <- skip-elif-condition.asm(18)
+error: division by zero
+    ╭─[ test.asm:6:14 ]
+    │
+  6 │     elif (\1) / 0 == 42 ; only evaluated if neither "small" nor "large" was taken
+    │                 ┬  
+    │                 ╰── this is equal to zero
+    │ 
+ 18 │     mac 23
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+1 error generated.

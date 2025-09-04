@@ -1,3 +1,4 @@
 small 2 + 2
 small STRLEN("abcdef")
 large 101
+division by zero!?
