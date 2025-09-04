@@ -287,8 +287,29 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                     write_byte(&mut self.file, 1)?;
                     write_string(&mut self.file, &node.src.name)?;
                 }
-                SpanKind::Macro(_) => todo!(),
-                SpanKind::Loop(_) => todo!(),
+                SpanKind::Macro(ident) => {
+                    write_byte(&mut self.file, 2)?;
+                    let macro_name = self.identifiers.resolve(ident).unwrap();
+                    write_string(&mut self.file, &format!("{}::{macro_name}", node.src.name))?;
+                }
+                SpanKind::Loop(_) => {
+                    write_byte(&mut self.file, 0)?;
+                    let depth = {
+                        let mut iter = *node;
+                        let mut depth = 0;
+                        while matches!(iter.kind, SpanKind::Loop(..)) {
+                            depth += 1;
+                            iter = &iter.parent.as_ref().unwrap().node;
+                        }
+                        depth
+                    };
+                    write_long(&mut self.file, depth)?;
+                    let mut iter = *node;
+                    while let SpanKind::Loop(iteration_num) = &iter.kind {
+                        write_long(&mut self.file, *iteration_num)?;
+                        iter = &iter.parent.as_ref().unwrap().node;
+                    }
+                }
                 _ => {
                     debug_assert!(node.kind.ends_implicitly());
                     unreachable!("Registered non-hard node!?")

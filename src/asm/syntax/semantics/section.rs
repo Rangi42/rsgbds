@@ -4,7 +4,7 @@ use crate::{
     common::section::MemRegion,
     diagnostics,
     expr::Expr,
-    section::{ActiveSections, AddrConstraint, SectionAttrs, SectionKind},
+    section::{AddrConstraint, SectionAttrs, SectionKind},
     sources::Span,
     warning,
 };
