@@ -10,7 +10,7 @@ PRINTLN STRFMT("\tdb %#03{s:FMT} %% 26\t; %#03{FMT}", N, N % 26)
 
 PRINTLN STRFMT("%d = %#x = %#b = %#o != %f", 42, 42, 42, 42, 42.0)
 
-DEF TEMPLATE EQUS "\"%s are %s\\n\""
+DEF TEMPLATE EQUS "%s are %s\n"
 PRINT STRFMT(TEMPLATE, "roses", "red")
 PRINT STRFMT(TEMPLATE, "violets", "blue")
 PRINT STRFMT(TEMPLATE, "void", 0, "extra")

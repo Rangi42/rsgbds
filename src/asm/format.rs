@@ -56,7 +56,7 @@ pub enum FormatError {
         unexpected: char,
         for_what: &'static str,
     },
-    /// missing character {for_what}
+    /// missing {for_what}
     MissingChar { for_what: &'static str },
     /// missing number after '{0}'
     MissingNumber(char),
@@ -345,9 +345,24 @@ impl Display for NumberFormatter {
             FormatKind::LowerHex => LOWERCASE_DIGITS,
             FormatKind::Default | FormatKind::UpperHex => UPPERCASE_DIGITS,
         };
+        let (is_negative, prefix, mut number) = if let Some(prefix) = self.exact_prefix {
+            debug_assert_eq!(self.force_sign, None);
+            debug_assert_ne!(prefix, "\0");
+            (false, prefix, self.number)
+        } else if matches!(self.kind, FormatKind::Signed) {
+            if (self.number as i32) < 0 {
+                (true, "", -(self.number as i32) as u32)
+            } else if let Some(prefix) = self.force_sign {
+                (false, prefix, self.number)
+            } else {
+                (false, "", self.number)
+            }
+        } else {
+            (false, "", self.number)
+        };
+
         let mut buf = [0; 32]; // 32 bits.
         let mut idx = buf.len();
-        let mut number = self.number;
         let base = digits.len() as u32;
         loop {
             // This must run at least once, so that 0 prints one digit.
@@ -358,22 +373,6 @@ impl Display for NumberFormatter {
                 break;
             }
         }
-
-        let (is_negative, prefix) = if let Some(prefix) = self.exact_prefix {
-            debug_assert_eq!(self.force_sign, None);
-            debug_assert_ne!(prefix, "\0");
-            (false, prefix)
-        } else if matches!(self.kind, FormatKind::Signed) {
-            if (self.number as i32) < 0 {
-                (true, "")
-            } else if let Some(prefix) = self.force_sign {
-                (false, prefix)
-            } else {
-                (false, "")
-            }
-        } else {
-            (false, "")
-        };
 
         f.pad_integral(
             !is_negative,

@@ -726,17 +726,19 @@ impl parse_ctx!() {
                 self.error(&fmt_span, |error| {
                     error.set_message("not all arguments were used by the format string");
                     error.add_label(diagnostics::error_label(&fmt_span).with_message(format!(
-                        "{remaining} argument{} remain unformatted",
-                        S::from(remaining)
+                        "{remaining} argument{} remain{} unformatted",
+                        S::from(remaining),
+                        if remaining == 1 { "s" } else { "" },
                     )));
                 });
             } else if nb_missing_args != 0 {
                 self.error(&fmt_span, |error| {
                     error.set_message("not enough arguments for the format string");
                     error.add_label(diagnostics::error_label(&fmt_span).with_message(format!(
-                        "{} argument{} were supplied, {nb_missing_args} more {} missing",
+                        "{} argument{} {} supplied, {nb_missing_args} more {} missing",
                         args_vec.len(),
                         S::from(args_vec.len()),
+                        if args_vec.len() == 1 { "was" } else { "were" },
                         if nb_missing_args == 1 { "is" } else { "are" },
                     )))
                 });
