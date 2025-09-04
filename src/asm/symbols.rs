@@ -170,14 +170,6 @@ impl Symbols {
             (now.with_timezone(&chrono::Utc), now)
         });
         def_builtin(
-            "__TIME__",
-            string(now.format("%H:%M:%S").to_compact_string()),
-        );
-        def_builtin(
-            "__DATE__",
-            string(now.format("%d %B %Y").to_compact_string()),
-        );
-        def_builtin(
             "__ISO_8601_LOCAL__",
             string(now.format("%Y-%m-%dT%H:%M:%S%z").to_compact_string()),
         );
