@@ -1,2 +1,8 @@
-FATAL: No entries in the section stack
-    at pops-no-pushed-sections.asm(1)
+error: no entries in the section stack
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ POPS
+   │ ──┬─  
+   │   ╰─── cannot pop
+───╯
+1 error generated.

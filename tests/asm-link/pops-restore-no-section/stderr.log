@@ -1,5 +1,17 @@
-error: Label `DisallowedContent` created outside of a `SECTION`
-    at pops-restore-no-section.asm(9)
-error: Cannot output data outside of a `SECTION`
-    at pops-restore-no-section.asm(10)
-Assembly aborted with 2 errors!
+error: label defined outside of a section
+   ╭─[ test.asm:9:1 ]
+   │
+ 9 │ DisallowedContent:
+   │ ────────┬────────  
+   │         ╰────────── no section is active at this point
+───╯
+error: byte emitted outside of a section
+    ╭─[ test.asm:10:2 ]
+    │
+ 10 │     db 0
+    │     ─┬  
+    │      ╰── no section is active at this point
+    │ 
+    │ Help: consider opening a section with `section` before this
+────╯
+2 errors generated.

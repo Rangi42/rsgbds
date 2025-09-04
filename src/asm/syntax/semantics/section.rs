@@ -322,6 +322,27 @@ impl parse_ctx!() {
         self.sections
             .reject_active_union(&span, self.nb_errors_left, self.options);
 
+        if self
+            .sections
+            .active_section
+            .as_ref()
+            .is_some_and(|active| active.is_load_block_active())
+        {
+            diagnostics::warn(
+                warning!("unterminated-load"),
+                &span,
+                |error| {
+                    error.set_message("`load` block terminated by `section`");
+                    error.add_label(
+                        diagnostics::warning_label(&span)
+                            .with_message("no `endl` before this point"),
+                    );
+                },
+                self.nb_errors_left,
+                self.options,
+            );
+        }
+
         let active_section = self.sections.create_if_not_exists(
             name,
             attrs,

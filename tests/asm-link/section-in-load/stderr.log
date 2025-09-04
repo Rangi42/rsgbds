@@ -1,5 +1,15 @@
-warning: `LOAD` block without `ENDL` terminated by `SECTION` [-Wunterminated-load]
-    at section-in-load.asm(3)
-error: Found `ENDL` outside of a `LOAD` block
-    at section-in-load.asm(4)
-Assembly aborted with 1 error!
+[-Wunterminated-load] warning: `load` block terminated by `section`
+   ╭─[ test.asm:3:9 ]
+   │
+ 3 │ SECTION "outer2", ROM0
+   │         ────┬───  
+   │             ╰───── no `endl` before this point
+───╯
+error: `endl` used outside of a `load` block
+   ╭─[ test.asm:4:1 ]
+   │
+ 4 │ ENDL
+   │ ──┬─  
+   │   ╰─── this directive is invalid
+───╯
+1 error generated.
