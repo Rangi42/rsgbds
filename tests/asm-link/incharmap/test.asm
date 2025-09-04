@@ -6,7 +6,7 @@ charmap "abc", 3
 newcharmap second
 charmap "d", 4
 charmap "e", 5
-charmap {__ISO_8601_UTC__}, 6 ; expands with quotes
+charmap __ISO_8601_UTC__, 6
 
 setcharmap main
 
@@ -25,4 +25,4 @@ setcharmap second
 assert incharmap("d") ; now "d" is mapped
 assert !incharmap("a") ; only in 'main'
 assert !incharmap("bc") ; still unmapped chars
-assert incharmap({__ISO_8601_UTC__})
+assert incharmap(__ISO_8601_UTC__)
