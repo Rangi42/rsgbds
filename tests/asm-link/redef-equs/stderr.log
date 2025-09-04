@@ -1,12 +1,12 @@
 error: A symbol called "N" already exists
-    ╭─[ test.asm:25:1 ]
+    ╭─[ test.asm:25:9 ]
     │
  24 │ DEF N EQU 42
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ─┬─  
+    │        ╰─── the name is defined here...
  25 │ REDEF N EQUS "X"
-    │ ──┬──  
-    │   ╰──── ...so it's not available for this definition
+    │         ──┬─  
+    │           ╰─── ...so it's not available for this definition
     │ 
     │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯

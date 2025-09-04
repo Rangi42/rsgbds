@@ -1,3 +1,13 @@
-warning: Crash? [-Wuser]
-    at equs-purge.asm(2)
-    while expanding symbol `BYE`
+[-Wuser] warning: Crash?
+   ╭─[ BYE:2:1 ]
+   │
+ 2 │ WARN "Crash?"
+   │ ──┬─  
+   │   ╰─── triggered here
+   │
+   ├─[ test.asm:2:1 ]
+   │
+ 2 │ {BYE}
+   │ ──┬──  
+   │   ╰──── interpolated here
+───╯
