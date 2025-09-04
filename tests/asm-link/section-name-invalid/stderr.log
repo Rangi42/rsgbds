@@ -1,2 +1,8 @@
-FATAL: `Value` does not belong to any section
-    at section-name-invalid.asm(7)
+error: `Value` does not belong to a section
+   ╭─[ test.asm:7:17 ]
+   │
+ 7 │ println SECTION(Value) ; not OK
+   │                 ──┬──  
+   │                   ╰──── constant symbols do not belong to any section
+───╯
+1 error generated.

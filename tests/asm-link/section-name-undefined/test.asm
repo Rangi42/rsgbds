@@ -1,1 +1,1 @@
-assert SECTION(Undefined)
+assert 1, SECTION(Undefined)

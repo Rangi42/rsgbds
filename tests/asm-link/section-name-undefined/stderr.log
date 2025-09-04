@@ -1,2 +1,8 @@
-FATAL: Undefined symbol `Undefined`
-    at section-name-undefined.asm(1)
+error: no symbol called `Undefined`
+   ╭─[ test.asm:1:19 ]
+   │
+ 1 │ assert 1, SECTION(Undefined)
+   │                   ────┬────  
+   │                       ╰────── cannot get the section of that symbol
+───╯
+1 error generated.
