@@ -1,5 +1,19 @@
-error: syntax error, unexpected '-' at the beginning of the line (is it a leftover diff mark?)
-    at diff-marks.asm(2)
-error: syntax error, unexpected '+' at the beginning of the line (is it a leftover diff mark?)
-    at diff-marks.asm(3)
-Assembly aborted with 2 errors!
+error: syntax error: leftover diff marker
+   ╭─[ test.asm:2:1 ]
+   │
+ 2 │ -   ld a, 0
+   │ ┬    
+   │ ╰──── this is invalid
+   │ 
+   │ Help: consider applying patches using the `patch` command
+───╯
+error: syntax error: leftover diff marker
+   ╭─[ test.asm:3:1 ]
+   │
+ 3 │ +   xor a
+   │ ┬    
+   │ ╰──── this is invalid
+   │ 
+   │ Help: consider applying patches using the `patch` command
+───╯
+2 errors generated.
