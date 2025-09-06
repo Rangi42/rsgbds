@@ -216,69 +216,67 @@ impl parse_ctx!() {
         r_span_idx: usize,
     ) -> Expr {
         let span = self.span_from_to(l_span_idx, r_span_idx);
-
         let charmap = self.charmaps.active_charmap();
-        match charmap.encode_one(&string) {
-            None => {
-                self.error(&span, |error| {
-                    error.set_message("empty string doesn't have any character values");
-                    error.add_label(
-                        diagnostics::error_label(&span).with_message("this string is empty"),
-                    );
-                });
+
+        let Some((mapping, byte_len)) = charmap.encode_one(&string) else {
+            self.error(&span, |error| {
+                error.set_message("empty string doesn't have any character values");
+                error.add_label(
+                    diagnostics::error_label(&span).with_message("this string is empty"),
+                );
+            });
+            return Expr::nothing(span);
+        };
+
+        if byte_len != string.len() {
+            self.error(&span, |error| {
+                error.set_message("string passed to `charval` isn't a single mapping");
+                error.add_label(diagnostics::error_label(&span).with_message(format!(
+                    "its longest initial mapping is \"{}\"",
+                    &string[..byte_len],
+                )));
+            });
+            return Expr::nothing(span);
+        }
+
+        fn get_only_value<T: Copy + Into<i32>>(
+            slice: &[T],
+            span: Span,
+            nb_errors_left: &Cell<usize>,
+            options: &Options,
+        ) -> Expr {
+            if let [value] = slice {
+                Expr::number((*value).into(), span)
+            } else {
+                diagnostics::error(
+                    &span,
+                    |error| {
+                        error.set_message("string passed to `charval` maps to more than one unit");
+                        error.add_label(
+                            diagnostics::error_label(&span)
+                                .with_message(format!("this string maps to {} units", slice.len())),
+                        )
+                    },
+                    nb_errors_left,
+                    options,
+                );
                 Expr::nothing(span)
             }
-            Some((mapping, byte_len)) => {
-                if byte_len != string.len() {
-                    self.error(&span, |error| {
-                        error.set_message("string passed to `charval` is more than one mapping");
-                        error.add_label(diagnostics::error_label(&span).with_message(format!(
-                            "the longest initial mapping is \"{}\"",
-                            &string[..byte_len],
-                        )));
-                    });
-                }
-                fn get_only_value<T: Copy + Into<i32>>(
-                    slice: &[T],
-                    span: Span,
-                    nb_errors_left: &Cell<usize>,
-                    options: &Options,
-                ) -> Expr {
-                    if let [value] = slice {
-                        Expr::number((*value).into(), span)
-                    } else {
-                        diagnostics::error(
-                            &span,
-                            |error| {
-                                error.set_message(
-                                    "string passed to `charval` maps to more than one unit",
-                                );
-                                error.add_label(diagnostics::error_label(&span).with_message(
-                                    format!("this string maps to {} units", slice.len()),
-                                ))
-                            },
-                            nb_errors_left,
-                            options,
-                        );
-                        Expr::nothing(span)
-                    }
-                }
-                match mapping {
-                    CharMapping::Mapped(slice) => {
-                        get_only_value(slice, span, self.nb_errors_left, self.options)
-                    }
-                    CharMapping::Passthrough(string) => {
-                        // TODO: maybe such a case can be intentional
-                        self.error(&span, |error| {
-                            error.set_message("string passed to `charval` isn't mapped");
-                            error.add_label(diagnostics::error_label(&span).with_message(format!(
-                                "\"{string}\" isn't in charmap `{}`",
-                                self.identifiers.resolve(charmap.name()).unwrap(),
-                            )));
-                        });
-                        get_only_value(string.as_bytes(), span, self.nb_errors_left, self.options)
-                    }
-                }
+        }
+        match mapping {
+            CharMapping::Mapped(slice) => {
+                get_only_value(slice, span, self.nb_errors_left, self.options)
+            }
+            CharMapping::Passthrough(string) => {
+                // TODO: maybe such a case can be intentional
+                self.error(&span, |error| {
+                    error.set_message("string passed to `charval` isn't mapped");
+                    error.add_label(diagnostics::error_label(&span).with_message(format!(
+                        "\"{string}\" isn't in charmap `{}`",
+                        self.identifiers.resolve(charmap.name()).unwrap(),
+                    )));
+                });
+                get_only_value(string.as_bytes(), span, self.nb_errors_left, self.options)
             }
         }
     }
@@ -291,94 +289,77 @@ impl parse_ctx!() {
         r_span_idx: usize,
     ) -> Expr {
         let span = self.span_from_to(l_span_idx, r_span_idx);
-
         let charmap = self.charmaps.active_charmap();
-        match charmap.encode_one(&string) {
-            None => {
-                self.error(&span, |error| {
-                    error.set_message("empty string doesn't have any character values");
-                    error.add_label(
-                        diagnostics::error_label(&span).with_message("this string is empty"),
-                    );
-                });
+
+        let Some((mapping, _byte_len)) = charmap.encode_one(&string) else {
+            self.error(&span, |error| {
+                error.set_message("an empty string doesn't have any character values");
+                error.add_label(
+                    diagnostics::error_label(&span).with_message("this string is empty"),
+                );
+            });
+            return Expr::nothing(span);
+        };
+
+        let Some((index, logical_idx)) =
+            self.logical_index_to_physical(expr, mapping.into_iter().len())
+        else {
+            return Expr::nothing(span);
+        };
+
+        fn get_nth_value<T: Copy + Into<i32>>(
+            slice: &[T],
+            index: usize,
+            logical_idx: i32,
+            span: Span,
+            nb_errors_left: &Cell<usize>,
+            options: &Options,
+        ) -> Expr {
+            if let Some(value) = slice.get(index) {
+                Expr::number((*value).into(), span)
+            } else {
+                diagnostics::error(
+                    &span,
+                    |error| {
+                        error.set_message("character mapping index out of bounds");
+                        error.add_label(diagnostics::error_label(&span).with_message(format!(
+                            "attempted to take the {} value, out of {}",
+                            ordinal::Ordinal(logical_idx),
+                            slice.len(),
+                        )))
+                    },
+                    nb_errors_left,
+                    options,
+                );
                 Expr::nothing(span)
             }
-            Some((mapping, _byte_len)) => {
-                match self.logical_index_to_physical(
-                    expr,
-                    charmap
-                        .encode(
-                            (&string, &span),
-                            self.charmaps.is_main_charmap_active(),
-                            self.identifiers,
-                            self.nb_errors_left,
-                            self.options,
-                        )
-                        .count(),
-                ) {
-                    None => Expr::nothing(span),
-                    Some((index, logical_idx)) => {
-                        fn get_nth_value<T: Copy + Into<i32>>(
-                            slice: &[T],
-                            index: usize,
-                            logical_idx: i32,
-                            span: Span,
-                            nb_errors_left: &Cell<usize>,
-                            options: &Options,
-                        ) -> Expr {
-                            if let Some(value) = slice.get(index) {
-                                Expr::number((*value).into(), span)
-                            } else {
-                                diagnostics::error(
-                                    &span,
-                                    |error| {
-                                        error.set_message("character mapping index out of bounds");
-                                        error.add_label(
-                                            diagnostics::error_label(&span).with_message(format!(
-                                                "attempted to take the {} value, out of {}",
-                                                ordinal::Ordinal(logical_idx),
-                                                slice.len(),
-                                            )),
-                                        )
-                                    },
-                                    nb_errors_left,
-                                    options,
-                                );
-                                Expr::nothing(span)
-                            }
-                        }
-                        match mapping {
-                            CharMapping::Mapped(slice) => get_nth_value(
-                                slice,
-                                index,
-                                logical_idx,
-                                span,
-                                self.nb_errors_left,
-                                self.options,
-                            ),
-                            CharMapping::Passthrough(string) => {
-                                // TODO: maybe such a case can be intentional
-                                self.error(&span, |error| {
-                                    error.set_message("string passed to `charval` isn't mapped");
-                                    error.add_label(diagnostics::error_label(&span).with_message(
-                                        format!(
-                                            "\"{string}\" isn't in charmap `{}`",
-                                            self.identifiers.resolve(charmap.name()).unwrap(),
-                                        ),
-                                    ));
-                                });
-                                get_nth_value(
-                                    string.as_bytes(),
-                                    index,
-                                    logical_idx,
-                                    span,
-                                    self.nb_errors_left,
-                                    self.options,
-                                )
-                            }
-                        }
-                    }
-                }
+        }
+        match mapping {
+            CharMapping::Mapped(slice) => get_nth_value(
+                slice,
+                index,
+                logical_idx,
+                span,
+                self.nb_errors_left,
+                self.options,
+            ),
+            CharMapping::Passthrough(string) => {
+                // TODO: maybe such a case can be intentional
+                self.error(&span, |error| {
+                    error.set_message("string passed to `charval` isn't mapped");
+                    error.add_label(diagnostics::error_label(&span).with_message(format!(
+                        "\"{string}\" isn't in charmap `{}`",
+                        self.identifiers.resolve(charmap.name()).unwrap(),
+                    )));
+                });
+                get_nth_value(
+                    string.as_bytes(),
+                    index,
+                    logical_idx,
+                    span,
+                    self.nb_errors_left,
+                    self.options,
+                )
             }
         }
     }
