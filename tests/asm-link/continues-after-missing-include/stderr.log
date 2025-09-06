@@ -1,4 +1,16 @@
-warning: continues-after-missing-include/a.asm(7): [-Wuser]
-    still going!
-warning: continues-after-missing-include/a.asm(9): [-Wuser]
-    and going!
+
+[-Wuser] warning: still going!
+   ╭─[ test.asm:7:1 ]
+   │
+ 7 │ WARN "still going!"
+   │ ──┬─
+   │   ╰─── triggered here
+───╯
+[-Wuser] warning: and going!
+   ╭─[ test.asm:9:1 ]
+   │
+ 9 │ WARN "and going!"
+   │ ──┬─
+   │   ╰─── triggered here
+───╯
+2 errors generated.

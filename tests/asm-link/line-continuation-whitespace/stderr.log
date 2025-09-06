@@ -1,3 +1,8 @@
-error: Label `foo` created outside of a `SECTION`
-    at line-continuation-whitespace.asm(7)
-Assembly aborted with 1 error!
+error: label defined outside of a section
+   ╭─[ test.asm:7:1 ]
+   │
+ 7 │ foo: bar baz\
+   │ ─┬─  
+   │  ╰─── no section is active at this point
+───╯
+1 error generated.

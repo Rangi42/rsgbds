@@ -6,18 +6,18 @@ error: unexpected character after line continuation
    │            ╰── there can only be whitespace between this backslash and the end of the line
 ───╯
 error: syntax error: unexpected end of line
-   ╭─[ test.asm:6:14 ]
+   ╭─[ test.asm:6:13 ]
    │
  6 │ println 6 \ / ; comment
-   │              ┬  
-   │              ╰── expected a number or an expression here
+   │             ┬  
+   │             ╰── expected "number", "identifier", "local identifier", "anonymous label reference", "(", "+", "-", ...37 others
 ───╯
 error: syntax error: unexpected number
    ╭─[ test.asm:7:1 ]
    │
  7 │ 2
    │ ┬  
-   │ ╰── expected an instruction or a directive here
+   │ ╰── expected "identifier", "local identifier", ":", "+", "-", "adc", "add", ...89 others
 ───╯
 error: unexpected character after line continuation
     ╭─[ test.asm:12:12 ]
