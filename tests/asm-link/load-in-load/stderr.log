@@ -1,5 +1,15 @@
-warning: `LOAD` block without `ENDL` terminated by `LOAD` [-Wunterminated-load]
-    at load-in-load.asm(3)
-error: Found `ENDL` outside of a `LOAD` block
-    at load-in-load.asm(5)
-Assembly aborted with 1 error!
+[-Wunterminated-load] warning: `load` block terminated by another `load`
+   ╭─[ test.asm:3:1 ]
+   │
+ 3 │ LOAD "inner2", HRAM ; ends "inner1", starts "inner2"
+   │ ──┬─  
+   │   ╰─── no `endl` before this point
+───╯
+error: `endl` used outside of a `load` block
+   ╭─[ test.asm:5:1 ]
+   │
+ 5 │ ENDL ; error
+   │ ──┬─  
+   │   ╰─── this directive is invalid
+───╯
+1 error generated.
