@@ -1,5 +1,19 @@
-error: Section "code" cannot contain code or data (not `ROM0` or `ROMX`)
-    at data-in-ram.asm(2)
-error: Section "data" cannot contain code or data (not `ROM0` or `ROMX`)
-    at data-in-ram.asm(4)
-Assembly aborted with 2 errors!
+error: instruction emitted outside of ROM
+   ╭─[ test.asm:2:2 ]
+   │
+ 2 │     xor a
+   │     ──┬──  
+   │       ╰──── a WRAM0 section is active here
+   │ 
+   │ Help: you can store the data in ROM while leaving labels pointing to RAM, using `load`
+───╯
+error: byte emitted outside of ROM
+   ╭─[ test.asm:4:2 ]
+   │
+ 4 │     db 42
+   │     ─┬  
+   │      ╰── a WRAMX section is active here
+   │ 
+   │ Help: you can store the data in ROM while leaving labels pointing to RAM, using `load`
+───╯
+2 errors generated.

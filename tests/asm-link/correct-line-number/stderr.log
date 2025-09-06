@@ -1,4 +1,14 @@
-warning: Am I geting ahead of myself? [-Wuser]
-    at correct-line-number.asm(5)
-warning: Hopefully not. [-Wuser]
-    at correct-line-number.asm(11)
+[-Wuser] warning: Am I geting ahead of myself?
+   ╭─[ test.asm:5:2 ]
+   │
+ 5 │     WARN "Am I geting ahead of myself?"
+   │     ──┬─  
+   │       ╰─── triggered here
+───╯
+[-Wuser] warning: Hopefully not.
+    ╭─[ test.asm:11:1 ]
+    │
+ 11 │ WARN "Hopefully not."
+    │ ──┬─  
+    │   ╰─── triggered here
+────╯
