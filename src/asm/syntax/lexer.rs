@@ -1118,25 +1118,11 @@ impl Lexer {
             options,
         };
 
-        // Create a 1-char span pointing at the character right after the previous token,
-        // which will be used for newlines, to provide better-looking syntax error messages.
-        // Create it *after* the first `peek` call, so that it points inside of any expansions that would create.
-        let first_char = self.peek(&mut params);
         let ctx = self
             .active_context() // Do this after `peek`, in case it triggered an expansion.
             .expect("Attempting to lex a token without an active context!?");
-        // TODO: this span is also before any invalid chars, so a newline after invalid chars is reported in a weird location.
-        let mut span_before_whitespace = ctx.new_span();
-        let Some(ch) = first_char else {
-            return Token {
-                // Empty span pointing at EOF.
-                span: Span::Normal(span_before_whitespace),
-                payload: tok!("end of line"),
-            };
-        };
-        span_before_whitespace.bytes.end += ch.len_utf8();
+        let mut span = ctx.new_span();
 
-        let mut span = self.active_context().unwrap().new_span();
         macro_rules! token {
             ($what:tt $(($($params:tt)+))?) => {
                 token!($what $(($($params)+))?, span)
@@ -1150,14 +1136,12 @@ impl Lexer {
         }
         loop {
             match self.peek(&mut params) {
-                None => {
-                    break token!("end of line", span_before_whitespace);
-                }
+                None => break token!("end of line"),
 
                 Some(ch @ chars!(newline)) => {
                     self.consume(&mut span);
                     self.handle_crlf(ch, &mut span, &mut params);
-                    break token!("end of line", span_before_whitespace);
+                    break token!("end of line");
                 }
 
                 // All the stuff that gets ignored.
@@ -1814,7 +1798,6 @@ impl Lexer {
                     span = moved_span;
                     // Make the span empty, as we ignore the character that's just been consumed.
                     span.bytes.start = span.bytes.end;
-                    span_before_whitespace = span.clone();
                 }
             }
         }
