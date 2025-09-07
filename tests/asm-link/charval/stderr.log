@@ -1,15 +1,50 @@
-error: CHARVAL: Character mapping for "b" must have a single value
-    at charval.asm(23)
-error: CHARVAL: No character mapping for "ab"
-    at charval.asm(24)
-error: CHARVAL: No character mapping for "abc"
-    at charval.asm(25)
-error: CHARVAL: No character mapping for "cd"
-    at charval.asm(26)
-error: CHARVAL: No character mapping for "xyz"
-    at charval.asm(27)
-warning: CHARVAL: Index starts at 0 [-Wbuiltin-args]
-    at charval.asm(28)
-warning: CHARVAL: Index 10 is past the end of the character mapping [-Wbuiltin-args]
-    at charval.asm(29)
-Assembly aborted with 5 errors!
+error: string passed to `charval` maps to more than one unit
+    ╭─[ test.asm:23:8 ]
+    │
+ 23 │ assert charval("b") == 0
+    │        ──────┬─────  
+    │              ╰─────── this string maps to 2 units
+────╯
+error: "ab" isn't a single char mapping
+    ╭─[ test.asm:24:8 ]
+    │
+ 24 │ assert charval("ab") == 0
+    │        ──────┬──────  
+    │              ╰──────── the longest mapping found is "a"
+────╯
+error: "abc" isn't a single char mapping
+    ╭─[ test.asm:25:8 ]
+    │
+ 25 │ assert charval("abc", 0) == 0
+    │        ────────┬────────  
+    │                ╰────────── the longest mapping found is "a"
+────╯
+error: "cd" isn't a single char mapping
+    ╭─[ test.asm:26:8 ]
+    │
+ 26 │ assert charval("cd", 1) == 0
+    │        ────────┬───────  
+    │                ╰───────── the longest mapping found is "c"
+────╯
+error: "xyz" isn't a single char mapping
+    ╭─[ test.asm:27:8 ]
+    │
+ 27 │ assert charval("xyz", 2) == 0
+    │        ────────┬────────  
+    │                ╰────────── the longest mapping found is "x"
+────╯
+error: character mapping index out of bounds
+    ╭─[ test.asm:28:8 ]
+    │
+ 28 │ assert charval("ghi", -10) == 0
+    │        ─────────┬─────────  
+    │                 ╰─────────── attempted to take the -10th value, out of 5
+────╯
+error: character mapping index out of bounds
+    ╭─[ test.asm:29:8 ]
+    │
+ 29 │ assert charval("ghi", 10) == 0
+    │        ─────────┬────────  
+    │                 ╰────────── attempted to take the 10th value, out of 5
+────╯
+7 errors generated.

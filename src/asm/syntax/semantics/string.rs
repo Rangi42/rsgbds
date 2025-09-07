@@ -230,9 +230,9 @@ impl parse_ctx!() {
 
         if byte_len != string.len() {
             self.error(&span, |error| {
-                error.set_message("string passed to `charval` isn't a single mapping");
+                error.set_message(format!("\"{string}\" isn't a single char mapping"));
                 error.add_label(diagnostics::error_label(&span).with_message(format!(
-                    "its longest initial mapping is \"{}\"",
+                    "the longest mapping found is \"{}\"",
                     &string[..byte_len],
                 )));
             });
@@ -291,7 +291,7 @@ impl parse_ctx!() {
         let span = self.span_from_to(l_span_idx, r_span_idx);
         let charmap = self.charmaps.active_charmap();
 
-        let Some((mapping, _byte_len)) = charmap.encode_one(&string) else {
+        let Some((mapping, byte_len)) = charmap.encode_one(&string) else {
             self.error(&span, |error| {
                 error.set_message("an empty string doesn't have any character values");
                 error.add_label(
@@ -300,6 +300,17 @@ impl parse_ctx!() {
             });
             return Expr::nothing(span);
         };
+
+        if byte_len != string.len() {
+            self.error(&span, |error| {
+                error.set_message(format!("\"{string}\" isn't a single char mapping"));
+                error.add_label(diagnostics::error_label(&span).with_message(format!(
+                    "the longest mapping found is \"{}\"",
+                    &string[..byte_len],
+                )));
+            });
+            return Expr::nothing(span);
+        }
 
         let Some((index, logical_idx)) =
             self.logical_index_to_physical(expr, mapping.into_iter().len())

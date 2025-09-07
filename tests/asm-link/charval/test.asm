@@ -25,5 +25,5 @@ assert charval("ab") == 0
 assert charval("abc", 0) == 0
 assert charval("cd", 1) == 0
 assert charval("xyz", 2) == 0
-assert charval("ghi", -10) == 5
+assert charval("ghi", -10) == 0
 assert charval("ghi", 10) == 0
