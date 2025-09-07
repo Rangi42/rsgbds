@@ -225,10 +225,13 @@ impl parse_ctx!() {
 
         if byte_len != literal.len() {
             self.error(&span, |error| {
-                error.set_message(format!("\"{literal}\" isn't a single char mapping"));
+                error.set_message(format!(
+                    "\"{}\" isn't a single char mapping",
+                    literal.escape_debug(),
+                ));
                 error.add_label(diagnostics::error_label(&span).with_message(format!(
                     "the longest mapping found is \"{}\"",
-                    &literal[..byte_len],
+                    literal[..byte_len].escape_debug(),
                 )));
             });
             return Expr::nothing(span);
@@ -263,14 +266,14 @@ impl parse_ctx!() {
                 get_only_value(slice, span, self.nb_errors_left, self.options)
             }
             CharMapping::Passthrough(string) => {
-                // TODO: maybe such a case can be intentional
-                self.error(&span, |error| {
-                    error.set_message("character literal isn't mapped");
-                    error.add_label(diagnostics::error_label(&span).with_message(format!(
-                        "\"{string}\" isn't in charmap `{}`",
-                        self.identifiers.resolve(charmap.name()).unwrap(),
-                    )));
-                });
+                charmap.warn_on_passthrough(
+                    string.chars().next().unwrap(),
+                    self.charmaps.is_main_charmap_active(),
+                    &span,
+                    self.identifiers,
+                    self.nb_errors_left,
+                    self.options,
+                );
                 get_only_value(string.as_bytes(), span, self.nb_errors_left, self.options)
             }
         }
@@ -297,10 +300,13 @@ impl parse_ctx!() {
 
         if byte_len != string.len() {
             self.error(&span, |error| {
-                error.set_message(format!("\"{string}\" isn't a single char mapping"));
+                error.set_message(format!(
+                    "\"{}\" isn't a single char mapping",
+                    string.escape_debug(),
+                ));
                 error.add_label(diagnostics::error_label(&span).with_message(format!(
                     "the longest mapping found is \"{}\"",
-                    &string[..byte_len],
+                    string[..byte_len].escape_debug(),
                 )));
             });
             return Expr::nothing(span);
@@ -335,14 +341,14 @@ impl parse_ctx!() {
                 get_only_value(slice, span, self.nb_errors_left, self.options)
             }
             CharMapping::Passthrough(string) => {
-                // TODO: maybe such a case can be intentional
-                self.error(&span, |error| {
-                    error.set_message("string passed to `charval` isn't mapped");
-                    error.add_label(diagnostics::error_label(&span).with_message(format!(
-                        "\"{string}\" isn't in charmap `{}`",
-                        self.identifiers.resolve(charmap.name()).unwrap(),
-                    )));
-                });
+                charmap.warn_on_passthrough(
+                    string.chars().next().unwrap(),
+                    self.charmaps.is_main_charmap_active(),
+                    &span,
+                    self.identifiers,
+                    self.nb_errors_left,
+                    self.options,
+                );
                 get_only_value(string.as_bytes(), span, self.nb_errors_left, self.options)
             }
         }
@@ -370,10 +376,13 @@ impl parse_ctx!() {
 
         if byte_len != string.len() {
             self.error(&span, |error| {
-                error.set_message(format!("\"{string}\" isn't a single char mapping"));
+                error.set_message(format!(
+                    "\"{}\" isn't a single char mapping",
+                    string.escape_debug(),
+                ));
                 error.add_label(diagnostics::error_label(&span).with_message(format!(
                     "the longest mapping found is \"{}\"",
-                    &string[..byte_len],
+                    string[..byte_len].escape_debug(),
                 )));
             });
             return Expr::nothing(span);
@@ -422,14 +431,14 @@ impl parse_ctx!() {
                 self.options,
             ),
             CharMapping::Passthrough(string) => {
-                // TODO: maybe such a case can be intentional
-                self.error(&span, |error| {
-                    error.set_message("string passed to `charval` isn't mapped");
-                    error.add_label(diagnostics::error_label(&span).with_message(format!(
-                        "\"{string}\" isn't in charmap `{}`",
-                        self.identifiers.resolve(charmap.name()).unwrap(),
-                    )));
-                });
+                charmap.warn_on_passthrough(
+                    string.chars().next().unwrap(),
+                    self.charmaps.is_main_charmap_active(),
+                    &span,
+                    self.identifiers,
+                    self.nb_errors_left,
+                    self.options,
+                );
                 get_nth_value(
                     string.as_bytes(),
                     index,

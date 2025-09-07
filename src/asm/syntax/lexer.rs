@@ -2451,7 +2451,11 @@ impl Lexer {
         err_span.bytes.end = ctx.cur_byte + end_ofs;
         let err_span = Span::Normal(err_span);
         params.error(&err_span, |error| {
-            error.set_message("unterminated string literal");
+            error.set_message(if delim_char == '"' {
+                "unterminated string literal"
+            } else {
+                "unterminated character literal"
+            });
             error.add_label(diagnostics::error_label(&err_span).with_message(format!(
                 "no closing quote before the end of {}",
                 if multiline { "input" } else { "the line" }

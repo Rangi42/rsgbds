@@ -1,19 +1,83 @@
-warning: Unmapped character '?' [-Wunmapped-char]
-    at character-literals.asm::char(13) <- character-literals.asm(31)
-error: Character literals must be a single charmap unit
-    at character-literals.asm::char(13) <- character-literals.asm(32)
-error: Character literals must be a single charmap unit
-    at character-literals.asm::char(13) <- character-literals.asm(33)
-warning: Unmapped character '\n' [-Wunmapped-char]
-    at character-literals.asm::char(13) <- character-literals.asm(34)
-warning: Unmapped character '\r' [-Wunmapped-char]
-    at character-literals.asm::char(13) <- character-literals.asm(34)
-warning: Unmapped character '\t' [-Wunmapped-char]
-    at character-literals.asm::char(13) <- character-literals.asm(34)
-error: Character literals must be a single charmap unit
-    at character-literals.asm::char(13) <- character-literals.asm(34)
-error: Unterminated character
-    at character-literals.asm(35)
-error: Character literals must be a single charmap unit
-    at character-literals.asm(35)
-Assembly aborted with 5 errors!
+[-Wunmapped-char=1] warning: '?' is not mapped
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ '?'
+    │ ─┬─  
+    │  ╰─── in this string
+    │
+    ├─[ test.asm:13:10 ]
+    │
+ 13 │     assert (\1) == (\2)
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 31 │ char '?', $3f ; ASCII
+    │ ──┬─  
+    │   ╰─── macro called here
+────╯
+error: character literal maps to more than one unit
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 'F'
+    │ ─┬─  
+    │  ╰─── this string maps to 3 units
+    │
+    ├─[ test.asm:13:10 ]
+    │
+ 13 │     assert (\1) == (\2)
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 32 │ char 'F', 0
+    │ ──┬─  
+    │   ╰─── macro called here
+────╯
+error: "ABF" isn't a single char mapping
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 'ABF'
+    │ ──┬──  
+    │   ╰──── the longest mapping found is "A"
+    │
+    ├─[ test.asm:13:10 ]
+    │
+ 13 │     assert (\1) == (\2)
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 33 │ char 'ABF', 0
+    │ ──┬─  
+    │   ╰─── macro called here
+────╯
+error: "\n\r\t" isn't a single char mapping
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ '\n\r\t'
+    │ ────┬───  
+    │     ╰───── the longest mapping found is "\n"
+    │
+    ├─[ test.asm:13:10 ]
+    │
+ 13 │     assert (\1) == (\2)
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 34 │ char '\n\r\t', 0
+    │ ──┬─  
+    │   ╰─── macro called here
+────╯
+error: unterminated character literal
+    ╭─[ test.asm:35:13 ]
+    │
+ 35 │ assert 0 == '
+    │             ┬  
+    │             ╰── no closing quote before the end of the line
+────╯
+error: empty character literal
+    ╭─[ test.asm:35:13 ]
+    │
+ 35 │ assert 0 == '
+    │             ┬  
+    │             ╰── this literal is empty
+────╯
+5 errors generated.
