@@ -54,7 +54,7 @@ LabelDef: () = {
 	<span_idx:@L> ":" => ctx.define_anon_label(span_idx),
 };
 
-// Capturing `Instruction_Emit` as the "focus" of the repetition makes it return a `Vec<()>`, which does not allocate.
+// Capturing `Datum` as the "focus" of the repetition makes it return a `Vec<()>`, which does not allocate.
 Emittable = <Datum> ("::" <Datum>)*;
 Datum: () = {
 	Instruction => ctx.emit_instruction(<>),
@@ -120,15 +120,21 @@ Directive: () = {
 	<span_idx:@L> "newcharmap" <name:"identifier"> <src:("," <"identifier">)?> => ctx.create_charmap(name, src, span_idx),
 	"setcharmap" <span_idx:@L> <name:"identifier"> => ctx.switch_to_charmap(name, span_idx),
 	<span_idx:@L> "pushc" => ctx.push_charmap(),
-	<span_idx:@L> "pushc" <name:"identifier"> <src:("," <"identifier">)?> => { ctx.push_charmap(); ctx.create_charmap(name, src, span_idx) },
+	<span_idx:@L> "pushc" <name:"identifier"> <src:("," <"identifier">)?> => {
+		ctx.push_charmap(); ctx.create_charmap(name, src, span_idx)
+	},
 	<span_idx:@L> "popc" => ctx.pop_charmap(span_idx),
 	// `context.rs`
 	<@L> "break" => ctx.break_loop(<>),
 	<span_idx:@L> "include" <path:StringExpr> => ctx.include_file(path, span_idx),
 	// `data.rs`
 	// `db`, `dw`, `dl` and `ds` are `Datum`s, instead.
-	<span_idx:@L> "incbin" <path:StringExpr> <start:("," <Expr> ","?)?>         => ctx.incbin_file(path, start,       None,         span_idx),
-	<span_idx:@L> "incbin" <path:StringExpr> "," <start:Expr> "," <length:Expr> => ctx.incbin_file(path, Some(start), Some(length), span_idx),
+	<span_idx:@L> "incbin" <path:StringExpr> <start:("," <Expr> ","?)?>         => {
+		ctx.incbin_file(path, start,       None,         span_idx);
+	},
+	<span_idx:@L> "incbin" <path:StringExpr> "," <start:Expr> "," <length:Expr> => {
+		ctx.incbin_file(path, Some(start), Some(length), span_idx);
+	},
 	<@L> "union" => ctx.start_union(<>),
 	<@L> "nextu" => ctx.union_next(<>),
 	<@L> "endu" => ctx.end_union(<>),
@@ -534,6 +540,7 @@ ExprExponent<Atom>: Expr = { // Note the reversed expression tokens, which make 
 };
 ExprAtom: Expr = {
 	<span_idx:@L> <ident:"identifier"> => Expr::symbol(ident, ctx.line_spans[span_idx].clone()),
+	<StringExprNoIdent> => ctx.str_to_num(<>),
 	ExprAtomNoIdent
 };
 ExprAtomNoIdent: Expr = {
@@ -542,6 +549,7 @@ ExprAtomNoIdent: Expr = {
 	<span_idx:@L> <ident:AnonLabelRef> => ctx.anon_label_ref(ident, span_idx),
 	<span_idx:@L> <number:"number"> => Expr::number(number as i32, ctx.line_spans[span_idx].clone()),
 	<span_idx:@L> <ch:"character literal"> => ctx.convert_char_lit(ch, span_idx),
+	// TODO: user-defined functions
 	// Arithmetic functions.
 	<l_span_idx:@L> "high" "(" <expr:Expr> ")" <r_span_idx:@R> => expr.high(ctx.span_from_to(l_span_idx, r_span_idx)),
 	<l_span_idx:@L> "low"  "(" <expr:Expr> ")" <r_span_idx:@R> => expr.low(ctx.span_from_to(l_span_idx, r_span_idx)),
@@ -587,8 +595,6 @@ ExprAtomNoIdent: Expr = {
 	<l_span_idx:@L> "charval"   "(" <string:StringExpr> ")" <r_span_idx:@R> => ctx.charval_single(string, l_span_idx, r_span_idx),
 	<l_span_idx:@L> "charval"   "(" <string:StringExpr> "," <pos:Expr> ")" <r_span_idx:@R> =>  ctx.charval(string, pos, l_span_idx, r_span_idx),
 	<l_span_idx:@L> "strbyte"   "(" <string:StringExpr> "," <pos:Expr> ")" <r_span_idx:@R> =>  ctx.strbyte(string, pos, l_span_idx, r_span_idx),
-	// TODO: character literals
-	// TODO: function calls
 };
 
 StringExpr = StringExprConcat<StringExprAtom>;

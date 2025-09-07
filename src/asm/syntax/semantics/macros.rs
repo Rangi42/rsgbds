@@ -8,7 +8,12 @@ impl parse_ctx!() {
 
         if let Some(args) = self.macro_args.last_mut() {
             if let Some(expr) = amount {
-                match expr.try_const_eval(self.symbols, Some(args), self.sections) {
+                match expr.try_const_eval(
+                    self.symbols,
+                    Some(args),
+                    self.sections,
+                    |warning, span| warning.report(span, self.nb_errors_left, self.options),
+                ) {
                     Ok((value, span)) => {
                         args.shift_by(value as isize, &span, self.nb_errors_left, self.options)
                     }

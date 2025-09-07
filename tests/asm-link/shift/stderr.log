@@ -1,42 +1,385 @@
-warning: Shifting left by large amount 32 [-Wshift-amount]
-    at shift.asm::test(8) <- shift.asm(14)
-warning: Shifting left by large amount 9001 [-Wshift-amount]
-    at shift.asm::test(8) <- shift.asm(15)
-warning: Shifting left by large amount 32 [-Wshift-amount]
-    at shift.asm::test(8) <- shift.asm(17)
-warning: Shifting left by negative amount -9001 [-Wshift-amount]
-    at shift.asm::test(8) <- shift.asm(18)
-warning: Shifting right negative value -1 [-Wshift]
-    at shift.asm::test(8) <- shift.asm(20)
-warning: Shifting right negative value -1 [-Wshift]
-    at shift.asm::test(8) <- shift.asm(21)
-warning: Shifting right by large amount 32 [-Wshift-amount]
-    at shift.asm::test(8) <- shift.asm(21)
-warning: Shifting right negative value -1 [-Wshift]
-    at shift.asm::test(8) <- shift.asm(22)
-warning: Shifting right by large amount 9001 [-Wshift-amount]
-    at shift.asm::test(8) <- shift.asm(22)
-warning: Shifting right negative value -4 [-Wshift]
-    at shift.asm::test(8) <- shift.asm(23)
-warning: Shifting right negative value -4 [-Wshift]
-    at shift.asm::test(8) <- shift.asm(24)
-warning: Shifting right negative value -1 [-Wshift]
-    at shift.asm::test(8) <- shift.asm(25)
-warning: Shifting right by negative amount -9001 [-Wshift-amount]
-    at shift.asm::test(8) <- shift.asm(25)
-warning: Shifting left by negative amount -2 [-Wshift-amount]
-    at shift.asm::test(8) <- shift.asm(27)
-warning: Shifting right by negative amount -2 [-Wshift-amount]
-    at shift.asm::test(8) <- shift.asm(28)
-warning: Shifting right by negative amount -16 [-Wshift-amount]
-    at shift.asm::test(8) <- shift.asm(31)
-warning: Shifting right by large amount 32 [-Wshift-amount]
-    at shift.asm::test(8) <- shift.asm(32)
-warning: Shifting right by negative amount -32 [-Wshift-amount]
-    at shift.asm::test(8) <- shift.asm(33)
-warning: Shifting right by large amount 32 [-Wshift-amount]
-    at shift.asm::test(8) <- shift.asm(34)
-warning: Shifting right by negative amount -32 [-Wshift-amount]
-    at shift.asm::test(8) <- shift.asm(35)
-warning: Shifting right negative value -559038737 [-Wshift]
-    at shift.asm::test(8) <- shift.asm(37)
+[-Wshift-amount] warning: shifting left by more than 31
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 1 << 32
+    │ ───┬───  
+    │    ╰───── shifting by 32
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 14 │     test 1 << 32
+    │     ──┬─  
+    │       ╰─── macro called here
+────╯
+[-Wshift-amount] warning: shifting left by more than 31
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 1 << 9001
+    │ ────┬────  
+    │     ╰────── shifting by 9001
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 15 │     test 1 << 9001
+    │     ──┬─  
+    │       ╰─── macro called here
+────╯
+[-Wshift-amount] warning: shifting left by more than 31
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ -1 << 32
+    │ ────┬───  
+    │     ╰───── shifting by 32
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 17 │     test -1 << 32
+    │     ──┬─  
+    │       ╰─── macro called here
+────╯
+[-Wshift-amount] warning: shifting left by negative amount
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ -1 << -9001
+    │ ─────┬─────  
+    │      ╰─────── shifting by -9001
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 18 │     test -1 << -9001
+    │     ──┬─  
+    │       ╰─── macro called here
+    │ 
+    │ Help: consider using `>>` or `>>>` instead
+────╯
+[-Wshift] warning: shifting right a negative number
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ -1 >> 1
+    │ ───┬───  
+    │    ╰───── the left-hand side evaluates to -1
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 20 │     test -1 >> 1
+    │     ──┬─  
+    │       ╰─── macro called here
+    │ 
+    │ Help: to divide rounding towards 0, use `/`; to perform a logical shift, use `>>>`
+────╯
+[-Wshift-amount] warning: shifting right by more than 31
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ -1 >> 32
+    │ ────┬───  
+    │     ╰───── shifting by 32
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 21 │     test -1 >> 32
+    │     ──┬─  
+    │       ╰─── macro called here
+────╯
+[-Wshift] warning: shifting right a negative number
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ -1 >> 32
+    │ ────┬───  
+    │     ╰───── the left-hand side evaluates to -1
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 21 │     test -1 >> 32
+    │     ──┬─  
+    │       ╰─── macro called here
+    │ 
+    │ Help: to divide rounding towards 0, use `/`; to perform a logical shift, use `>>>`
+────╯
+[-Wshift-amount] warning: shifting right by more than 31
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ -1 >> 9001
+    │ ─────┬────  
+    │      ╰────── shifting by 9001
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 22 │     test -1 >> 9001
+    │     ──┬─  
+    │       ╰─── macro called here
+────╯
+[-Wshift] warning: shifting right a negative number
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ -1 >> 9001
+    │ ─────┬────  
+    │      ╰────── the left-hand side evaluates to -1
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 22 │     test -1 >> 9001
+    │     ──┬─  
+    │       ╰─── macro called here
+    │ 
+    │ Help: to divide rounding towards 0, use `/`; to perform a logical shift, use `>>>`
+────╯
+[-Wshift] warning: shifting right a negative number
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ -4 >> 1
+    │ ───┬───  
+    │    ╰───── the left-hand side evaluates to -4
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 23 │     test -4 >> 1
+    │     ──┬─  
+    │       ╰─── macro called here
+    │ 
+    │ Help: to divide rounding towards 0, use `/`; to perform a logical shift, use `>>>`
+────╯
+[-Wshift] warning: shifting right a negative number
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ -4 >> 2
+    │ ───┬───  
+    │    ╰───── the left-hand side evaluates to -4
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 24 │     test -4 >> 2
+    │     ──┬─  
+    │       ╰─── macro called here
+    │ 
+    │ Help: to divide rounding towards 0, use `/`; to perform a logical shift, use `>>>`
+────╯
+[-Wshift-amount] warning: shifting right by negative amount
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ -1 >> -9001
+    │ ─────┬─────  
+    │      ╰─────── shifting by -9001
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 25 │     test -1 >> -9001
+    │     ──┬─  
+    │       ╰─── macro called here
+    │ 
+    │ Help: consider using `<<` instead
+────╯
+[-Wshift] warning: shifting right a negative number
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ -1 >> -9001
+    │ ─────┬─────  
+    │      ╰─────── the left-hand side evaluates to -1
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 25 │     test -1 >> -9001
+    │     ──┬─  
+    │       ╰─── macro called here
+    │ 
+    │ Help: to divide rounding towards 0, use `/`; to perform a logical shift, use `>>>`
+────╯
+[-Wshift-amount] warning: shifting left by negative amount
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 100 << -2
+    │ ────┬────  
+    │     ╰────── shifting by -2
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 27 │     test 100 << -2
+    │     ──┬─  
+    │       ╰─── macro called here
+    │ 
+    │ Help: consider using `>>` or `>>>` instead
+────╯
+[-Wshift-amount] warning: shifting right by negative amount
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 1 >> -2
+    │ ───┬───  
+    │    ╰───── shifting by -2
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 28 │     test 1 >> -2
+    │     ──┬─  
+    │       ╰─── macro called here
+    │ 
+    │ Help: consider using `<<` instead
+────╯
+[-Wshift-amount] warning: shifting right by negative amount
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 100 >>> -16
+    │ ─────┬─────  
+    │      ╰─────── shifting by -16
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 31 │     test 100 >>> -16
+    │     ──┬─  
+    │       ╰─── macro called here
+    │ 
+    │ Help: consider using `<<` instead
+────╯
+[-Wshift-amount] warning: shifting right by more than 31
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 100 >>> 32
+    │ ─────┬────  
+    │      ╰────── shifting by 32
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 32 │     test 100 >>> 32
+    │     ──┬─  
+    │       ╰─── macro called here
+────╯
+[-Wshift-amount] warning: shifting right by negative amount
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 100 >>> -32
+    │ ─────┬─────  
+    │      ╰─────── shifting by -32
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 33 │     test 100 >>> -32
+    │     ──┬─  
+    │       ╰─── macro called here
+    │ 
+    │ Help: consider using `<<` instead
+────╯
+[-Wshift-amount] warning: shifting right by more than 31
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ -100 >>> 32
+    │ ─────┬─────  
+    │      ╰─────── shifting by 32
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 34 │     test -100 >>> 32
+    │     ──┬─  
+    │       ╰─── macro called here
+────╯
+[-Wshift-amount] warning: shifting right by negative amount
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ -100 >>> -32
+    │ ──────┬─────  
+    │       ╰─────── shifting by -32
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 35 │     test -100 >>> -32
+    │     ──┬─  
+    │       ╰─── macro called here
+    │ 
+    │ Help: consider using `<<` instead
+────╯
+[-Wshift] warning: shifting right a negative number
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ $DEADBEEF >> 1
+    │ ───────┬──────  
+    │        ╰──────── the left-hand side evaluates to -559038737
+    │
+    ├─[ test.asm:8:20 ]
+    │
+  8 │     println "\1 = ", (\1)
+    │                       ─┬  
+    │                        ╰── expanded here
+    │ 
+ 37 │     test $DEADBEEF >> 1
+    │     ──┬─  
+    │       ╰─── macro called here
+    │ 
+    │ Help: to divide rounding towards 0, use `/`; to perform a logical shift, use `>>>`
+────╯

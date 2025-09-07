@@ -5,7 +5,7 @@ use either::Either;
 
 use crate::{
     common::section::MemRegion,
-    diagnostics::{self, ReportBuilder},
+    diagnostics::{self, warning, ReportBuilder},
     macro_args::MacroArgs,
     section::{SectionKind, Sections},
     sources::Span,
@@ -54,6 +54,13 @@ pub enum OpKind {
 pub struct Error {
     pub span: Span,
     pub kind: ErrKind,
+}
+
+#[derive(Debug)]
+pub enum ExprWarning {
+    ShiftByNeg(bool, i32),
+    ShiftByTooMuch(bool, i32),
+    LeftShiftNeg(i32),
 }
 
 #[derive(Debug)]
@@ -251,12 +258,12 @@ impl Expr {
 }
 
 impl Expr {
-    // TODO: there may be more than one reason!
-    pub fn try_const_eval(
+    pub fn try_const_eval<F: FnMut(ExprWarning, &Span)>(
         &self,
         symbols: &Symbols,
         macro_args: Option<&MacroArgs>,
         sections: &Sections,
+        mut warn: F,
     ) -> Result<(i32, Span), Error> {
         debug_assert_ne!(self.payload.len(), 0);
 
@@ -366,7 +373,7 @@ impl Expr {
                         },
                     }),
                 },
-                // These can vary depending on linker settings.
+                // These two can vary depending on linker settings.
                 OpKind::SizeOfRegion(..) => Err(Error {
                     span: op.span.clone(),
                     kind: ErrKind::SizeOfRegion,
@@ -378,7 +385,7 @@ impl Expr {
                 OpKind::Binary(operator) => {
                     let rhs = eval_stack.pop().unwrap();
                     let lhs = eval_stack.pop().unwrap();
-                    operator.const_eval(lhs, rhs, symbols, sections)
+                    operator.const_eval(lhs, rhs, symbols, sections, &mut warn)
                 }
                 OpKind::Unary(operator) => {
                     let value = eval_stack.pop().unwrap();
@@ -478,15 +485,16 @@ impl Expr {
     ///
     /// ...because this would emit the `Label + I` expression identically twice,
     /// yet the intent is that each capture the same value for `Label`, but different values for `I`.
-    pub fn prep_for_patch(
+    pub fn prep_for_patch<F: FnMut(ExprWarning, &Span)>(
         &self,
         symbols: &mut Symbols,
         macro_args: Option<&MacroArgs>,
         sections: &Sections,
+        warn: F,
     ) -> Result<Either<(i32, Span), Self>, Error> {
         debug_assert_ne!(self.payload.len(), 0);
 
-        match self.try_const_eval(symbols, macro_args, sections) {
+        match self.try_const_eval(symbols, macro_args, sections, warn) {
             Ok((value, span)) => Ok(Either::Left((value, span))),
             Err(Error { kind, .. }) if kind.can_be_deferred_to_linker() => {
                 Ok(Either::Right(Self {
@@ -623,12 +631,13 @@ fn from_bool(b: bool) -> i32 {
 }
 
 impl BinOp {
-    fn const_eval(
+    fn const_eval<F: FnMut(ExprWarning, &Span)>(
         &self,
         lhs: Result<(i32, Span), Error>,
         rhs: Result<(i32, Span), Error>,
         symbols: &Symbols,
         sections: &Sections,
+        mut warn: F,
     ) -> Result<(i32, Span), Error> {
         // Most operators are "greedy", and require both operands to be known in order to be
         // const-evaluable themselves.
@@ -728,10 +737,39 @@ impl BinOp {
             BinOp::And => greedy!(|lhs, rhs| Ok(lhs & rhs)),
             BinOp::Or => greedy!(|lhs, rhs| Ok(lhs | rhs)),
             BinOp::Xor => greedy!(|lhs, rhs| Ok(lhs ^ rhs)),
-            // TODO: `-Wshift-amount`
-            BinOp::LeftShift => greedy!(|lhs, rhs| Ok(shift_left(lhs, rhs))),
-            BinOp::RightShift => greedy!(|lhs, rhs| Ok(shift_right(lhs, rhs))),
-            BinOp::UnsignedRightShift => greedy!(|lhs, rhs| Ok(shift_right_unsigned(lhs, rhs))),
+            BinOp::LeftShift => greedy!(|(lhs, left_span), (rhs, right_span)| {
+                let span = left_span.merged_with(&right_span);
+                if rhs < 0 {
+                    warn(ExprWarning::ShiftByNeg(false, rhs), &span);
+                }
+                if rhs >= 32 {
+                    warn(ExprWarning::ShiftByTooMuch(false, rhs), &span);
+                }
+                Ok((shift_left(lhs, rhs), span))
+            }),
+            BinOp::RightShift => greedy!(|(lhs, left_span), (rhs, right_span)| {
+                let span = left_span.merged_with(&right_span);
+                if rhs < 0 {
+                    warn(ExprWarning::ShiftByNeg(true, rhs), &span);
+                }
+                if rhs >= 32 {
+                    warn(ExprWarning::ShiftByTooMuch(true, rhs), &span);
+                }
+                if lhs < 0 {
+                    warn(ExprWarning::LeftShiftNeg(lhs), &span);
+                }
+                Ok((shift_right(lhs, rhs), span))
+            }),
+            BinOp::UnsignedRightShift => greedy!(|(lhs, left_span), (rhs, right_span)| {
+                let span = left_span.merged_with(&right_span);
+                if rhs < 0 {
+                    warn(ExprWarning::ShiftByNeg(true, rhs), &span);
+                }
+                if rhs >= 32 {
+                    warn(ExprWarning::ShiftByTooMuch(true, rhs), &span);
+                }
+                Ok((shift_right_unsigned(lhs, rhs), span))
+            }),
             BinOp::Multiply => greedy!(|lhs, rhs| Ok((lhs as u32).wrapping_mul(rhs as u32) as i32)),
             BinOp::Divide => greedy!(|(lhs, left_span), (rhs, right_span)| if rhs == 0 {
                 Err(Error {
@@ -754,7 +792,7 @@ impl BinOp {
     }
 }
 
-// Lifted from the Rust standard library, currently unstable.
+// Lifted from the Rust standard library, since it's currently unstable.
 fn div_floor(lhs: i32, rhs: i32) -> i32 {
     let d = lhs.wrapping_div(rhs);
     let r = lhs.wrapping_rem(rhs);
@@ -1058,6 +1096,71 @@ impl ErrKind {
                 just_the_sect: true,
             } => sections.sections.get_index_of(name).map(|idx| (idx, 0)),
             _ => None,
+        }
+    }
+}
+impl ExprWarning {
+    pub fn report(&self, span: &Span, nb_errors_left: &Cell<usize>, options: &Options) {
+        match self {
+            Self::ShiftByNeg(dir_right, shift_amount) => {
+                diagnostics::warn(
+                    warning!("shift-amount"),
+                    span,
+                    |warning| {
+                        warning.set_message(if *dir_right {
+                            "shifting right by negative amount"
+                        } else {
+                            "shifting left by negative amount"
+                        });
+                        warning.add_label(
+                            diagnostics::warning_label(span)
+                                .with_message(format!("shifting by {shift_amount}")),
+                        );
+                        warning.set_help(if *dir_right {
+                            "consider using `<<` instead"
+                        } else {
+                            "consider using `>>` or `>>>` instead"
+                        });
+                    },
+                    nb_errors_left,
+                    options,
+                );
+            }
+            Self::ShiftByTooMuch(dir_right, shift_amount) => {
+                diagnostics::warn(
+                    warning!("shift-amount"),
+                    span,
+                    |warning| {
+                        warning.set_message(if *dir_right {
+                            "shifting right by more than 31"
+                        } else {
+                            "shifting left by more than 31"
+                        });
+                        warning.add_label(
+                            diagnostics::warning_label(span)
+                                .with_message(format!("shifting by {shift_amount}")),
+                        );
+                    },
+                    nb_errors_left,
+                    options,
+                );
+            }
+            Self::LeftShiftNeg(shiftee) => {
+                diagnostics::warn(
+                    warning!("shift"),
+                    span,
+                    |warning| {
+                        warning.set_message("shifting right a negative number");
+                        warning
+                            .add_label(diagnostics::warning_label(span).with_message(format!(
+                                "the left-hand side evaluates to {shiftee}"
+                            )));
+                        warning.set_help("to divide rounding towards 0, use `/`; to perform a logical shift, use `>>>`");
+                    },
+                    nb_errors_left,
+                    options,
+                );
+            }
         }
     }
 }

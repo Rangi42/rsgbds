@@ -1,6 +1,6 @@
 use crate::{
     diagnostics::{self, ReportBuilder, WarningKind},
-    expr::Expr,
+    expr::{Expr, ExprWarning},
     sources::Span,
 };
 
@@ -50,7 +50,12 @@ impl parse_ctx!() {
     }
 
     pub(super) fn try_const_eval(&self, expr: &Expr) -> Result<(i32, Span), crate::expr::Error> {
-        expr.try_const_eval(self.symbols, self.macro_args.last(), self.sections)
+        expr.try_const_eval(
+            self.symbols,
+            self.macro_args.last(),
+            self.sections,
+            |warning, span| warning.report(span, self.nb_errors_left, self.options),
+        )
     }
 
     pub(super) fn error<'span, F: FnOnce(&mut ReportBuilder<'span>)>(

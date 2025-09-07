@@ -100,7 +100,11 @@ impl Sections {
     ) {
         let eval_res: Vec<_> = bytes
             .iter()
-            .map(|expr| expr.prep_for_patch(symbols, macro_args, self))
+            .map(|expr| {
+                expr.prep_for_patch(symbols, macro_args, self, |warning, span| {
+                    warning.report(span, nb_errors_left, options)
+                })
+            })
             .collect();
 
         self.emit_data(
@@ -129,7 +133,9 @@ impl Sections {
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
-        let eval_res = byte.prep_for_patch(symbols, macro_args, self);
+        let eval_res = byte.prep_for_patch(symbols, macro_args, self, |warning, span| {
+            warning.report(span, nb_errors_left, options)
+        });
 
         self.emit_data(
             "byte",
@@ -176,7 +182,9 @@ impl Sections {
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
-        let eval_res = word.prep_for_patch(symbols, macro_args, self);
+        let eval_res = word.prep_for_patch(symbols, macro_args, self, |warning, span| {
+            warning.report(span, nb_errors_left, options)
+        });
 
         self.emit_data(
             "word",
@@ -223,7 +231,9 @@ impl Sections {
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
-        let eval_res = long.prep_for_patch(symbols, macro_args, self);
+        let eval_res = long.prep_for_patch(symbols, macro_args, self, |warning, span| {
+            warning.report(span, nb_errors_left, options)
+        });
 
         self.emit_data(
             "long word",
@@ -269,9 +279,16 @@ impl Sections {
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
-        let patch_res = instruction
-            .patch
-            .map(|patch| (patch.expr.prep_for_patch(symbols, macro_args, self), patch));
+        let patch_res = instruction.patch.map(|patch| {
+            (
+                patch
+                    .expr
+                    .prep_for_patch(symbols, macro_args, self, |warning, span| {
+                        warning.report(span, nb_errors_left, options)
+                    }),
+                patch,
+            )
+        });
 
         self.emit_data(
             "instruction",

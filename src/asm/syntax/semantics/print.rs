@@ -49,7 +49,12 @@ impl parse_ctx!() {
         (level, expr, msg): (AssertLevel, Expr, Option<(CompactString, Span)>),
         span_idx: usize,
     ) -> Result<(), ParseError> {
-        match expr.prep_for_patch(self.symbols, self.macro_args.last(), self.sections) {
+        match expr.prep_for_patch(
+            self.symbols,
+            self.macro_args.last(),
+            self.sections,
+            |warning, span| warning.report(span, self.nb_errors_left, self.options),
+        ) {
             Ok(Either::Left((0, span))) => assert_failure(level, msg.as_ref(), &span, self),
             Ok(Either::Left(_)) => Ok(()), // OK
             Err(error) => {
