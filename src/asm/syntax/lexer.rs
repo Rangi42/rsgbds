@@ -8,7 +8,20 @@
 //! but this meant that there was a lot of duplicated handling, and this caused a lot of bugs ([#63], [#362], [#531]...)
 //! Instead, we handle them at the lowest level, thus handling them in a manner transparent to the rest of the lexer.
 //!
-//! TODO: describe the "char stream" / remainder split more
+//! The core of the lexer is the [`peek`][Lexer::peek] and [`consume`][Lexer::consume] functions.
+//! The former seeks the next character, accounting for expansions
+//! (since it is the function responsible for “opening” expansions, that's why it takes `&mut LexerParams`);
+//! the latter makes said character be part of the current token.
+//!
+//! These two functions are however not part of the lexer's public API: this honor goes mainly
+//! to [`next_token`][Lexer::next_token] and [`next_token_raw`][Lexer::next_token_raw].
+//! The former is the main token generation function, the latter permitting special cases
+//! to process the syntax more directly (macro calls passing the arguments through, which defers
+//! actual tokenization to expansion time; `opt` effectively doing its own lexing).
+//!
+//! You may notice that there are no functions to “rewind” input: this is intentional,
+//! as rewinding the effects of a `consume` is difficult due to the expansions.
+//! Therefore, this lexer is strictly a 1-char lookahead non-backtracking lexer.
 //!
 //! [#63]: https://github.com/gbdev/rgbds/issues/63
 //! [#362]: https://github.com/gbdev/rgbds/issues/362
