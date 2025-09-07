@@ -1380,9 +1380,7 @@ impl Lexer {
                                     self.consume(&mut span);
                                     break token!("<<=");
                                 }
-                                _ => {
-                                    break token!("<<");
-                                }
+                                _ => break token!("<<"),
                             }
                         }
                         _ => break token!("<"),
@@ -1412,9 +1410,7 @@ impl Lexer {
                                         _ => break token!(">>>"),
                                     }
                                 }
-                                _ => {
-                                    break token!(">>");
-                                }
+                                _ => break token!(">>"),
                             }
                         }
                         _ => break token!(">"),
@@ -1567,10 +1563,7 @@ impl Lexer {
                         Some('_') => {
                             self.consume(&mut span);
                             let value = self.read_number(8, 0, true, &mut span, &mut params);
-                            break Token {
-                                payload: tok!("number"(value)),
-                                span: Span::Normal(span),
-                            };
+                            break token!("number"(value));
                         }
                         Some(ch @ '0'..='7') => {
                             self.consume(&mut span);
@@ -1581,10 +1574,7 @@ impl Lexer {
                                 &mut span,
                                 &mut params,
                             );
-                            break Token {
-                                payload: tok!("number"(value)),
-                                span: Span::Normal(span),
-                            };
+                            break token!("number"(value));
                         }
                         _ => break token!("&"),
                     }
@@ -1599,10 +1589,7 @@ impl Lexer {
                         Some('_') => {
                             self.consume(&mut span);
                             let value = self.read_bin_number(0, true, &mut span, &mut params);
-                            break Token {
-                                payload: tok!("number"(value)),
-                                span: Span::Normal(span),
-                            };
+                            break token!("number"(value));
                         }
                         Some(ch) if params.options.runtime_opts.binary_digits.contains(&ch) => {
                             self.consume(&mut span);
@@ -1630,10 +1617,7 @@ impl Lexer {
                         Some('_') => {
                             self.consume(&mut span);
                             let value = self.read_number(8, 0, true, &mut span, &mut params);
-                            break Token {
-                                payload: tok!("number"(value)),
-                                span: Span::Normal(span),
-                            };
+                            break token!("number"(value));
                         }
                         Some(ch @ ('0'..='9' | 'A'..='F' | 'a'..='f')) => {
                             self.consume(&mut span);
@@ -1644,10 +1628,7 @@ impl Lexer {
                                 &mut span,
                                 &mut params,
                             );
-                            break Token {
-                                payload: tok!("number"(value)),
-                                span: Span::Normal(span),
-                            };
+                            break token!("number"(value));
                         }
                         _ => {
                             let err_span = Span::Normal(span.clone());
@@ -1671,10 +1652,7 @@ impl Lexer {
                         Some('_') => {
                             self.consume(&mut span);
                             let value = self.read_gfx_constant(0, true, &mut span, &mut params);
-                            break Token {
-                                payload: tok!("number"(value)),
-                                span: Span::Normal(span),
-                            };
+                            break token!("number"(value));
                         }
                         Some(ch) if params.options.runtime_opts.gfx_chars.contains(&ch) => {
                             self.consume(&mut span);
@@ -1687,10 +1665,7 @@ impl Lexer {
                                 .unwrap() as u8;
                             let value =
                                 self.read_gfx_constant(first_digit, false, &mut span, &mut params);
-                            break Token {
-                                payload: tok!("number"(value)),
-                                span: Span::Normal(span),
-                            };
+                            break token!("number"(value));
                         }
                         _ => {
                             let err_span = Span::Normal(span.clone());
