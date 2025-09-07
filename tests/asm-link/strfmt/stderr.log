@@ -1,16 +1,16 @@
 error: a numeric expression cannot be formatted as string
     ╭─[ test.asm:16:14 ]
     │
- 16 │ PRINT STRFMT(TEMPLATE, "void", 0, "extra")
-    │              ────┬───  
-    │                  ╰───── bad format specifier 7 bytes into this format string
+ 16 │ PRINT STRFMT(#TEMPLATE, "void", 0, "extra")
+    │              ────┬────  
+    │                  ╰────── bad format specifier 7 bytes into this format string
 ────╯
 error: not all arguments were used by the format string
     ╭─[ test.asm:16:14 ]
     │
- 16 │ PRINT STRFMT(TEMPLATE, "void", 0, "extra")
-    │              ────┬───  
-    │                  ╰───── 1 argument remains unformatted
+ 16 │ PRINT STRFMT(#TEMPLATE, "void", 0, "extra")
+    │              ────┬────  
+    │                  ╰────── 1 argument remains unformatted
 ────╯
 error: missing print type
     ╭─[ test.asm:24:16 ]
