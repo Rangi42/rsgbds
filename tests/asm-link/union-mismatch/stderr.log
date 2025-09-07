@@ -1,4 +1,8 @@
-error: Section already declared as fixed at incompatible address $c001
-    at union-mismatch.asm(2)
-FATAL: Cannot create section "fixed" (1 error)
-    at union-mismatch.asm(2)
+error: cannot align the section's lower 1 bit to 0
+   ╭─[ test.asm:2:15 ]
+   │
+ 2 │ section union "fixed", wram0, align[1]
+   │               ───┬───  
+   │                  ╰───── the fixed address would have the bit equal to $01 at this point
+───╯
+1 error generated.
