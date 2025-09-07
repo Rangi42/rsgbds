@@ -1689,6 +1689,15 @@ impl Lexer {
                     }
                 }
 
+                // Character literal (very similar to `read_string_maybe`).
+                Some('\'') => {
+                    let payload = self.read_char_literal(&mut span, &mut params);
+                    break Token {
+                        payload,
+                        span: Span::Normal(span),
+                    };
+                }
+
                 // String.
                 Some('"') => {
                     // Guaranteed to succeed, since we've already read the opening quote.
@@ -1701,29 +1710,31 @@ impl Lexer {
 
                 // Raw string or raw identifier.
                 Some('#') => {
-                    let payload = if let Some(payload) =
-                        self.read_string_maybe(&mut span, &mut params)
-                    {
-                        payload
-                    } else {
-                        self.consume(&mut span);
-                        match self.peek(&mut params) {
-                            Some(first_char @ (chars!(ident_start) | '.')) => {
-                                self.consume(&mut span);
-                                self.read_identifier(first_char, &mut span, false, &mut params)
+                    let payload =
+                        if let Some(payload) = self.read_string_maybe(&mut span, &mut params) {
+                            payload
+                        } else {
+                            self.consume(&mut span);
+                            match self.peek(&mut params) {
+                                Some(first_char @ (chars!(ident_start) | '.')) => {
+                                    self.consume(&mut span);
+                                    self.read_identifier(first_char, &mut span, false, &mut params)
+                                }
+                                _ => {
+                                    let err_span = Span::Normal(span.clone());
+                                    params.error(&err_span, |error| {
+                                        error.set_message("invalid '#'");
+                                        error.add_label(
+                                            diagnostics::error_label(&err_span).with_message(
+                                                "this doesn't start a raw string or raw identifier",
+                                            ),
+                                        );
+                                    });
+                                    span.bytes.start = span.bytes.end;
+                                    continue;
+                                }
                             }
-                            _ => {
-                                let span = Span::Normal(span.clone());
-                                params.error(&span, |error| {
-                                    error.set_message("invalid '#'");
-                                    error.add_label(diagnostics::error_label(&span).with_message(
-                                        "this doesn't start a raw string or raw identifier",
-                                    ));
-                                });
-                                continue;
-                            }
-                        }
-                    };
+                        };
                     break Token {
                         payload,
                         span: Span::Normal(span),
@@ -1761,16 +1772,13 @@ impl Lexer {
                             diagnostics::error_label(&err_span)
                                 .with_message("this character was not expected at this point"),
                         );
-                        if was_blue_painted && matches!(ch, '{'|'}'|'\\') {
+                        if was_blue_painted && matches!(ch, '{' | '}' | '\\') {
                             error.set_help("characters inside of macro args cannot start an expansion themselves")
                         }
                     });
 
-                    // Borrowck is not happy otherwise, but this should hopefully compile to nothing.
-                    let Span::Normal(moved_span) = err_span else {
-                        unreachable!();
-                    };
-                    span = moved_span;
+                    // Borrowck is not happy without this, but this should hopefully compile to nothing.
+                    span = err_span.extract_normal();
                     // Make the span empty, as we ignore the character that's just been consumed.
                     span.bytes.start = span.bytes.end;
                 }
@@ -2241,6 +2249,7 @@ impl Lexer {
                 &mut string,
                 raw,
                 false, // Not passthrough.
+                '"',
                 &mut chars,
                 ctx,
                 depth,
@@ -2252,35 +2261,63 @@ impl Lexer {
         (!span.bytes.is_empty()).then_some(tok!("string"(string)))
     }
 
+    fn read_char_literal(
+        &mut self,
+        span: &mut NormalSpan,
+        params: &mut LexerParams,
+    ) -> TokenPayload {
+        let mut string = CompactString::default();
+        let depth = self.contexts.len();
+        self.with_active_context_raw(span, |ctx, text| {
+            let mut chars = text.char_indices().peekable();
+            let opt = chars.next();
+            debug_assert_eq!(opt, Some((0, '\'')));
+            Self::read_string_inner(
+                &mut string,
+                false, // Not raw.
+                false, // Not passthrough.
+                '\'',
+                &mut chars,
+                ctx,
+                depth,
+                text,
+                params,
+            )
+        });
+
+        tok!("character literal"(string))
+    }
+
     fn read_string_inner(
         string: &mut CompactString,
         raw: bool,
         passthrough: bool,
+        delim_char: char,
         chars: &mut Peekable<CharIndices>,
         ctx: &Context,
         ctx_depth: usize,
         text: &str,
         params: &mut LexerParams,
     ) -> usize {
-        fn is_quote(&(_, ch): &(usize, char)) -> bool {
-            ch == '"'
-        }
+        let is_delim = |&(_, ch): &(usize, char)| ch == delim_char;
 
         // If passthrough, make sure to add the string's opening quotes.
         if passthrough {
-            string.push('"');
+            string.push(delim_char);
         }
-        let multiline = if let Some((ofs, quote)) = chars.next_if(is_quote) {
+        let multiline = if delim_char != '"' {
+            false // Only strings can be multiline, not character literals.
+        } else if let Some((ofs, quote)) = chars.next_if(is_delim) {
             if passthrough {
-                string.push('"');
+                string.push(delim_char);
             }
             // We have two consecutive quotes: if there are only two, then we have an empty string;
             //                                 if there are three, we have a multi-line string.
-            if chars.next_if(is_quote).is_none() {
+            if chars.next_if(is_delim).is_none() {
                 return ofs + quote.len_utf8();
             }
             if passthrough {
-                string.push('"');
+                string.push(delim_char);
             }
             true
         } else {
@@ -2290,26 +2327,26 @@ impl Lexer {
         let mut end_ofs = text.len();
         while let Some((ofs, ch)) = chars.next() {
             match ch {
-                '"' => {
+                ch if ch == delim_char => {
                     if multiline {
                         // We need three consecutive quotes to close the string, not just one.
-                        if let Some((_ofs, _quote)) = chars.next_if(is_quote) {
+                        if let Some((_ofs, _quote)) = chars.next_if(is_delim) {
                             // Two in a row...
-                            if let Some((ofs, _quote)) = chars.next_if(is_quote) {
+                            if let Some((ofs, _quote)) = chars.next_if(is_delim) {
                                 if passthrough {
-                                    string.push('"');
-                                    string.push('"');
-                                    string.push('"');
+                                    string.push(delim_char);
+                                    string.push(delim_char);
+                                    string.push(delim_char);
                                 }
                                 // Three in a row! Winner winner chicken dinner
                                 return ofs + ch.len_utf8();
                             }
-                            string.push('"');
+                            string.push(delim_char);
                         }
-                        string.push('"');
+                        string.push(delim_char);
                     } else {
                         if passthrough {
-                            string.push('"');
+                            string.push(delim_char);
                         }
                         return ofs + ch.len_utf8();
                     }
@@ -2423,10 +2460,10 @@ impl Lexer {
 
         // If passthrough, close the string, so that the error doesn't occur again at expansion time.
         if passthrough {
-            string.push('"');
+            string.push(delim_char);
             if multiline {
-                string.push('"');
-                string.push('"');
+                string.push(delim_char);
+                string.push(delim_char);
             }
         }
 
@@ -2442,7 +2479,7 @@ impl Lexer {
         params: &LexerParams,
     ) -> Option<char> {
         match escaped {
-            Some((_ofs, ch @ ('\\' | '"' | '{' | '}'))) => Some(ch),
+            Some((_ofs, ch @ ('\\' | '"' | '\'' | '{' | '}'))) => Some(ch),
             Some((_ofs, 'n')) => Some('\n'),
             Some((_ofs, 'r')) => Some('\r'),
             Some((_ofs, 't')) => Some('\t'),
@@ -2599,11 +2636,27 @@ impl Lexer {
                 last_char = Some(ch);
 
                 let was_blank = match ch {
+                    '\'' => {
+                        let _len = Self::read_string_inner(
+                            &mut string,
+                            false, // Not raw.
+                            true,  // Passthrough.
+                            '\'',
+                            &mut chars,
+                            ctx,
+                            depth,
+                            text,
+                            &mut params,
+                        );
+                        last_char = Some('\''); // The terminating single quote.
+                        false
+                    }
                     '"' => {
                         let _len = Self::read_string_inner(
                             &mut string,
                             false, // Not raw.
                             true,  // Passthrough.
+                            '"',
                             &mut chars,
                             ctx,
                             depth,
@@ -2620,6 +2673,7 @@ impl Lexer {
                                 &mut string,
                                 true, // Raw.
                                 true, // Passthrough.
+                                '"',
                                 &mut chars,
                                 ctx,
                                 depth,

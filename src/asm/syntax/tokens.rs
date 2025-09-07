@@ -62,6 +62,8 @@ define_tokens! {
         Number(u32),
         #[name = "string"]
         String(CompactString),
+        #[name = "character literal"]
+        CharLit(CompactString),
         #[name = "identifier"]
         Identifier(Identifier),
         #[name = "local identifier"]

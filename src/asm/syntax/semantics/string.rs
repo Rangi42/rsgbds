@@ -209,6 +209,73 @@ impl parse_ctx!() {
         }
     }
 
+    pub fn convert_char_lit(&self, literal: CompactString, span_idx: usize) -> Expr {
+        let span = self.line_spans[span_idx].clone();
+        let charmap = self.charmaps.active_charmap();
+
+        let Some((mapping, byte_len)) = charmap.encode_one(&literal) else {
+            self.error(&span, |error| {
+                error.set_message("empty character literal");
+                error.add_label(
+                    diagnostics::error_label(&span).with_message("this literal is empty"),
+                );
+            });
+            return Expr::nothing(span);
+        };
+
+        if byte_len != literal.len() {
+            self.error(&span, |error| {
+                error.set_message(format!("\"{literal}\" isn't a single char mapping"));
+                error.add_label(diagnostics::error_label(&span).with_message(format!(
+                    "the longest mapping found is \"{}\"",
+                    &literal[..byte_len],
+                )));
+            });
+            return Expr::nothing(span);
+        }
+
+        fn get_only_value<T: Copy + Into<i32>>(
+            slice: &[T],
+            span: Span,
+            nb_errors_left: &Cell<usize>,
+            options: &Options,
+        ) -> Expr {
+            if let [value] = slice {
+                Expr::number((*value).into(), span)
+            } else {
+                diagnostics::error(
+                    &span,
+                    |error| {
+                        error.set_message("character literal maps to more than one unit");
+                        error.add_label(
+                            diagnostics::error_label(&span)
+                                .with_message(format!("this string maps to {} units", slice.len())),
+                        );
+                    },
+                    nb_errors_left,
+                    options,
+                );
+                Expr::nothing(span)
+            }
+        }
+        match mapping {
+            CharMapping::Mapped(slice) => {
+                get_only_value(slice, span, self.nb_errors_left, self.options)
+            }
+            CharMapping::Passthrough(string) => {
+                // TODO: maybe such a case can be intentional
+                self.error(&span, |error| {
+                    error.set_message("character literal isn't mapped");
+                    error.add_label(diagnostics::error_label(&span).with_message(format!(
+                        "\"{string}\" isn't in charmap `{}`",
+                        self.identifiers.resolve(charmap.name()).unwrap(),
+                    )));
+                });
+                get_only_value(string.as_bytes(), span, self.nb_errors_left, self.options)
+            }
+        }
+    }
+
     pub fn charval_single(
         &self,
         (string, _span): (CompactString, Span),
@@ -255,7 +322,7 @@ impl parse_ctx!() {
                         error.add_label(
                             diagnostics::error_label(&span)
                                 .with_message(format!("this string maps to {} units", slice.len())),
-                        )
+                        );
                     },
                     nb_errors_left,
                     options,

@@ -541,6 +541,7 @@ ExprAtomNoIdent: Expr = {
 	<span_idx:@L> <ident:"local identifier"> => Expr::symbol(ident, ctx.line_spans[span_idx].clone()),
 	<span_idx:@L> <ident:AnonLabelRef> => ctx.anon_label_ref(ident, span_idx),
 	<span_idx:@L> <number:"number"> => Expr::number(number as i32, ctx.line_spans[span_idx].clone()),
+	<span_idx:@L> <ch:"character literal"> => ctx.convert_char_lit(ch, span_idx),
 	// Arithmetic functions.
 	<l_span_idx:@L> "high" "(" <expr:Expr> ")" <r_span_idx:@R> => expr.high(ctx.span_from_to(l_span_idx, r_span_idx)),
 	<l_span_idx:@L> "low"  "(" <expr:Expr> ")" <r_span_idx:@R> => expr.low(ctx.span_from_to(l_span_idx, r_span_idx)),
@@ -663,6 +664,7 @@ extern {
 
 		"number" => TokenPayload::Number(<u32>),
 		"string" => TokenPayload::String(<CompactString>),
+		"character literal" => TokenPayload::CharLit(<CompactString>),
 		"identifier" => TokenPayload::Identifier(<Identifier>),
 		"local identifier" => TokenPayload::LocalIdentifier(<Identifier>),
 		"anonymous label reference" => TokenPayload::AnonLabelRef(<i32>),
