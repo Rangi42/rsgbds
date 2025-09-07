@@ -78,19 +78,24 @@ impl NormalSpan {
         }
     }
 
-    // TODO: this is almost unused, better add a method to `Context`s that takes a `cur_byte`-relative range.
-    pub fn sub_span(&self, sub_range: Range<usize>) -> Self {
-        debug_assert!(self.is_offset_valid(sub_range.start));
-        debug_assert!(self.is_offset_valid(sub_range.end));
+    pub fn sub_span(&self, bytes: Range<usize>) -> Self {
+        debug_assert!(self.is_offset_valid(bytes.start));
+        debug_assert!(self.is_offset_valid(bytes.end));
         Self {
             node: self.node.clone(),
-            bytes: sub_range,
+            bytes,
         }
     }
 
     pub fn is_offset_valid(&self, byte_ofs: usize) -> bool {
         // Not using `.contains()` because we accept offsets matching the end.
         self.bytes.start <= byte_ofs && byte_ofs <= self.bytes.end
+    }
+
+    /// Moves the span's beginning to its end, so that it is empty.
+    /// In essence, this discards all characters scanned thus far.
+    pub fn make_empty(&mut self) {
+        self.bytes.start = self.bytes.end;
     }
 }
 

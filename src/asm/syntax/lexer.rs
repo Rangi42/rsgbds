@@ -27,7 +27,13 @@
 //! [#362]: https://github.com/gbdev/rgbds/issues/362
 //! [#531]: https://github.com/gbdev/rgbds/issues/531
 
-use std::{cell::Cell, iter::Peekable, ops::Deref, rc::Rc, str::CharIndices};
+use std::{
+    cell::Cell,
+    iter::Peekable,
+    ops::{Deref, Range},
+    rc::Rc,
+    str::CharIndices,
+};
 
 use compact_str::CompactString;
 use unicase::UniCase;
@@ -204,9 +210,16 @@ impl Context {
     }
 
     fn new_span(&self) -> NormalSpan {
-        let mut span = self.span.clone();
-        span.bytes = self.cur_byte..self.cur_byte;
-        span
+        self.span.sub_span(self.cur_byte..self.cur_byte)
+    }
+    // Convenience functions for creating spans.
+    fn new_span_len(&self, start_ofs: usize, len: usize) -> NormalSpan {
+        let start = self.cur_byte + start_ofs;
+        self.span.sub_span(start..start + len)
+    }
+    fn new_span_ofs(&self, bytes: Range<usize>) -> NormalSpan {
+        self.span
+            .sub_span(self.cur_byte + bytes.start..self.cur_byte + bytes.end)
     }
 }
 
@@ -414,9 +427,7 @@ impl Lexer {
                         None => text.len(),
                     };
                     if let Some(res) = macro_arg_id {
-                        let trigger_span = ctx
-                            .span
-                            .sub_span(ctx.cur_byte..ctx.cur_byte + macro_arg_len);
+                        let trigger_span = ctx.new_span_len(0, macro_arg_len);
                         match res {
                             Ok((span_kind, source)) => {
                                 // Consume all the characters implicated in the macro arg.
@@ -485,8 +496,7 @@ impl Lexer {
                         Some((ofs, _ch)) => ofs,
                         None => text.len(),
                     };
-                    let mut trigger_span = ctx.new_span();
-                    trigger_span.bytes.end += interpolation_len;
+                    let trigger_span = ctx.new_span_len(0, interpolation_len);
 
                     // Consume all the characters implicated in the interpolation.
                     ctx.cur_byte += interpolation_len;
@@ -546,15 +556,15 @@ impl Lexer {
 
             // Only repoint the span if it is currently pointing to the context we are exiting.
             if Rc::ptr_eq(&span.node.src, &ctx.span.node.src) {
-                let span_is_empty = span.bytes.is_empty();
+                let span_was_empty = span.bytes.is_empty();
                 // Since we're popping a context, this means that the span is straddling two buffers.
                 // Thus, we will mark the span as spanning the entirety of the buffer's “expansion”.
                 // (Plus the character that's about to be consumed.)
                 *span = ctx.span.node.parent.unwrap().deref().clone();
                 // Exception: if the span is empty, we'll keep it empty (pointing at the end of the trigger),
                 //            but we still need to point it to the new active buffer.
-                if span_is_empty {
-                    span.bytes.start = span.bytes.end;
+                if span_was_empty {
+                    span.make_empty();
                 }
             }
         };
@@ -601,9 +611,7 @@ impl Lexer {
                     span.bytes.end = parent.bytes.end;
                 } else {
                     // The span is empty, so move it to the beginning of the current buffer instead.
-                    *span = ctx.new_span();
-                    debug_assert!(span.bytes.is_empty());
-                    span.bytes.end = ctx.cur_byte + c.len_utf8();
+                    *span = ctx.new_span_len(0, c.len_utf8());
                 }
             }
         }
@@ -778,9 +786,7 @@ impl Lexer {
                         *chars = macro_chars; // Consume the macro's contents.
 
                         if cur_depth == params.options.runtime_opts.recursion_depth {
-                            let mut span = ctx.new_span();
-                            span.bytes.start += ofs;
-                            span.bytes.end = span.bytes.start + ch.len_utf8();
+                            let span = ctx.new_span_len(ofs, ch.len_utf8());
                             Self::report_depth_overflow(
                                 cur_depth,
                                 &Span::Normal(span),
@@ -792,13 +798,9 @@ impl Lexer {
                             match res {
                                 Ok((_kind, text)) => name.push_str(text.contents.text()),
                                 Err(err) => {
-                                    let mut span = ctx.new_span();
-                                    span.bytes.start += ofs;
-                                    span.bytes.end += match chars.peek() {
-                                        Some((ofs, _ch)) => *ofs,
-                                        None => text.len(),
-                                    };
-                                    let span = Span::Normal(span);
+                                    let span = Span::Normal(ctx.new_span_ofs(
+                                        ofs..chars.peek().map_or(text.len(), |(ofs, _ch)| *ofs),
+                                    ));
                                     diagnostics::error(
                                         &span,
                                         |error| {
@@ -822,9 +824,7 @@ impl Lexer {
                 }
                 '{' => {
                     if cur_depth == params.options.runtime_opts.recursion_depth {
-                        let mut span = ctx.new_span();
-                        span.bytes.start += ofs;
-                        span.bytes.end = span.bytes.start + ch.len_utf8();
+                        let span = ctx.new_span_len(ofs, ch.len_utf8());
                         Self::report_depth_overflow(
                             cur_depth,
                             &Span::Normal(span),
@@ -846,10 +846,7 @@ impl Lexer {
                 }
                 ':' => {
                     if fmt.is_some() {
-                        let mut span = ctx.new_span();
-                        span.bytes.start += ofs;
-                        span.bytes.end = span.bytes.start + ch.len_utf8();
-                        let span = Span::Normal(span);
+                        let span = Span::Normal(ctx.new_span_len(ofs, ch.len_utf8()));
                         diagnostics::error(
                             &span,
                             |error| {
@@ -868,10 +865,7 @@ impl Lexer {
                         {
                             Ok(spec) => fmt = Some(spec),
                             Err(err) => {
-                                let mut span = ctx.new_span();
-                                span.bytes.start += first_ofs.unwrap();
-                                span.bytes.end += ofs;
-                                let span = Span::Normal(span);
+                                let span = Span::Normal(ctx.new_span_ofs(first_ofs.unwrap()..ofs));
                                 diagnostics::error(
                                     &span,
                                     |error| {
@@ -896,10 +890,7 @@ impl Lexer {
                     let ident = if let Some(raw_name) = name.strip_prefix('#') {
                         params.identifiers.get(raw_name)
                     } else if KEYWORDS.contains_key(&UniCase::ascii(&name)) {
-                        let mut span = ctx.new_span();
-                        span.bytes.start += first_ofs.unwrap();
-                        span.bytes.end += ofs;
-                        let span = Span::Normal(span);
+                        let span = Span::Normal(ctx.new_span_ofs(first_ofs.unwrap()..ofs));
                         diagnostics::error(
                             &span,
                             |error| {
@@ -927,10 +918,7 @@ impl Lexer {
                         params.identifiers,
                         params.sections,
                     ) {
-                        let mut span = ctx.new_span();
-                        span.bytes.start += first_ofs.unwrap();
-                        span.bytes.end += ofs;
-                        let span = Span::Normal(span);
+                        let span = Span::Normal(ctx.new_span_ofs(first_ofs.unwrap()..ofs));
                         diagnostics::error(
                             &span,
                             |error| {
@@ -952,10 +940,8 @@ impl Lexer {
             }
         }
 
-        let mut span = ctx.new_span();
-        span.bytes.end += first_ofs.unwrap_or(text.len());
-        span.bytes.start = span.bytes.end - '{'.len_utf8();
-        let span = Span::Normal(span);
+        let end = first_ofs.unwrap_or(text.len());
+        let span = Span::Normal(ctx.new_span_ofs(end - '{'.len_utf8()..end));
         diagnostics::error(
             &span,
             |error| {
@@ -1015,10 +1001,7 @@ impl Lexer {
                 }
                 '/' => {
                     if matches!(chars.peek(), Some((_, '*'))) {
-                        let mut span = ctx.new_span();
-                        span.bytes.start += ofs;
-                        span.bytes.end = span.bytes.start + 2;
-                        let span = Span::Normal(span);
+                        let span = Span::Normal(ctx.new_span_len(ofs, 2));
                         diagnostics::warn(
                             warning!("nested-comment"),
                             &span,
@@ -1078,7 +1061,6 @@ impl Lexer {
         let ctx = self.active_context().unwrap();
         let text = ctx.remaining_text();
 
-        *span = ctx.new_span();
         let nb_bytes_consumed = callback(ctx, text);
         debug_assert!(
             nb_bytes_consumed <= text.len(),
@@ -1086,7 +1068,7 @@ impl Lexer {
             text.len()
         );
 
-        span.bytes.end += nb_bytes_consumed;
+        *span = ctx.new_span_len(0, nb_bytes_consumed);
         ctx.cur_byte += nb_bytes_consumed;
     }
 }
@@ -1149,7 +1131,7 @@ impl Lexer {
                     debug_assert!(span.bytes.is_empty());
                     self.consume(&mut span);
                     // Move the start of the span as well.
-                    span.bytes.start = span.bytes.end;
+                    span.make_empty();
                 }
 
                 Some(';') => {
@@ -1162,7 +1144,7 @@ impl Lexer {
                         }
                     });
                     // Ignore the comment.
-                    span.bytes.start = span.bytes.end;
+                    span.make_empty();
                 }
 
                 Some('\\') => {
@@ -1181,9 +1163,7 @@ impl Lexer {
                         match res {
                             Ok(()) => {}
                             Err(err) => {
-                                let mut span = ctx.new_span();
-                                span.bytes.end += cont_len;
-                                let span = Span::Normal(span.clone());
+                                let span = Span::Normal(ctx.new_span_len(0, cont_len));
                                 params.error(&span, |error| {
                                     error.set_message(&err);
                                     error.add_label(
@@ -1200,7 +1180,7 @@ impl Lexer {
                     });
 
                     // Ignore the line continuation.
-                    span.bytes.start = span.bytes.end;
+                    span.make_empty();
                 }
 
                 // Unambiguous single-char tokens.
@@ -1291,9 +1271,7 @@ impl Lexer {
                             params.nb_errors_left,
                             params.options,
                         ) {
-                            let mut span = ctx.new_span();
-                            span.bytes.end = span.bytes.start + "/*".len();
-                            let span = Span::Normal(span);
+                            let span = Span::Normal(ctx.new_span_len(0, "/*".len()));
                             params.error(&span, |error| {
                                 error.set_message(&err);
                                 error.add_label(
@@ -1319,7 +1297,7 @@ impl Lexer {
                         }
                     } else {
                         // Ignore the block comment.
-                        span.bytes.start = span.bytes.end;
+                        span.make_empty();
                     }
                 }
                 Some('|') => {
@@ -1642,7 +1620,7 @@ impl Lexer {
                                     "in rgbasm, the current address is notated `@`, not `$`",
                                 );
                             });
-                            span.bytes.start = span.bytes.end;
+                            span.make_empty();
                         }
                     }
                 }
@@ -1684,7 +1662,7 @@ impl Lexer {
                                     gfx_char(3),
                                 ));
                             });
-                            span.bytes.start = span.bytes.end;
+                            span.make_empty();
                         }
                     }
                 }
@@ -1730,7 +1708,7 @@ impl Lexer {
                                             ),
                                         );
                                     });
-                                    span.bytes.start = span.bytes.end;
+                                    span.make_empty();
                                     continue;
                                 }
                             }
@@ -1780,7 +1758,7 @@ impl Lexer {
                     // Borrowck is not happy without this, but this should hopefully compile to nothing.
                     span = err_span.extract_normal();
                     // Make the span empty, as we ignore the character that's just been consumed.
-                    span.bytes.start = span.bytes.end;
+                    span.make_empty();
                 }
             }
         }
@@ -2382,9 +2360,7 @@ impl Lexer {
                                     Some(&(ofs, _ch)) => ofs,
                                     None => text.len(),
                                 };
-                                let mut span = ctx.new_span();
-                                span.bytes = ctx.cur_byte + ofs..ctx.cur_byte + macro_arg_len;
-                                let span = Span::Normal(span);
+                                let span = Span::Normal(ctx.new_span_ofs(ofs..macro_arg_len));
                                 params.error(&span, |error| {
                                     error.set_message(&err);
                                     error.add_label(
@@ -2428,10 +2404,7 @@ impl Lexer {
                     string.push_str(&expanded);
                 }
                 '}' if !raw => {
-                    let mut span = ctx.new_span();
-                    span.bytes.start += ofs;
-                    span.bytes.end = span.bytes.start + '}'.len_utf8();
-                    let span = Span::Normal(span);
+                    let span = Span::Normal(ctx.new_span_len(ofs, '}'.len_utf8()));
                     params.warn(warning!("unescaped-brace"), &span, |warning| {
                         warning.set_message("unescaped closing brace");
                         warning.add_label(
@@ -2447,9 +2420,7 @@ impl Lexer {
         }
 
         // The string wasn't terminated properly.
-        let mut err_span = ctx.new_span();
-        err_span.bytes.end = ctx.cur_byte + end_ofs;
-        let err_span = Span::Normal(err_span);
+        let err_span = Span::Normal(ctx.new_span_ofs(0..end_ofs));
         params.error(&err_span, |error| {
             error.set_message(if delim_char == '"' {
                 "unterminated string literal"
@@ -2494,10 +2465,7 @@ impl Lexer {
             #[allow(unreachable_patterns)]
             Some((_ofs, chars!(line_cont))) => {
                 if let Err(err) = Self::read_line_continuation(chars) {
-                    let mut span = ctx.new_span();
-                    span.bytes.start += backslash_ofs;
-                    span.bytes.end = span.bytes.start + '\\'.len_utf8();
-                    let span = Span::Normal(span);
+                    let span = Span::Normal(ctx.new_span_len(backslash_ofs, '\\'.len_utf8()));
                     params.error(&span, |error| {
                         error.set_message(&err);
                         error.add_label(
@@ -2510,10 +2478,8 @@ impl Lexer {
             }
 
             Some((escaped_ofs, ch)) => {
-                let mut span = ctx.new_span();
-                span.bytes =
-                    ctx.cur_byte + backslash_ofs..ctx.cur_byte + escaped_ofs + ch.len_utf8();
-                let span = Span::Normal(span);
+                let span =
+                    Span::Normal(ctx.new_span_ofs(backslash_ofs..escaped_ofs + ch.len_utf8()));
                 params.error(&span, |error| {
                     error.set_message("invalid character escape");
                     error.add_label(
@@ -2525,9 +2491,7 @@ impl Lexer {
                 None // Avoid returning a character, so passthrough strings don't report the bad escape twice.
             }
             None => {
-                let mut span = ctx.new_span();
-                span.bytes = ctx.cur_byte + backslash_ofs..ctx.cur_byte + text.len();
-                let span = Span::Normal(span);
+                let span = Span::Normal(ctx.new_span_ofs(backslash_ofs..text.len()));
                 params.error(&span, |error| {
                     error.set_message("invalid character escape");
                     error.add_label(
@@ -2593,13 +2557,9 @@ impl Lexer {
 
                         // Line continuations count as “whitespace”.
                         if let Err(err) = Self::read_line_continuation(&mut chars) {
-                            let mut span = ctx.new_span();
-                            span.bytes.start += ofs;
-                            span.bytes.end += match chars.peek() {
-                                Some(&(ofs, _ch)) => ofs,
-                                None => text.len(),
-                            };
-                            let span = Span::Normal(span);
+                            let span = Span::Normal(ctx.new_span_ofs(
+                                ofs..chars.peek().map_or(text.len(), |(ofs, _ch)| *ofs),
+                            ));
                             params.error(&span, |error| {
                                 error.set_message(&err);
                                 error.add_label(
@@ -2702,10 +2662,7 @@ impl Lexer {
                                 params.nb_errors_left,
                                 params.options,
                             ) {
-                                let mut span = ctx.new_span();
-                                span.bytes.start += ofs;
-                                span.bytes.end = span.bytes.start + "/*".len();
-                                let span = Span::Normal(span);
+                                let span = Span::Normal(ctx.new_span_len(ofs, "/*".len()));
                                 params.error(&span, |error| {
                                     error.set_message(&err);
                                     error.add_label(
@@ -2747,10 +2704,7 @@ impl Lexer {
                             match res {
                                 Ok((_kind, source)) => string.push_str(source.contents.text()),
                                 Err(err) => {
-                                    let mut span = ctx.new_span();
-                                    span.bytes.start += ofs;
-                                    span.bytes.end = span.bytes.start + '\\'.len_utf8();
-                                    let span = Span::Normal(span);
+                                    let span = Span::Normal(ctx.new_span_len(ofs, '\\'.len_utf8()));
                                     params.error(&span, |error| {
                                         error.set_message(&err);
                                         error.add_label(
