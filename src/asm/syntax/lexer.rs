@@ -2111,6 +2111,7 @@ impl Lexer {
                 _ => break,
             }
         }
+        let value = (high_bitplane as u32) << 8 | low_bitplane as u32;
 
         if overflowed {
             let span = Span::Normal(span.clone());
@@ -2141,7 +2142,7 @@ impl Lexer {
             });
         }
 
-        (high_bitplane as u32) << 8 | low_bitplane as u32
+        value
     }
 
     fn read_identifier(
