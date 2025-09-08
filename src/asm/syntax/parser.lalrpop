@@ -172,6 +172,9 @@ Directive: () = {
 	<export:(<@L> "export")?> <redef:Def> <name:"identifier"> <span_idx:@L> <stride:RsKindKeyword> <value:Expr?> => {
 		ctx.define_rs(export, redef, name, stride, value, span_idx)
 	},
+	<export:(<@L> "export")?> <redef:Def> <span_idx:@L> <name:"identifier"> "(" <params:CommaList<"identifier">> ")" "=" <expr:Expr> => {
+		ctx.define_function(redef, name, params, expr, span_idx)
+	},
 	"export" NonEmptyCommaList<ExportArg> => (),
 	"purge" NonEmptyCommaList<PurgeArg> => (),
 	"rsreset" => ctx.reset_rs(),
@@ -549,7 +552,10 @@ ExprAtomNoIdent: Expr = {
 	<span_idx:@L> <ident:AnonLabelRef> => ctx.anon_label_ref(ident, span_idx),
 	<span_idx:@L> <number:"number"> => Expr::number(number as i32, ctx.line_spans[span_idx].clone()),
 	<span_idx:@L> <ch:"character literal"> => ctx.convert_char_lit(ch, span_idx),
-	// TODO: user-defined functions
+	<l_span_idx:@L> <func:"identifier"> <lazy_eval:(<@L> "!")?> "(" <args:CommaList<Expr>> ")" <r_span_idx:@R> => {
+		ctx.function_call(func, lazy_eval, args, l_span_idx, r_span_idx)
+	},
+	// TODO: `OPCODE`
 	// Arithmetic functions.
 	<l_span_idx:@L> "high" "(" <expr:Expr> ")" <r_span_idx:@R> => expr.high(ctx.span_from_to(l_span_idx, r_span_idx)),
 	<l_span_idx:@L> "low"  "(" <expr:Expr> ")" <r_span_idx:@R> => expr.low(ctx.span_from_to(l_span_idx, r_span_idx)),
@@ -634,7 +640,7 @@ StringExprAtomNoIdent: (CompactString, Span) = {
 };
 StrcatArgs: CompactString = {
 	<StringExpr> => <>.0,
-	<mut acc:StrcatArgs> "," <string:StringExpr> => acc + &string.0
+	<acc:StrcatArgs> "," <string:StringExpr> => acc + &string.0
 };
 
 Identifier = { "identifier", "local identifier" };

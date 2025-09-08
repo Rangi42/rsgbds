@@ -1,6 +1,6 @@
 use crate::{
     diagnostics::{self, ReportBuilder, WarningKind},
-    expr::{Expr, ExprWarning},
+    expr::Expr,
     sources::Span,
 };
 

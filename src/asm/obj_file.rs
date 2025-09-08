@@ -334,7 +334,9 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                     self.write_long(line_no)?;
 
                     let (value, section_id) = match kind {
-                        SymbolKind::String(_) | SymbolKind::Macro(_) => unreachable!(),
+                        SymbolKind::String(_)
+                        | SymbolKind::Macro(_)
+                        | SymbolKind::Function { .. } => unreachable!(),
                         SymbolKind::Numeric { value, .. } => (*value as u32, u32::MAX),
                         SymbolKind::Label { section_id, offset } => {
                             // The offset must be in u32 range, as section sizes are lower than u16 range.

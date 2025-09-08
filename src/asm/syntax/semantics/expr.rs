@@ -1,8 +1,113 @@
-use crate::{diagnostics, expr::Expr, Identifier};
+use crate::{
+    diagnostics,
+    expr::{Expr, OpKind},
+    symbols::{SymbolData, SymbolKind},
+    Identifier,
+};
 
 use super::parse_ctx;
 
 impl parse_ctx!() {
+    pub fn function_call(
+        &mut self,
+        ident: Identifier,
+        lazy_eval: Option<usize>,
+        args: Vec<Expr>,
+        l_span_idx: usize,
+        r_span_idx: usize,
+    ) -> Expr {
+        let span = self.span_from_to(l_span_idx, r_span_idx);
+
+        let Some(symbol) = self.symbols.find(&ident) else {
+            self.error(&span, |error| {
+                error.set_message(format!(
+                    "no function called `{}`",
+                    self.identifiers.resolve(ident).unwrap(),
+                ));
+                error.add_label(diagnostics::error_label(&span).with_message("no such function"));
+            });
+            return Expr::nothing(span);
+        };
+        let SymbolData::User {
+            kind: SymbolKind::Function { param_names, expr },
+            ..
+        } = symbol
+        else {
+            self.error(&span, |error| {
+                error.set_message(format!(
+                    "`{}` is not a function",
+                    self.identifiers.resolve(ident).unwrap(),
+                ));
+                error.add_labels([
+                    diagnostics::error_label(&span).with_message("invalid function call"),
+                    diagnostics::note_label(symbol.def_span())
+                        .with_message(format!("defined as {} here", symbol.kind_name())),
+                ]);
+            });
+            return Expr::nothing(span);
+        };
+
+        if args.len() != param_names.len() {
+            self.error(&span, |error| {
+                error.set_message("wrong number of arguments given to function call");
+                error.add_labels([
+                    diagnostics::note_label(symbol.def_span()).with_message(format!(
+                        "defined as taking {} arguments here...",
+                        param_names.len(),
+                    )),
+                    diagnostics::error_label(&span)
+                        .with_message(format!("...but given {} arguments here", args.len())),
+                ]);
+            });
+            return Expr::nothing(span);
+        }
+
+        if lazy_eval.is_some() {
+            // Lazy evaluation.
+
+            // Assume that each argument is expanded once; for each arg, subtract 1 since it'll be replacing one op.
+            let mut ops = Vec::with_capacity(
+                expr.ops().len() + args.iter().fold(0, |sum, arg| arg.ops().len() - 1 + sum),
+            );
+            for op in expr.ops() {
+                if let OpKind::Symbol(ident) = op.kind {
+                    if let Some(arg_idx) = param_names.iter().position(|name| *name == ident) {
+                        ops.extend(args[arg_idx].ops().cloned());
+                        continue;
+                    }
+                }
+                ops.push(op.clone());
+            }
+            ops.into_iter().collect()
+        } else {
+            // Eager evaluation.
+
+            let mut arg_results = Vec::with_capacity(args.len());
+            for arg in &args {
+                match self.try_const_eval(arg) {
+                    Ok((value, _span)) => arg_results.push(value),
+                    Err(err) => self.report_expr_error(err),
+                }
+            }
+
+            if arg_results.len() != args.len() {
+                // At least one error has been produced, bail out.
+                return Expr::nothing(span);
+            }
+            expr.ops()
+                .map(|op| {
+                    let mut new_op = op.clone();
+                    if let OpKind::Symbol(ident) = op.kind {
+                        if let Some(arg_idx) = param_names.iter().position(|name| *name == ident) {
+                            new_op.kind = OpKind::Number(arg_results[arg_idx]);
+                        }
+                    }
+                    new_op
+                })
+                .collect()
+        }
+    }
+
     pub fn is_expr_constant(&self, expr: Expr, l_span_idx: usize, r_span_idx: usize) -> Expr {
         let value = match self.try_const_eval(&expr) {
             Ok((_value, _span)) => 1,
@@ -10,7 +115,11 @@ impl parse_ctx!() {
                 if err.can_be_deferred_to_linker() {
                     0
                 } else {
-                    1 // Report the value as constant, but don't report the error itself.
+                    // Report the value as constant, but don't report the error itself:
+                    // generally, if the function returns 1 (true), then its argument gets used again;
+                    // reporting the error here would cause it to be reported twice.
+                    // Returning 0 could cause the error to be deferred to the linker, which is not great UX.
+                    1
                 }
             }
         };

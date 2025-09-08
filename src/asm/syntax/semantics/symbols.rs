@@ -1,12 +1,14 @@
+use std::fmt::Display;
+
 use compact_str::CompactString;
 use either::Either;
 
 use crate::{
-    diagnostics,
-    expr::{BinOp, Expr},
+    diagnostics::{self, warning},
+    expr::{BinOp, Expr, OpKind},
     sources::Span,
     symbols::{SymbolData, SymbolKind},
-    Identifier,
+    Identifier, Identifiers,
 };
 
 use super::parse_ctx;
@@ -240,7 +242,7 @@ impl parse_ctx!() {
                     self.identifiers,
                     span,
                     constant_value,
-                    false,
+                    false, // Not mutable.
                     export.is_some(),
                     redef,
                     self.sections
@@ -254,6 +256,89 @@ impl parse_ctx!() {
             }
             Err(error) => self.report_expr_error(error),
         }
+    }
+
+    pub fn define_function(
+        &mut self,
+        redef: bool,
+        name: Identifier,
+        param_names: Vec<Identifier>,
+        expr: Expr,
+        span_idx: usize,
+    ) {
+        let span = &self.line_spans[span_idx];
+
+        // Check for shadowing.
+        // TODO
+
+        // Check for by-reference captures, and tag the referenced symbols to warn on deletion/mutation.
+        // TODO
+
+        // Check for unused arguments.
+        let mut unused: Vec<_> = param_names
+            .iter()
+            .map(|ident| !self.identifiers.resolve(*ident).unwrap().starts_with('_')) // A leading `_` suppresses the warning.
+            .collect();
+        for op in expr.ops() {
+            if let OpKind::Symbol(ident) = &op.kind {
+                if let Some(idx) = param_names.iter().position(|param| *param == *ident) {
+                    unused[idx] = false;
+                }
+            }
+        }
+        let mut unused_iter = unused.iter();
+        if let Some(last_unused) = unused_iter.rposition(|is_unused| *is_unused) {
+            let rest = unused_iter.as_slice();
+            if unused_iter.any(|is_unused| *is_unused) {
+                self.warn(warning!("unused-func-param"), span, |warning| {
+                    warning.set_message("unused function parameters");
+                    warning.add_label(diagnostics::warning_label(span).with_message(format!(
+                        "{}and {} are not used within the function's body",
+                        Params(rest, &param_names, self.identifiers),
+                        self.identifiers.resolve(param_names[last_unused]).unwrap(),
+                    )));
+                    struct Params<'idents, 'names, 'unused>(
+                        &'unused [bool],
+                        &'names [Identifier],
+                        &'idents Identifiers,
+                    );
+                    impl Display for Params<'_, '_, '_> {
+                        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                            let mut iter = self.0.iter();
+                            while let Some(idx) = iter.position(|is_unused| *is_unused) {
+                                write!(f, "{}, ", self.2.resolve(self.1[idx]).unwrap())?;
+                            }
+                            Ok(())
+                        }
+                    }
+                });
+            } else {
+                self.warn(warning!("unused-func-param"), span, |warning| {
+                    warning.set_message("unused function parameter");
+                    warning.add_label(diagnostics::warning_label(span).with_message(format!(
+                        "{} is not used within the function's body",
+                        self.identifiers.resolve(param_names[last_unused]).unwrap(),
+                    )));
+                });
+            }
+        }
+
+        let span = self.nth_span(span_idx);
+        self.symbols.define_function(
+            name,
+            self.identifiers,
+            span,
+            param_names,
+            expr,
+            redef,
+            self.sections
+                .active_section
+                .as_ref()
+                .map(|active| &active.sym_section),
+            self.macro_args.last(),
+            self.nb_errors_left,
+            self.options,
+        )
     }
 
     pub fn export_symbol(&mut self, name: Identifier, span_idx: usize) {

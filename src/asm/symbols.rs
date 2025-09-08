@@ -8,6 +8,7 @@ use string_interner::Symbol;
 use crate::{
     common::S,
     diagnostics::{self, warning},
+    expr::Expr,
     format::{FormatError, FormatSpec},
     macro_args::MacroArgs,
     section::{ActiveSection, SectionId, Sections},
@@ -57,6 +58,10 @@ pub enum SymbolKind {
     Label {
         section_id: SectionId,
         offset: usize,
+    },
+    Function {
+        param_names: Vec<Identifier>,
+        expr: Expr,
     },
 }
 
@@ -549,6 +554,33 @@ impl Symbols {
         )
     }
 
+    pub fn define_function(
+        &mut self,
+        name: Identifier,
+        identifiers: &Identifiers,
+        definition: Span,
+        param_names: Vec<Identifier>,
+        expr: Expr,
+        redef: bool,
+        active_section: Option<&ActiveSection>,
+        macro_args: Option<&MacroArgs>,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        self.define_symbol(
+            name,
+            identifiers,
+            definition,
+            SymbolKind::Function { param_names, expr },
+            false, // Not exported.
+            redef,
+            active_section,
+            macro_args,
+            nb_errors_left,
+            options,
+        )
+    }
+
     pub fn define_macro(
         &mut self,
         name: Identifier,
@@ -775,7 +807,8 @@ impl SymbolKind {
             ) => *mutable == *other_mutable,
             (SymbolKind::String(_), SymbolKind::String(_))
             | (SymbolKind::Macro(_), SymbolKind::Macro(_))
-            | (SymbolKind::Label { .. }, SymbolKind::Label { .. }) => true,
+            | (SymbolKind::Label { .. }, SymbolKind::Label { .. })
+            | (SymbolKind::Function { .. }, SymbolKind::Function { .. }) => true,
             (_, _) => false,
         }
     }
@@ -817,6 +850,7 @@ impl SymbolData {
                 SymbolKind::String(_) => "string symbol",
                 SymbolKind::Macro(_) => "macro",
                 SymbolKind::Label { .. } => "label",
+                SymbolKind::Function { .. } => "function",
             },
             SymbolData::Pc => "label",
             SymbolData::Narg => "constant",
@@ -837,6 +871,7 @@ impl SymbolData {
                 SymbolKind::String(string) => Some(Ok(string.clone())),
                 SymbolKind::Macro(_) => None,
                 SymbolKind::Label { .. } => None,
+                SymbolKind::Function { .. } => None,
             },
             Self::Pc => None,
             Self::Narg => None,
@@ -871,6 +906,7 @@ impl SymbolData {
                     .find(*section_id)
                     .address()
                     .map(|base_addr| base_addr as i32 + *offset as i32))),
+                SymbolKind::Function { .. } => None,
             },
             Self::Pc => Some(match sections.active_section.as_ref() {
                 Some(active) => Ok(sections.sections[active.sym_section.id]
@@ -902,6 +938,7 @@ impl SymbolData {
                 SymbolKind::Numeric { .. } => None,
                 SymbolKind::String(_) => None,
                 SymbolKind::Macro(_) => None,
+                SymbolKind::Function { .. } => None,
             },
             SymbolData::Pc => match sections.active_section.as_ref() {
                 Some(active) => Some(Ok((active.sym_section.id, active.sym_section.offset))),

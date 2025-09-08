@@ -165,6 +165,13 @@ impl Expr {
         })
     }
 }
+impl FromIterator<Op> for Expr {
+    fn from_iter<T: IntoIterator<Item = Op>>(iter: T) -> Self {
+        Self {
+            payload: iter.into_iter().collect(),
+        }
+    }
+}
 
 impl Expr {
     pub fn binary_op(mut self, operator: BinOp, mut other: Self, op_span: Span) -> Self {
@@ -551,7 +558,7 @@ impl Expr {
         }
     }
 
-    pub fn ops(&self) -> impl Iterator<Item = &Op> {
+    pub fn ops(&self) -> impl ExactSizeIterator<Item = &Op> {
         self.payload.iter()
     }
 }

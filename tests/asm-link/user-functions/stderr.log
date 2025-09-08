@@ -1,0 +1,40 @@
+error: no function called `g`
+    ╭─[ test.asm:11:9 ]
+    │
+ 11 │ println g() ; Undefined function.
+    │         ─┬─  
+    │          ╰─── no such function
+────╯
+error: `x` is not a function
+    ╭─[ test.asm:12:9 ]
+    │
+  2 │ def x = 0
+    │       ┬  
+    │       ╰── defined as variable here
+    │ 
+ 12 │ println x() ; Not a function.
+    │         ─┬─  
+    │          ╰─── invalid function call
+────╯
+[-Wunused-func-param] warning: unused function parameter
+    ╭─[ test.asm:16:7 ]
+    │
+ 16 │ redef g(x)    = 0 ; Warn on unused parameter.
+    │       ┬  
+    │       ╰── x is not used within the function's body
+────╯
+[-Wunused-func-param] warning: unused function parameters
+    ╭─[ test.asm:17:7 ]
+    │
+ 17 │ redef g(x, y) = 0 ; ...different warning when there are multiple unused ones.
+    │       ┬  
+    │       ╰── x, and y are not used within the function's body
+────╯
+error: division by zero
+    ╭─[ test.asm:26:26 ]
+    │
+ 26 │ println logic_and(0, 1 / 0) ; TODO: decide whether this should emit the div-0 error or not
+    │                          ┬  
+    │                          ╰── this is equal to zero
+────╯
+3 errors generated.
