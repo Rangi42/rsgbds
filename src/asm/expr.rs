@@ -61,6 +61,7 @@ pub enum ExprWarning {
     ShiftByNeg(bool, i32),
     ShiftByTooMuch(bool, i32),
     LeftShiftNeg(i32),
+    MinDivM1,
 }
 
 #[derive(Debug)]
@@ -836,7 +837,11 @@ impl BinOp {
                     kind: ErrKind::DivBy0,
                 })
             } else {
-                Ok((div_floor(lhs, rhs), left_span.merged_with(&right_span)))
+                let span = left_span.merged_with(&right_span);
+                if lhs == i32::MIN && rhs == -1 {
+                    warn(ExprWarning::MinDivM1, &span);
+                }
+                Ok((div_floor(lhs, rhs), span))
             }),
             BinOp::Modulo => greedy!(|(lhs, left_span), (rhs, right_span)| if rhs == 0 {
                 Err(Error {
@@ -1161,65 +1166,72 @@ impl ErrKind {
 impl ExprWarning {
     pub fn report(&self, span: &Span, nb_errors_left: &Cell<usize>, options: &Options) {
         match self {
-            Self::ShiftByNeg(dir_right, shift_amount) => {
-                diagnostics::warn(
-                    warning!("shift-amount"),
-                    span,
-                    |warning| {
-                        warning.set_message(if *dir_right {
-                            "shifting right by negative amount"
-                        } else {
-                            "shifting left by negative amount"
-                        });
-                        warning.add_label(
-                            diagnostics::warning_label(span)
-                                .with_message(format!("shifting by {shift_amount}")),
-                        );
-                        warning.set_help(if *dir_right {
-                            "consider using `<<` instead"
-                        } else {
-                            "consider using `>>` or `>>>` instead"
-                        });
-                    },
-                    nb_errors_left,
-                    options,
-                );
-            }
-            Self::ShiftByTooMuch(dir_right, shift_amount) => {
-                diagnostics::warn(
-                    warning!("shift-amount"),
-                    span,
-                    |warning| {
-                        warning.set_message(if *dir_right {
-                            "shifting right by more than 31"
-                        } else {
-                            "shifting left by more than 31"
-                        });
-                        warning.add_label(
-                            diagnostics::warning_label(span)
-                                .with_message(format!("shifting by {shift_amount}")),
-                        );
-                    },
-                    nb_errors_left,
-                    options,
-                );
-            }
-            Self::LeftShiftNeg(shiftee) => {
-                diagnostics::warn(
-                    warning!("shift"),
-                    span,
-                    |warning| {
-                        warning.set_message("shifting right a negative number");
-                        warning
-                            .add_label(diagnostics::warning_label(span).with_message(format!(
-                                "the left-hand side evaluates to {shiftee}"
-                            )));
-                        warning.set_help("to divide rounding towards 0, use `/`; to perform a logical shift, use `>>>`");
-                    },
-                    nb_errors_left,
-                    options,
-                );
-            }
+            Self::ShiftByNeg(dir_right, shift_amount) => diagnostics::warn(
+                warning!("shift-amount"),
+                span,
+                |warning| {
+                    warning.set_message(if *dir_right {
+                        "shifting right by negative amount"
+                    } else {
+                        "shifting left by negative amount"
+                    });
+                    warning.add_label(
+                        diagnostics::warning_label(span)
+                            .with_message(format!("shifting by {shift_amount}")),
+                    );
+                    warning.set_help(if *dir_right {
+                        "consider using `<<` instead"
+                    } else {
+                        "consider using `>>` or `>>>` instead"
+                    });
+                },
+                nb_errors_left,
+                options,
+            ),
+            Self::ShiftByTooMuch(dir_right, shift_amount) => diagnostics::warn(
+                warning!("shift-amount"),
+                span,
+                |warning| {
+                    warning.set_message(if *dir_right {
+                        "shifting right by more than 31"
+                    } else {
+                        "shifting left by more than 31"
+                    });
+                    warning.add_label(
+                        diagnostics::warning_label(span)
+                            .with_message(format!("shifting by {shift_amount}")),
+                    );
+                },
+                nb_errors_left,
+                options,
+            ),
+            Self::LeftShiftNeg(shiftee) => diagnostics::warn(
+                warning!("shift"),
+                span,
+                |warning| {
+                    warning.set_message("shifting right a negative number");
+                    warning.add_label(
+                        diagnostics::warning_label(span)
+                            .with_message(format!("the left-hand side evaluates to {shiftee}")),
+                    );
+                    warning.set_help("to divide rounding towards 0, use `/`; to perform a logical shift, use `>>>`");
+                },
+                nb_errors_left,
+                options,
+            ),
+            Self::MinDivM1 => diagnostics::warn(
+                warning!("div"),
+                span,
+                |warning| {
+                    warning.set_message("division of -2_147_483_648 by -1 yields itself");
+                    warning.add_label(
+                        diagnostics::warning_label(span)
+                            .with_message("the sign of this quotient may be surprising"),
+                    );
+                },
+                nb_errors_left,
+                options,
+            ),
         }
     }
 }

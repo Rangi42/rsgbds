@@ -1,8 +1,28 @@
-warning: Division of -2147483648 by -1 yields -2147483648 [-Wdiv]
-    at overflow.asm(23)
-warning: Division of -2147483648 by -1 yields -2147483648 [-Wdiv]
-    at overflow.asm(24)
-warning: Integer constant is too large [-Wlarge-constant]
-    at overflow.asm(44)
-warning: Graphics constant is too large; only first 8 pixels considered [-Wlarge-constant]
-    at overflow.asm(47)
+[-Wdiv] warning: division of -2_147_483_648 by -1 yields itself
+    ╭─[ test.asm:23:9 ]
+    │
+ 23 │ def x = x / -1
+    │         ───┬──  
+    │            ╰──── the sign of this quotient may be surprising
+────╯
+[-Wdiv] warning: division of -2_147_483_648 by -1 yields itself
+    ╭─[ test.asm:24:5 ]
+    │
+ 24 │     dl -2147483648 / -1
+    │        ────────┬───────  
+    │                ╰───────── the sign of this quotient may be surprising
+────╯
+[-Wlarge-constant] warning: integer constant is larger than 4294967295
+    ╭─[ test.asm:44:9 ]
+    │
+ 44 │ def x = 4294967296
+    │         ─────┬────  
+    │              ╰────── this was truncated to 0
+────╯
+[-Wlarge-constant] warning: graphics constant contains more than 8 pixels
+    ╭─[ test.asm:47:9 ]
+    │
+ 47 │ def x = `333333333
+    │         ─────┬────  
+    │              ╰────── this was truncated to $FFFF
+────╯
