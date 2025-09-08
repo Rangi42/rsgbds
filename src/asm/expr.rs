@@ -729,12 +729,71 @@ impl BinOp {
                         .bubble_up()),
                     }
                 }
-                (Ok((lhs, left_span)), Ok((rhs, right_span))) => (Ok(lhs.wrapping_sub(rhs)))
-                    .map(|value| (value, left_span.merged_with(&right_span))),
+                (Ok((lhs, left_span)), Ok((rhs, right_span))) => {
+                    Ok((lhs.wrapping_sub(rhs), left_span.merged_with(&right_span)))
+                }
                 (Ok(_), Err(err)) | (Err(err), Ok(_)) => Err(err.bubble_up()),
             },
-            // TODO: symbol alignment can be constant
-            BinOp::And => greedy!(|lhs, rhs| Ok(lhs & rhs)),
+            BinOp::And => {
+                fn try_compute_align_mask(
+                    mask: i32,
+                    err_kind: &ErrKind,
+                    sections: &Sections,
+                    symbols: &Symbols,
+                ) -> Option<i32> {
+                    err_kind
+                        .get_section_and_offset(symbols, sections)
+                        .and_then(|(sect_id, ofs)| {
+                            let section = &sections.sections[sect_id];
+                            let unknown_bits = !section.attrs.address.align_mask();
+                            if mask & i32::from(unknown_bits) == 0 {
+                                // Only known bits are kept: the result is constant!
+                                Some(
+                                    (ofs + usize::from(section.attrs.address.align_ofs())) as i32
+                                        & mask,
+                                )
+                            } else {
+                                // Not all bits are known to the assembler.
+                                None
+                            }
+                        })
+                }
+                match (lhs, rhs) {
+                    // ANDing with an aligned label can be constant.
+                    (
+                        Ok((mask, left_span)),
+                        Err(Error {
+                            span: right_span,
+                            kind,
+                        }),
+                    ) => match try_compute_align_mask(mask, &kind, sections, symbols) {
+                        Some(value) => Ok((value, left_span.merged_with(&right_span))),
+                        None => Err(Error {
+                            span: right_span,
+                            kind,
+                        }
+                        .bubble_up()),
+                    },
+                    (
+                        Err(Error {
+                            span: left_span,
+                            kind,
+                        }),
+                        Ok((mask, right_span)),
+                    ) => match try_compute_align_mask(mask, &kind, sections, symbols) {
+                        Some(value) => Ok((value, left_span.merged_with(&right_span))),
+                        None => Err(Error {
+                            span: left_span,
+                            kind,
+                        }
+                        .bubble_up()),
+                    },
+                    (Ok((lhs, left_span)), Ok((rhs, right_span))) => {
+                        Ok((lhs & rhs, left_span.merged_with(&right_span)))
+                    }
+                    (Err(err), Err(_)) => Err(err.bubble_up()),
+                }
+            }
             BinOp::Or => greedy!(|lhs, rhs| Ok(lhs | rhs)),
             BinOp::Xor => greedy!(|lhs, rhs| Ok(lhs ^ rhs)),
             BinOp::LeftShift => greedy!(|(lhs, left_span), (rhs, right_span)| {

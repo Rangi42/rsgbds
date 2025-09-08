@@ -1,9 +1,29 @@
-error: PC has no value outside of a section
-    at const-and.asm(2)
-error: Expected constant expression: `Aligned` is not constant at assembly time
-    at const-and.asm(11)
-error: Expected constant expression: PC is not constant at assembly time
-    at const-and.asm(17)
-error: Expected constant expression: `Floating` is not constant at assembly time
-    at const-and.asm(20)
-Assembly aborted with 4 errors!
+error: PC doesn't have a value outside of a section
+   ╭─[ test.asm:2:10 ]
+   │
+ 2 │     println @ & 0 ; This should produce an error, but not crash
+   │             ┬  
+   │             ╰── this symbol is invalid
+───╯
+error: `Aligned` is not constant
+    ╭─[ test.asm:11:10 ]
+    │
+ 11 │     println Aligned & $1f ; Not constant
+    │             ───┬───  
+    │                ╰───── this symbol's value is not known at this point
+────╯
+error: `@` is not constant
+    ╭─[ test.asm:17:10 ]
+    │
+ 17 │     println @ & 1 ; Nope
+    │             ┬  
+    │             ╰── this symbol's value is not known at this point
+────╯
+error: `Floating` is not constant
+    ╭─[ test.asm:20:10 ]
+    │
+ 20 │     println Floating & Aligned ; Neither defined
+    │             ────┬───  
+    │                 ╰───── this symbol's value is not known at this point
+────╯
+4 errors generated.

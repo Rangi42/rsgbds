@@ -499,6 +499,21 @@ impl From<(u8, u16)> for AddrConstraint {
     }
 }
 impl AddrConstraint {
+    pub fn align_mask(&self) -> u16 {
+        match self {
+            Self::None => 0,
+            Self::Align(alignment, _) => (1 << *alignment) - 1,
+            Self::Addr(_) => 0xFFFF,
+        }
+    }
+    pub fn align_ofs(&self) -> u16 {
+        match self {
+            Self::None => 0,
+            Self::Align(_, align_ofs) => *align_ofs,
+            Self::Addr(addr) => *addr,
+        }
+    }
+
     pub fn merge(&mut self, other: Self, offset: usize) -> Result<(), MergeError> {
         match (self as &mut _, other) {
             // If the new constraint is nonexistent, then there is nothing to do.
