@@ -871,8 +871,8 @@ fn div_floor(lhs: i32, rhs: i32) -> i32 {
 }
 fn modulo(lhs: i32, rhs: i32) -> i32 {
     let remainder = lhs.wrapping_rem(rhs);
-    // Adjust module to have the sign of the divisor, not the sign of the dividend.
-    remainder + rhs * from_bool((remainder < 0) != (rhs < 0))
+    // Adjust modulo to have the sign of the divisor, not the sign of the dividend.
+    remainder + rhs * from_bool((lhs < 0) != (rhs < 0))
 }
 fn shift_left(lhs: i32, rhs: i32) -> i32 {
     match rhs {
