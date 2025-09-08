@@ -870,7 +870,7 @@ fn div_floor(lhs: i32, rhs: i32) -> i32 {
     }
 }
 fn modulo(lhs: i32, rhs: i32) -> i32 {
-    let remainder = lhs % rhs;
+    let remainder = lhs.wrapping_rem(rhs);
     // Adjust module to have the sign of the divisor, not the sign of the dividend.
     remainder + rhs * from_bool((remainder < 0) != (rhs < 0))
 }
@@ -915,7 +915,7 @@ impl UnOp {
         match self {
             UnOp::Complement => map(|n| !n),
             UnOp::Identity => map(|n| n),
-            UnOp::Negation => map(|n| -n),
+            UnOp::Negation => map(|n| n.wrapping_neg()),
             UnOp::Not => map(|n| if n == 0 { 1 } else { 0 }),
         }
     }
