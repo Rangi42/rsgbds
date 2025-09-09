@@ -78,11 +78,11 @@ pub fn parse_file(
             // There are two kinds of lines: regular lines, and lines with a “raw” portion.
             // The latter is macro invocations and `opt` directives;
             // thus, the lexing phase has to do some parsing to figure out its lexing strategy.
-            let mut token = parse_ctx.next_token();
+            let mut token = parse_ctx.next_token(true);
             if matches!(token.payload, tok!("+") | tok!("-")) {
                 // Leftover diff marker.
                 parse_ctx.push_line_token(token, &mut line_tokens);
-                token = parse_ctx.next_token();
+                token = parse_ctx.next_token(true);
             }
             if match &token.payload {
                 tok!("identifier"(_)) => parse_ctx.lexer.next_char_is_a_colon(),
@@ -91,10 +91,10 @@ pub fn parse_file(
             } {
                 // Label definition.
                 parse_ctx.push_line_token(token, &mut line_tokens);
-                token = parse_ctx.next_token();
+                token = parse_ctx.next_token(true);
                 if matches!(token.payload, tok!(":") | tok!("::")) {
                     parse_ctx.push_line_token(token, &mut line_tokens);
-                    token = parse_ctx.next_token();
+                    token = parse_ctx.next_token(true);
                 }
             }
 
@@ -116,7 +116,8 @@ pub fn parse_file(
                     // ```
                     parse_ctx.lexer.skip_to_eol();
                     // The parser still expects to read something after the `elif`, so we push a token that normally doesn't occur: an end of line.
-                    let token = parse_ctx.next_token();
+                    let token = parse_ctx.next_token(false);
+                    debug_assert!(matches!(token.payload, tok!("end of line")));
                     parse_ctx.push_line_token(token, &mut line_tokens);
                 }
                 tok!("identifier"(_)) | tok!("opt") | tok!("pusho") => {
@@ -134,9 +135,29 @@ pub fn parse_file(
                 }
                 _ => {
                     // Regular line.
+                    let mut enable_equs_expansion = true;
                     loop {
+                        match &token.payload {
+                            tok!("purge") | tok!("def") | tok!("redef") => enable_equs_expansion = false,
+                            tok!(")") // The closing parens of a `def()`...
+                            | tok!("equ") // ...or a symbol definition keyword.
+                            | tok!("equs")
+                            | tok!("rb")
+                            | tok!("rw")
+                            | tok!("rl")
+                            | tok!("=")
+                            | tok!("+=")
+                            | tok!("-=")
+                            | tok!("*=")
+                            | tok!("/=")
+                            | tok!("%=")
+                            | tok!("&=")
+                            | tok!("|=")
+                            | tok!("^=") => enable_equs_expansion = true,
+                            _ => {}
+                        }
                         parse_ctx.push_line_token(token, &mut line_tokens);
-                        token = parse_ctx.next_token();
+                        token = parse_ctx.next_token(enable_equs_expansion);
                         if matches!(token.payload, tok!("end of line")) {
                             break;
                         }
@@ -248,16 +269,49 @@ macro_rules! parse_ctx {
 use parse_ctx;
 
 impl parse_ctx!() {
-    fn next_token(&mut self) -> tokens::Token {
-        self.lexer.next_token(
-            self.identifiers,
-            self.symbols,
-            self.macro_args.last_mut(),
-            &mut self.unique_id,
-            self.sections,
-            self.nb_errors_left,
-            self.options,
-        )
+    fn next_token(&mut self, with_equs_expansion: bool) -> tokens::Token {
+        loop {
+            let token = self.lexer.next_token(
+                self.identifiers,
+                self.symbols,
+                self.macro_args.last_mut(),
+                &mut self.unique_id,
+                self.sections,
+                self.nb_errors_left,
+                self.options,
+            );
+            if with_equs_expansion && !self.lexer.last_ident_was_raw {
+                if let tok!("identifier"(ident)) = &token.payload {
+                    if let Some(sym) = self.symbols.find(ident) {
+                        if let Some(res) = sym.get_string(
+                            self.symbols.global_scope,
+                            self.symbols.local_scope,
+                            self.identifiers,
+                        ) {
+                            match res {
+                                Ok(string) => self.lexer.expand_equs_symbol(
+                                    *ident,
+                                    string,
+                                    token.span.extract_normal(),
+                                    self.identifiers,
+                                    self.nb_errors_left,
+                                    self.options,
+                                ),
+                                Err(err) => self.error(&token.span, |error| {
+                                    error.set_message(err);
+                                    error.add_label(
+                                        diagnostics::error_label(&token.span)
+                                            .with_message("this expansion is invalid"),
+                                    );
+                                }),
+                            }
+                            continue;
+                        }
+                    }
+                }
+            }
+            break token;
+        }
     }
 
     fn next_token_raw(&mut self) -> Option<(CompactString, Span)> {

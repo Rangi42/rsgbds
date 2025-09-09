@@ -56,6 +56,7 @@ use super::tokens::{tok, Token, TokenPayload, KEYWORDS};
 pub struct Lexer {
     contexts: Vec<Context>,
     pub cond_stack: Vec<Condition>,
+    pub last_ident_was_raw: bool,
 }
 
 #[derive(Debug)]
@@ -85,6 +86,7 @@ impl Lexer {
         Self {
             contexts: vec![],
             cond_stack: vec![],
+            last_ident_was_raw: false,
         }
     }
 
@@ -239,6 +241,36 @@ impl Lexer {
             .rev()
             .find(|ctx| !ctx.span.node.kind.ends_implicitly())
             .expect("No active lexer context")
+    }
+
+    pub fn expand_equs_symbol(
+        &mut self,
+        ident: Identifier,
+        src: CompactString,
+        trigger_span: NormalSpan,
+        identifiers: &Identifiers,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        let nb_bytes = src.len();
+        let src = Rc::new(Source {
+            name: identifiers.resolve(ident).unwrap().into(),
+            contents: src.into(),
+        });
+        // It's fine if this fails; the function will have reported the error.
+        let _ = self.push_context(
+            NormalSpan {
+                bytes: 0..nb_bytes,
+                node: FileNode {
+                    src,
+                    kind: SpanKind::Expansion(ident),
+                    parent: Some(Rc::new(trigger_span)),
+                },
+            },
+            LoopInfo::default(),
+            nb_errors_left,
+            options,
+        );
     }
 
     fn push_context(
@@ -1695,6 +1727,7 @@ impl Lexer {
                             self.consume(&mut span);
                             match self.peek(&mut params) {
                                 Some(first_char @ (chars!(ident_start) | '.')) => {
+                                    self.last_ident_was_raw = true;
                                     self.consume(&mut span);
                                     self.read_identifier(first_char, &mut span, false, &mut params)
                                 }
@@ -1724,6 +1757,7 @@ impl Lexer {
                     self.consume(&mut span);
 
                     let payload = self.read_identifier(ch, &mut span, true, &mut params);
+                    self.last_ident_was_raw = false;
                     break Token {
                         payload,
                         span: Span::Normal(span),
