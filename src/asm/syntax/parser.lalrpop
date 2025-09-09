@@ -538,7 +538,7 @@ ExprUnary<Atom>: Expr = {
 	ExprExponent<Atom>
 };
 ExprExponent<Atom>: Expr = { // Note the reversed expression tokens, which make `**` right-associative.
-	<lhs:ExprAtom> <span_idx:@L> "**" <rhs:ExprExponent<ExprAtom>> => lhs.binary_op(BinOp::Exponent, rhs, ctx.nth_span(span_idx)),
+	<lhs:ExprAtom> <span_idx:@L> "**" <rhs:ExprUnary<ExprAtom>> => lhs.binary_op(BinOp::Exponent, rhs, ctx.nth_span(span_idx)),
 	Atom
 };
 ExprAtom: Expr = {
