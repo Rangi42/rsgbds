@@ -1,9 +1,36 @@
-error: CHARSIZE: No character mapping for ""
-    at charsize.asm(17)
-error: CHARSIZE: No character mapping for "hello world"
-    at charsize.asm(18)
-error: CHARSIZE: No character mapping for "abcdef"
-    at charsize.asm(19)
-error: CHARSIZE: No character mapping for "é"
-    at charsize.asm(20)
-Assembly aborted with 4 errors!
+error: empty string doesn't have a charmap size
+    ╭─[ test.asm:17:8 ]
+    │
+ 17 │ assert charsize("") == 0
+    │        ──────┬─────  
+    │              ╰─────── this string is empty
+────╯
+error: string passed to `charsize` isn't mapped
+    ╭─[ test.asm:18:8 ]
+    │
+ 18 │ assert charsize("hello world") == 0
+    │        ───────────┬───────────  
+    │                   ╰───────────── "hello world" isn't in charmap `main`
+────╯
+error: string passed to `charsize` is more than one mapping
+    ╭─[ test.asm:18:8 ]
+    │
+ 18 │ assert charsize("hello world") == 0
+    │        ───────────┬───────────  
+    │                   ╰───────────── the longest initial mapping is "h"
+────╯
+error: string passed to `charsize` is more than one mapping
+    ╭─[ test.asm:19:8 ]
+    │
+ 19 │ assert charsize("abcdef") == 0
+    │        ─────────┬────────  
+    │                 ╰────────── the longest initial mapping is "a"
+────╯
+error: string passed to `charsize` isn't mapped
+    ╭─[ test.asm:20:8 ]
+    │
+ 20 │ assert charsize("é") == 2
+    │        ──────┬──────  
+    │              ╰──────── "é" isn't in charmap `main`
+────╯
+5 errors generated.

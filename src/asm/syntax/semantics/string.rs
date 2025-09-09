@@ -181,15 +181,6 @@ impl parse_ctx!() {
                 Expr::nothing(span)
             }
             Some((mapping, byte_len)) => {
-                if byte_len != expr.len() {
-                    self.error(&span, |error| {
-                        error.set_message("string passed to `charsize` is more than one mapping");
-                        error.add_label(diagnostics::error_label(&span).with_message(format!(
-                            "the longest initial mapping is \"{}\"",
-                            &expr[..byte_len],
-                        )));
-                    });
-                }
                 let value = match mapping {
                     CharMapping::Mapped(slice) => slice.len(),
                     CharMapping::Passthrough(string) => {
@@ -201,10 +192,22 @@ impl parse_ctx!() {
                                 self.identifiers.resolve(charmap.name()).unwrap(),
                             )));
                         });
-                        string.len()
+                        debug_assert_eq!(string.len(), byte_len);
+                        byte_len
                     }
                 };
-                Expr::number(value as i32, span)
+                if byte_len != expr.len() {
+                    self.error(&span, |error| {
+                        error.set_message("string passed to `charsize` is more than one mapping");
+                        error.add_label(diagnostics::error_label(&span).with_message(format!(
+                            "the longest initial mapping is \"{}\"",
+                            &expr[..byte_len],
+                        )));
+                    });
+                    Expr::nothing(span)
+                } else {
+                    Expr::number(value as i32, span)
+                }
             }
         }
     }

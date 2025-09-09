@@ -17,4 +17,4 @@ assert charsize("¡Pokémon!") == 2
 assert charsize("") == 0
 assert charsize("hello world") == 0
 assert charsize("abcdef") == 0
-assert charsize("é") == 0
+assert charsize("é") == 2
