@@ -351,7 +351,7 @@ impl Display for NumberFormatter {
             (false, prefix, self.number)
         } else if matches!(self.kind, FormatKind::Signed) {
             if (self.number as i32) < 0 {
-                (true, "", -(self.number as i32) as u32)
+                (true, "", (self.number as i32).wrapping_neg() as u32)
             } else if let Some(prefix) = self.force_sign {
                 (false, prefix, self.number)
             } else {
@@ -367,7 +367,7 @@ impl Display for NumberFormatter {
         loop {
             // This must run at least once, so that 0 prints one digit.
             idx -= 1;
-            buf[idx] = digits[(number % base) as usize];
+            buf[idx] = digits[number.rem_euclid(base) as usize];
             number /= base;
             if number == 0 {
                 break;
