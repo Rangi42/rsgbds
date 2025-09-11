@@ -27,7 +27,7 @@ type FileNodeRegistry<'nodes> = IndexSet<&'nodes FileNode>;
 type SymRegistry<'sym> = IndexMap<Identifier, Option<(&'sym NormalSpan, &'sym SymbolKind, bool)>>;
 
 const VERSION_STRING: &[u8] = b"RGB9";
-const REVISION: u32 = 12;
+const REVISION: u32 = 13;
 
 pub fn emit(
     path: &Path,

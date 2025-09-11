@@ -11,7 +11,7 @@ datatest_stable::harness! {
 }
 
 const RGBASM_PATH: &str = env!("CARGO_BIN_EXE_rgbasm");
-const RGBLINK_PATH: &str = "rgblink"; // TODO: use rsgblink when it's complete
+const RGBLINK_PATH: &str = "../../../../rgbds/rgblink"; // TODO: use rsgblink when it's complete
 
 const ACTION_ENV_VAR_NAME: &str = "SNAPSHOTS_ASM_LINK";
 
