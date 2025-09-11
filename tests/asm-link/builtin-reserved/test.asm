@@ -29,5 +29,5 @@ DEF . EQUS "hello"
 REDEF . EQUS "world"
 
 SECTION ".", ROM0
-.:
+#.:
 ENDSECTION

@@ -190,8 +190,8 @@ error: A symbol called "." already exists
     │
     ├─[ test.asm:32:1 ]
     │
- 32 │ .:
-    │ ┬  
-    │ ╰── ...so it's not available for this definition
+ 32 │ #.:
+    │ ─┬  
+    │  ╰── ...so it's not available for this definition
 ────╯
 16 errors generated.

@@ -1,9 +1,9 @@
 error: cannot delete built-in symbol `__UTC_YEAR__`
     ╭─[ <macro argument #1>:1:1 ]
     │
-  1 │ __UTC_YEAR__
-    │ ──────┬─────  
-    │       ╰─────── cannot perform this deletion
+  1 │ #__UTC_YEAR__
+    │ ──────┬──────  
+    │       ╰──────── cannot perform this deletion
     │
     ├─[ test.asm:5:7 ]
     │
@@ -11,16 +11,16 @@ error: cannot delete built-in symbol `__UTC_YEAR__`
     │       ─┬  
     │        ╰── expanded here
     │ 
- 36 │     tickle __UTC_YEAR__, 1
+ 36 │     tickle #__UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
 error: cannot delete built-in symbol `__UTC_YEAR__`
     ╭─[ <macro argument #1>:1:1 ]
     │
-  1 │ __UTC_YEAR__
-    │ ──────┬─────  
-    │       ╰─────── cannot perform this deletion
+  1 │ #__UTC_YEAR__
+    │ ──────┬──────  
+    │       ╰──────── cannot perform this deletion
     │
     ├─[ test.asm:6:7 ]
     │
@@ -28,7 +28,7 @@ error: cannot delete built-in symbol `__UTC_YEAR__`
     │       ─┬  
     │        ╰── expanded here
     │ 
- 36 │     tickle __UTC_YEAR__, 1
+ 36 │     tickle #__UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -45,7 +45,7 @@ error: A symbol called "__UTC_YEAR__" already exists
     │        ─┬─  
     │         ╰─── ...so it's not available for this definition
     │ 
- 36 │     tickle __UTC_YEAR__, 1
+ 36 │     tickle #__UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -62,7 +62,7 @@ error: A symbol called "__UTC_YEAR__" already exists
     │        ─┬─  
     │         ╰─── ...so it's not available for this definition
     │ 
- 36 │     tickle __UTC_YEAR__, 1
+ 36 │     tickle #__UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -79,7 +79,7 @@ error: A symbol called "__UTC_YEAR__" already exists
     │        ┬  
     │        ╰── ...so it's not available for this definition
     │ 
- 36 │     tickle __UTC_YEAR__, 1
+ 36 │     tickle #__UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -96,7 +96,7 @@ error: A symbol called "__UTC_YEAR__" already exists
     │        ┬  
     │        ╰── ...so it's not available for this definition
     │ 
- 36 │     tickle __UTC_YEAR__, 1
+ 36 │     tickle #__UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -113,7 +113,7 @@ error: A symbol called "__UTC_YEAR__" already exists
     │        ──┬─  
     │          ╰─── ...so it's not available for this definition
     │ 
- 36 │     tickle __UTC_YEAR__, 1
+ 36 │     tickle #__UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -130,7 +130,7 @@ error: A symbol called "__UTC_YEAR__" already exists
     │        ──┬─  
     │          ╰─── ...so it's not available for this definition
     │ 
- 36 │     tickle __UTC_YEAR__, 1
+ 36 │     tickle #__UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -147,7 +147,7 @@ error: A symbol called "__UTC_YEAR__" already exists
     │          ┬  
     │          ╰── ...so it's not available for this definition
     │ 
- 36 │     tickle __UTC_YEAR__, 1
+ 36 │     tickle #__UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -164,7 +164,7 @@ error: A symbol called "__UTC_YEAR__" already exists
     │          ┬  
     │          ╰── ...so it's not available for this definition
     │ 
- 36 │     tickle __UTC_YEAR__, 1
+ 36 │     tickle #__UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -181,7 +181,7 @@ error: A symbol called "__UTC_YEAR__" already exists
     │          ─┬─  
     │           ╰─── ...so it's not available for this definition
     │ 
- 36 │     tickle __UTC_YEAR__, 1
+ 36 │     tickle #__UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -198,7 +198,7 @@ error: A symbol called "__UTC_YEAR__" already exists
     │          ─┬─  
     │           ╰─── ...so it's not available for this definition
     │ 
- 36 │     tickle __UTC_YEAR__, 1
+ 36 │     tickle #__UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -215,7 +215,7 @@ error: A symbol called "__UTC_YEAR__" already exists
     │          ──┬─  
     │            ╰─── ...so it's not available for this definition
     │ 
- 36 │     tickle __UTC_YEAR__, 1
+ 36 │     tickle #__UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -232,16 +232,16 @@ error: A symbol called "__UTC_YEAR__" already exists
     │          ──┬─  
     │            ╰─── ...so it's not available for this definition
     │ 
- 36 │     tickle __UTC_YEAR__, 1
+ 36 │     tickle #__UTC_YEAR__, 1
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
 error: cannot delete built-in symbol `__ISO_8601_UTC__`
     ╭─[ <macro argument #1>:1:1 ]
     │
-  1 │ __ISO_8601_UTC__
-    │ ────────┬───────  
-    │         ╰───────── cannot perform this deletion
+  1 │ #__ISO_8601_UTC__
+    │ ────────┬────────  
+    │         ╰────────── cannot perform this deletion
     │
     ├─[ test.asm:5:7 ]
     │
@@ -249,16 +249,16 @@ error: cannot delete built-in symbol `__ISO_8601_UTC__`
     │       ─┬  
     │        ╰── expanded here
     │ 
- 37 │     tickle __ISO_8601_UTC__, 0
+ 37 │     tickle #__ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
 error: cannot delete built-in symbol `__ISO_8601_UTC__`
     ╭─[ <macro argument #1>:1:1 ]
     │
-  1 │ __ISO_8601_UTC__
-    │ ────────┬───────  
-    │         ╰───────── cannot perform this deletion
+  1 │ #__ISO_8601_UTC__
+    │ ────────┬────────  
+    │         ╰────────── cannot perform this deletion
     │
     ├─[ test.asm:6:7 ]
     │
@@ -266,7 +266,7 @@ error: cannot delete built-in symbol `__ISO_8601_UTC__`
     │       ─┬  
     │        ╰── expanded here
     │ 
- 37 │     tickle __ISO_8601_UTC__, 0
+ 37 │     tickle #__ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -283,7 +283,7 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │        ─┬─  
     │         ╰─── ...so it's not available for this definition
     │ 
- 37 │     tickle __ISO_8601_UTC__, 0
+ 37 │     tickle #__ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -300,7 +300,7 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │        ─┬─  
     │         ╰─── ...so it's not available for this definition
     │ 
- 37 │     tickle __ISO_8601_UTC__, 0
+ 37 │     tickle #__ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -317,7 +317,7 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │        ┬  
     │        ╰── ...so it's not available for this definition
     │ 
- 37 │     tickle __ISO_8601_UTC__, 0
+ 37 │     tickle #__ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -334,7 +334,7 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │        ┬  
     │        ╰── ...so it's not available for this definition
     │ 
- 37 │     tickle __ISO_8601_UTC__, 0
+ 37 │     tickle #__ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -351,7 +351,7 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │        ──┬─  
     │          ╰─── ...so it's not available for this definition
     │ 
- 37 │     tickle __ISO_8601_UTC__, 0
+ 37 │     tickle #__ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -368,7 +368,7 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │        ──┬─  
     │          ╰─── ...so it's not available for this definition
     │ 
- 37 │     tickle __ISO_8601_UTC__, 0
+ 37 │     tickle #__ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -385,7 +385,7 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │          ┬  
     │          ╰── ...so it's not available for this definition
     │ 
- 37 │     tickle __ISO_8601_UTC__, 0
+ 37 │     tickle #__ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -402,7 +402,7 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │          ┬  
     │          ╰── ...so it's not available for this definition
     │ 
- 37 │     tickle __ISO_8601_UTC__, 0
+ 37 │     tickle #__ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -419,7 +419,7 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │          ─┬─  
     │           ╰─── ...so it's not available for this definition
     │ 
- 37 │     tickle __ISO_8601_UTC__, 0
+ 37 │     tickle #__ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -436,7 +436,7 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │          ─┬─  
     │           ╰─── ...so it's not available for this definition
     │ 
- 37 │     tickle __ISO_8601_UTC__, 0
+ 37 │     tickle #__ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -453,7 +453,7 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │          ──┬─  
     │            ╰─── ...so it's not available for this definition
     │ 
- 37 │     tickle __ISO_8601_UTC__, 0
+ 37 │     tickle #__ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
 ────╯
@@ -470,7 +470,7 @@ error: A symbol called "__ISO_8601_UTC__" already exists
     │          ──┬─  
     │            ╰─── ...so it's not available for this definition
     │ 
- 37 │     tickle __ISO_8601_UTC__, 0
+ 37 │     tickle #__ISO_8601_UTC__, 0
     │     ───┬──  
     │        ╰──── macro called here
 ────╯

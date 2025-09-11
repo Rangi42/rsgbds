@@ -17,7 +17,7 @@ error: `.` doesn't have a value outside of a label scope
    │
  8 │ println .
    │         ┬  
-   │         ╰── error evaluating this symbol
+   │         ╰── this expansion is invalid
 ───╯
 error: `.` doesn't have a value outside of a label scope
    ╭─[ test.asm:9:11 ]
@@ -31,7 +31,7 @@ error: `..` doesn't have a value outside of a local label scope
     │
  13 │ println ..
     │         ─┬  
-    │          ╰── error evaluating this symbol
+    │          ╰── this expansion is invalid
 ────╯
 error: `..` doesn't have a value outside of a local label scope
     ╭─[ test.asm:14:11 ]
