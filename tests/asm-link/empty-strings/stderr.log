@@ -1,5 +1,17 @@
-warning: Treating strings as numbers is deprecated [-Wobsolete]
-    at empty-strings.asm(5)
-error: Strings as numbers must be a single charmap unit
-    at empty-strings.asm(5)
-Assembly aborted with 1 error!
+[-Wobsolete] warning: treating strings as numbers is deprecated
+   ╭─[ test.asm:5:9 ]
+   │
+ 5 │ assert ("") == 0
+   │         ─┬  
+   │          ╰── consider using a character literal instead of this
+   │ 
+   │ Help: use the `charval` function to make this conversion explicit
+───╯
+error: empty string
+   ╭─[ test.asm:5:9 ]
+   │
+ 5 │ assert ("") == 0
+   │         ─┬  
+   │          ╰── this literal is empty
+───╯
+1 error generated.

@@ -1,5 +1,15 @@
-error: Illegal character escape '\' at end of input
-    at character-escape-at-end.asm(1)
-error: Unterminated string
-    at character-escape-at-end.asm(1)
-Assembly aborted with 2 errors!
+error: invalid character escape
+   ╭─[ test.asm:1:15 ]
+   │
+ 1 │ println "hello\
+   │               ┬  
+   │               ╰── no character to escape
+───╯
+error: unterminated string literal
+   ╭─[ test.asm:1:9 ]
+   │
+ 1 │ println "hello\
+   │         ───┬───  
+   │            ╰───── no closing quote before the end of the line
+───╯
+2 errors generated.

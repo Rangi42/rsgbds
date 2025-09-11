@@ -1,5 +1,15 @@
-error: Invalid character '!' in bracketed macro argument
-    at invalid-macro-arg-character.asm(1)
-error: syntax error, unexpected >
-    at invalid-macro-arg-character.asm(1)
-Assembly aborted with 2 errors!
+error: unterminated macro argument
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ \<10!>
+   │ ──┬─  
+   │   ╰─── missing '>' after this
+───╯
+error: syntax error: unexpected !
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ \<10!>
+   │ ──┬──  
+   │   ╰──── expected "identifier", "local identifier", ":", "+", "-", "adc", "add", ...89 others
+───╯
+2 errors generated.

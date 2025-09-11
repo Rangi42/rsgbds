@@ -1,5 +1,15 @@
-error: Unterminated string
-    at multi-line-strings.asm(23)
-warning: check the line number [-Wuser]
-    at multi-line-strings.asm(35)
-Assembly aborted with 1 error!
+error: unterminated string literal
+    ╭─[ test.asm:23:10 ]
+    │
+ 23 │     printarg "
+    │             ─┬  
+    │              ╰── no closing quote before the end of the line
+────╯
+[-Wuser] warning: check the line number
+    ╭─[ test.asm:35:2 ]
+    │
+ 35 │     warn "check the line number"
+    │     ──┬─  
+    │       ╰─── triggered here
+────╯
+1 error generated.

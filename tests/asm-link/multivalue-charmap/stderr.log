@@ -1,6 +1,27 @@
-warning: All character units must be 8-bit [-Wtruncation]
-    at multivalue-charmap.asm(11)
-warning: All character units must be 8-bit [-Wtruncation]
-    at multivalue-charmap.asm(22)
-warning: All character units must be 8-bit [-Wtruncation]
-    at multivalue-charmap.asm(34)
+[-Wtruncation=1] warning: this string's encoding is not 8-bit
+    ╭─[ test.asm:11:4 ]
+    │
+ 11 │ db "abcde" ; db $61, $62, $63, $64 (truncated)
+    │    ───┬───  
+    │       ╰───── this string's encoding contains 25956, which is not between -256 and 255
+    │ 
+    │ Help: consider emitting the string using `dw` or `dl`
+────╯
+[-Wtruncation=1] warning: this string's encoding is not 8-bit
+    ╭─[ test.asm:22:4 ]
+    │
+ 22 │ db "AB" ; db $01234567, $fedcba98 (truncated to $67, $98)
+    │    ──┬─  
+    │      ╰─── this string's encoding contains 19088743, which is not between -256 and 255
+    │ 
+    │ Help: consider emitting the string using `dw` or `dl`
+────╯
+[-Wtruncation=1] warning: this string's encoding is not 8-bit
+    ╭─[ test.asm:34:4 ]
+    │
+ 34 │ db "E" ; db $01, $2345, $6789ab, $cdef (truncated to $01, $45, $ab, $ef)
+    │    ─┬─  
+    │     ╰─── this string's encoding contains 9029, which is not between -256 and 255
+    │ 
+    │ Help: consider emitting the string using `dw` or `dl`
+────╯

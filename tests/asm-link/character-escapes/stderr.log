@@ -1,7 +1,34 @@
-error: Illegal character escape 'z'
-    at character-escapes.asm::m(6) <- character-escapes.asm(10)
-error: Invalid character '\' in bracketed macro argument
-    at character-escapes.asm::m(7) <- character-escapes.asm(10)
-error: Invalid character '\t' in bracketed macro argument
-    at character-escapes.asm::m(8) <- character-escapes.asm(10)
-Assembly aborted with 3 errors!
+error: invalid character escape
+    ╭─[ test.asm:6:8 ]
+    │
+  6 │ escape \z?"
+    │        ─┬  
+    │         ╰── cannot escape this character
+    │ 
+ 10 │   m "(\n \r \t)"
+    │   ┬  
+    │   ╰── macro called here
+────╯
+error: invalid character in bracketed macro argument
+    ╭─[ test.asm:7:30 ]
+    │
+  7 │   println "invalid character \<\n>?"
+    │                              ─┬  
+    │                               ╰── this bracketed macro argument is invalid
+    │ 
+ 10 │   m "(\n \r \t)"
+    │   ┬  
+    │   ╰── macro called here
+────╯
+error: invalid character in bracketed macro argument
+    ╭─[ test.asm:8:32 ]
+    │
+  8 │   println """invalid character \<   >?"""
+    │                                ─┬    
+    │                                 ╰──── this bracketed macro argument is invalid
+    │ 
+ 10 │   m "(\n \r \t)"
+    │   ┬  
+    │   ╰── macro called here
+────╯
+3 errors generated.
