@@ -1,5 +1,16 @@
-error: `FOO` already defined (should it be {interpolated} to define its contents "hello"?)
-    at command-line-symbols.asm(3)
-    and also:
-    at <command-line>
-Assembly aborted with 1 error!
+error: A symbol called "FOO" already exists
+   ╭─[ <command line>:1:1 ]
+   │
+ 1 │ 
+   │ │ 
+   │ ╰─ the name is defined here...
+   │
+   ├─[ test.asm:3:9 ]
+   │
+ 3 │ def FOO equ 42
+   │         ─┬─  
+   │          ╰─── ...so it's not available for this definition
+   │ 
+   │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+───╯
+1 error generated.
