@@ -82,11 +82,12 @@ impl Charmaps {
         let Some(i) = self.find_charmap(target_name) else {
             return Err(CharmapError::NoSuchCharmap(target_name, def_span));
         };
+        let charmap = &self.charmaps[i];
         self.charmaps.push(Charmap {
             def_span,
             name,
-            nodes: vec![],
-            root_node: self.charmaps[i].root_node.clone(),
+            nodes: charmap.nodes.clone(),
+            root_node: charmap.root_node.clone(),
         });
         self.active_charmap_id = self.charmaps.len() - 1;
         Ok(())
@@ -256,11 +257,8 @@ impl Charmap {
             Some((CharMapping::Mapped(mapping), nb_bytes))
         } else {
             // Default identity mapping: just return one character.
-            let c = string.chars().next()?;
-            Some((
-                CharMapping::Passthrough(&string[..c.len_utf8()]),
-                c.len_utf8(),
-            ))
+            let nb_bytes = string.chars().next()?.len_utf8();
+            Some((CharMapping::Passthrough(&string[..nb_bytes]), nb_bytes))
         }
     }
 
