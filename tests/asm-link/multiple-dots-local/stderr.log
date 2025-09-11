@@ -1,2 +1,8 @@
-FATAL: `Parent...spare` is a nonsensical reference to a nested local label
-    at multiple-dots-local.asm(6)
+error: nested local labels are not supported
+   ╭─[ test.asm:6:1 ]
+   │
+ 6 │ Parent...spare:
+   │ ───────┬──────  
+   │        ╰──────── there can only be up to 1 dot per identifier
+───╯
+1 error generated.

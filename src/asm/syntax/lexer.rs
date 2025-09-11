@@ -2193,7 +2193,7 @@ impl Lexer {
         debug_assert!(matches!(first_char, chars!(ident_start) | '.'));
 
         let mut name = CompactString::default();
-        let mut is_local = first_char == '.';
+        let mut is_local = (first_char == '.') as u8;
 
         name.push(first_char);
         loop {
@@ -2205,10 +2205,21 @@ impl Lexer {
                 Some('.') => {
                     self.consume(span);
                     name.push('.');
-                    is_local = true;
+                    is_local = is_local.saturating_add(1);
                 }
                 _ => break,
             }
+        }
+
+        if is_local > 1 {
+            let span = Span::Normal(span.clone());
+            params.error(&span, |error| {
+                error.set_message("nested local labels are not supported");
+                error.add_label(
+                    diagnostics::error_label(&span)
+                        .with_message("there can only be up to 1 dot per identifier"),
+                );
+            });
         }
 
         // `.` and `..` are not local.
@@ -2216,13 +2227,13 @@ impl Lexer {
             return tok!("local identifier"(name));
         }
 
-        if can_be_keyword && !is_local {
+        if can_be_keyword && is_local == 0 {
             if let Some(keyword) = KEYWORDS.get(&UniCase::ascii(name.as_str())) {
                 return keyword.clone();
             }
         }
         let identifier = params.identifiers.get_or_intern(&name);
-        if is_local {
+        if is_local != 0 {
             tok!("scoped identifier"(identifier))
         } else {
             tok!("identifier"(identifier))
