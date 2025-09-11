@@ -104,7 +104,7 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
         let reference = Data::try_read_from(bin_file_path.as_std_path(), Some(DataFormat::Binary))
             .context("Error reading binary")?;
         if Assert::new()
-            .action_env("SNAPSHOTS_ASM")
+            .action_env(ACTION_ENV_VAR_NAME)
             .try_eq(None, Data::binary(generated.as_slice()), reference.clone())
             .is_err()
         {
