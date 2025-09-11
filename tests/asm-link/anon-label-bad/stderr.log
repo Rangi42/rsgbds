@@ -17,7 +17,7 @@ error: syntax error: unexpected anonymous label reference
    │
  9 │     EXPORT :-
    │            ─┬  
-   │             ╰── expected "identifier", "local identifier", "redef", or "def"
+   │             ╰── expected "identifier", "scoped identifier", "local identifier", "redef", or "def"
 ───╯
 [-Wpurge=2] warning: deleting a label
     ╭─[ test.asm:10:8 ]
@@ -31,6 +31,6 @@ error: syntax error: unexpected ::
     │
  22 │ :: ; Syntax error, can't export this
     │ ─┬  
-    │  ╰── expected "identifier", "local identifier", ":", "+", "-", "adc", "add", ...89 others
+    │  ╰── expected "identifier", "scoped identifier", "local identifier", ":", "+", "-", "adc", ...90 others
 ────╯
 4 errors generated.
