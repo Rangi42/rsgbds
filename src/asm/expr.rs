@@ -863,7 +863,7 @@ impl BinOp {
     }
 }
 
-// Lifted from the Rust standard library, since it's currently unstable.
+// Adapted from the Rust standard library.
 fn div_floor(lhs: i32, rhs: i32) -> i32 {
     let d = lhs.wrapping_div(rhs);
     let r = lhs.wrapping_rem(rhs);
@@ -884,7 +884,7 @@ fn div_floor(lhs: i32, rhs: i32) -> i32 {
 fn modulo(lhs: i32, rhs: i32) -> i32 {
     let remainder = lhs.wrapping_rem(rhs);
     // Adjust modulo to have the sign of the divisor, not the sign of the dividend.
-    remainder + rhs * from_bool((lhs < 0) != (rhs < 0))
+    remainder + rhs * from_bool(remainder != 0 && (lhs < 0) != (rhs < 0))
 }
 fn shift_left(lhs: i32, rhs: i32) -> i32 {
     match rhs {
