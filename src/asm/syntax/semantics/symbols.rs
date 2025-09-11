@@ -14,20 +14,22 @@ use crate::{
 use super::parse_ctx;
 
 impl parse_ctx!() {
-    pub fn define_label(&mut self, name: Identifier, def_span_id: usize, exported: bool) {
+    pub fn define_label(&mut self, name: Option<Identifier>, def_span_id: usize, exported: bool) {
         let def_span = self.nth_span(def_span_id);
 
         if let Some(active) = self.sections.active_section.as_ref() {
-            active.sym_section.define_label(
-                name,
-                self.symbols,
-                self.identifiers,
-                def_span,
-                exported,
-                self.macro_args.last(),
-                self.nb_errors_left,
-                self.options,
-            );
+            if let Some(ident) = name {
+                active.sym_section.define_label(
+                    ident,
+                    self.symbols,
+                    self.identifiers,
+                    def_span,
+                    exported,
+                    self.macro_args.last(),
+                    self.nb_errors_left,
+                    self.options,
+                );
+            }
         } else {
             self.error(&def_span, |error| {
                 error.set_message("label defined outside of a section");
@@ -62,6 +64,28 @@ impl parse_ctx!() {
                         .with_message("no section is active at this point"),
                 );
             });
+        }
+    }
+
+    pub fn resolve_local_ident(
+        &mut self,
+        mut name: CompactString,
+        span_idx: usize,
+    ) -> Option<Identifier> {
+        if let Some(scope) = self.symbols.global_scope {
+            let scope_name = self.identifiers.resolve(scope).unwrap();
+            debug_assert!(!scope_name.contains('.'), "scope = {scope_name:?}");
+            name.insert_str(0, scope_name);
+            Some(self.identifiers.get_or_intern(&name))
+        } else {
+            let span = &self.line_spans[span_idx];
+            self.error(span, |error| {
+                error.set_message("local symbol in main scope");
+                error.add_label(
+                    diagnostics::error_label(span).with_message("no global label before this"),
+                );
+            });
+            None
         }
     }
 
@@ -341,15 +365,17 @@ impl parse_ctx!() {
         )
     }
 
-    pub fn export_symbol(&mut self, name: Identifier, span_idx: usize) {
-        let span = self.nth_span(span_idx);
-        self.symbols.export(
-            name,
-            span,
-            self.identifiers,
-            self.nb_errors_left,
-            self.options,
-        );
+    pub fn export_symbol(&mut self, name: Option<Identifier>, span_idx: usize) {
+        if let Some(ident) = name {
+            let span = self.nth_span(span_idx);
+            self.symbols.export(
+                ident,
+                span,
+                self.identifiers,
+                self.nb_errors_left,
+                self.options,
+            );
+        }
     }
 
     pub fn delete_symbol(&mut self, name: Option<Identifier>, span_idx: usize) {

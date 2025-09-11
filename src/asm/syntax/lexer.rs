@@ -2211,21 +2211,9 @@ impl Lexer {
             }
         }
 
-        let not_just_dots = name.contains(|ch| ch != '.');
-        if first_char == '.' && not_just_dots {
-            if let Some(scope) = params.symbols.global_scope {
-                let scope_name = params.identifiers.resolve(scope).unwrap();
-                debug_assert!(!scope_name.contains('.'), "scope = {scope_name:?}");
-                name.insert_str(0, scope_name);
-            } else {
-                let span = Span::Normal(span.clone());
-                params.error(&span, |error| {
-                    error.set_message("local symbol in main scope");
-                    error.add_label(
-                        diagnostics::error_label(&span).with_message("no global label before this"),
-                    );
-                });
-            }
+        // `.` and `..` are not local.
+        if first_char == '.' && name.contains(|ch| ch != '.') {
+            return tok!("local identifier"(name));
         }
 
         if can_be_keyword && !is_local {
@@ -2234,8 +2222,8 @@ impl Lexer {
             }
         }
         let identifier = params.identifiers.get_or_intern(&name);
-        if is_local && not_just_dots {
-            tok!("local identifier"(identifier))
+        if is_local {
+            tok!("scoped identifier"(identifier))
         } else {
             tok!("identifier"(identifier))
         }

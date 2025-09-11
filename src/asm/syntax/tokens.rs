@@ -66,8 +66,10 @@ define_tokens! {
         CharLit(CompactString),
         #[name = "identifier"]
         Identifier(Identifier),
+        #[name = "scoped identifier"]
+        ScopedIdentifier(Identifier),
         #[name = "local identifier"]
-        LocalIdentifier(Identifier),
+        LocalIdentifier(CompactString),
         #[name = "anonymous label reference"]
         AnonLabelRef(i32),
 

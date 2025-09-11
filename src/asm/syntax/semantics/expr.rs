@@ -127,6 +127,15 @@ impl parse_ctx!() {
         Expr::number(value, self.span_from_to(l_span_idx, r_span_idx))
     }
 
+    pub fn local_ident(&self, ident: Option<Identifier>, span_idx: usize) -> Expr {
+        let span = self.line_spans[span_idx].clone();
+        if let Some(name) = ident {
+            Expr::symbol(name, span)
+        } else {
+            Expr::nothing(span)
+        }
+    }
+
     pub fn anon_label_ref(&self, ident: Option<Identifier>, span_idx: usize) -> Expr {
         let span = self.line_spans[span_idx].clone();
         if let Some(name) = ident {

@@ -48,8 +48,8 @@ DiffMarker: () = {
 
 LabelDef: () = {
 	// Non-local labels require a colon so that they don't conflict with macro calls.
-	<span_idx:@L> <name:"local identifier"> ":"? => ctx.define_label(name, span_idx, false),
-	<span_idx:@L> <name:"identifier"> ":" => ctx.define_label(name, span_idx, false),
+	<span_idx:@L> <name:LocalIdent> ":"? => ctx.define_label(name, span_idx, false),
+	<span_idx:@L> <name:"identifier"> ":" => ctx.define_label(Some(name), span_idx, false),
 	<span_idx:@L> <name:Identifier> "::" => ctx.define_label(name, span_idx, true),
 	<span_idx:@L> ":" => ctx.define_anon_label(span_idx),
 };
@@ -548,7 +548,7 @@ ExprAtom: Expr = {
 };
 ExprAtomNoIdent: Expr = {
 	"(" <Expr> ")",
-	<span_idx:@L> <ident:"local identifier"> => Expr::symbol(ident, ctx.line_spans[span_idx].clone()),
+	<span_idx:@L> <ident:LocalIdent> => ctx.local_ident(ident, span_idx),
 	<span_idx:@L> <ident:AnonLabelRef> => ctx.anon_label_ref(ident, span_idx),
 	<span_idx:@L> <number:"number"> => Expr::number(number as i32, ctx.line_spans[span_idx].clone()),
 	<span_idx:@L> <ch:"character literal"> => ctx.convert_char_lit(ch, span_idx),
@@ -643,14 +643,18 @@ StrcatArgs: CompactString = {
 	<acc:StrcatArgs> "," <string:StringExpr> => acc + &string.0
 };
 
-Identifier = { "identifier", "local identifier" };
+Identifier: Option<Identifier> = {
+	"identifier" => Some(<>),
+	<LocalIdent>,
+};
+LocalIdent: Option<Identifier> = {
+	"scoped identifier" => Some(<>),
+	<span_idx:@L> <ident:"local identifier"> => ctx.resolve_local_ident(ident, span_idx),
+};
 AnonLabelRef: Option<Identifier> = {
 	<span_idx:@L> <offset:"anonymous label reference"> => ctx.anon_label_name(offset, span_idx)
 };
-IdentOrAnon: Option<Identifier> = {
-	<Identifier> => Some(<>),
-	<AnonLabelRef>
-};
+IdentOrAnon = { <Identifier>, <AnonLabelRef> };
 
 // A list of comma-separated elements, optionally with a trailing comma.
 CommaList<T>: Vec<T> = <mut list:(<T> ",")*> <last:T?> => match last {
@@ -678,7 +682,8 @@ extern {
 		"string" => TokenPayload::String(<CompactString>),
 		"character literal" => TokenPayload::CharLit(<CompactString>),
 		"identifier" => TokenPayload::Identifier(<Identifier>),
-		"local identifier" => TokenPayload::LocalIdentifier(<Identifier>),
+		"scoped identifier" => TokenPayload::ScopedIdentifier(<Identifier>),
+		"local identifier" => TokenPayload::LocalIdentifier(<CompactString>),
 		"anonymous label reference" => TokenPayload::AnonLabelRef(<i32>),
 
 		"," => TokenPayload::Comma,
