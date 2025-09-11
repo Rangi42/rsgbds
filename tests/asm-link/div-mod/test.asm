@@ -3,29 +3,28 @@ def _ASM equ 0
 MACRO test
 	; Test RGBASM
 	redef V equs "_ASM +"
-	static_assert \#
+	static_assert \#, "\#"
 	; Test RGBLINK
 	redef V equs "_LINK +"
-	assert \#
+	assert \#, "\#"
 ENDM
 
 MACRO test_mod
 	def x = \1 ; dividend
 	def y = \2 ; divisor
-	shift 2
-	def q = x / y ; quotient
-	def r = x % y ; remainder
+	def q = \1 / \2 ; quotient
+	def r = \1 % \2 ; remainder
 	; identity laws
-	test (V (q * y + r)) == (V x)
-	test (V (x + y) % y) == (V r)
-	test (V (x - y) % y) == (V r)
+	test (V ( q * \2  + r)) == (V \1)
+	test (V (\1 + \2) % \2) == (V r)
+	test (V (\1 - \2) % \2) == (V r)
 ENDM
 
 MACRO test_each_mod
-	test_mod +(\1), +(\2)
-	test_mod +(\1), -(\2)
-	test_mod -(\1), +(\2)
-	test_mod -(\1), -(\2)
+	test_mod +\1, +\2
+	test_mod +\1, -\2
+	test_mod -\1, +\2
+	test_mod -\1, -\2
 ENDM
 
 MACRO test_pow
@@ -38,8 +37,8 @@ MACRO test_pow
 ENDM
 
 MACRO test_each_pow
-	test_pow +(\1), +(\2)
-	test_pow -(\1), +(\2)
+	test_pow +\1, +\2
+	test_pow -\1, +\2
 ENDM
 
 	test_each_mod 0, 1
