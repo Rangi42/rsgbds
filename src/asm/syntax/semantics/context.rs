@@ -7,7 +7,7 @@ use crate::{
     expr::Expr,
     macro_args::MacroArgs,
     sources::{NormalSpan, Source, Span, SpanKind},
-    syntax::lexer::LoopInfo,
+    syntax::{lexer::LoopInfo, tokens::tok},
     Identifier,
 };
 
@@ -67,6 +67,8 @@ impl parse_ctx!() {
             });
         }
 
+        assert_eol(self);
+
         self.symbols.define_macro(
             name,
             self.identifiers,
@@ -121,6 +123,8 @@ impl parse_ctx!() {
                 error.add_label(diagnostics::error_label(&span).with_message("loop starting here"));
             });
         }
+
+        assert_eol(self);
 
         let ident = for_var.map(|(ident, span)| {
             self.symbols.define_constant(
@@ -194,6 +198,21 @@ impl parse_ctx!() {
                 error.add_label(diagnostics::error_label(&path_span).with_message(err));
             }),
         }
+    }
+}
+
+fn assert_eol(parse_ctx: &mut parse_ctx!()) {
+    let next_token = parse_ctx.next_token(false);
+    if !matches!(next_token.payload, tok!("end of line")) {
+        parse_ctx.error(&next_token.span, |error| {
+            error.set_message(format!("syntax error: unexpected {}", &next_token.payload));
+            error.add_label(
+                diagnostics::error_label(&next_token.span)
+                    .with_message("expected nothing else on this line"),
+            );
+        });
+        // Discard the rest of the line.
+        while !matches!(parse_ctx.next_token(false).payload, tok!("end of line")) {}
     }
 }
 
