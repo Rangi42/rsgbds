@@ -21,12 +21,12 @@ DEAD:
 SECTION "beef", SRAM[$BEEF]
 BEEF:
 
-SECTION "ram test", WRAMX,BANK[1] ; Should end up at $D005
-Word:
+SECTION "ram test", WRAMX,BANK[1]
+Word: assert @ == $D00C
 	dw
 
-SECTION "small ram test", WRAMX,BANK[1] ; Should end up at $D000
-Byte:
+SECTION "small ram test", WRAMX,BANK[1]
+Byte: assert @ == $D000
 	db
 
 	PRINTLN "{Target}\n{Target.end}\n{After}"

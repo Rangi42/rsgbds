@@ -83,6 +83,13 @@ impl Sections {
                 }
             }
         }
+        if active.is_load_block_active() {
+            let Contents::NoData(len) = &mut self.sections[active.sym_section.id].bytes else {
+                unreachable!("LOAD section has data!?")
+            };
+            debug_assert_eq!(*len, active.sym_section.offset);
+            *len += length;
+        }
 
         active.advance_by(length);
     }
@@ -481,6 +488,13 @@ impl Sections {
                     *len = MAX_SECTION_SIZE;
                 }
             }
+        }
+        if active.is_load_block_active() {
+            let Contents::NoData(len) = &mut self.sections[active.sym_section.id].bytes else {
+                unreachable!("LOAD section has data!?")
+            };
+            debug_assert_eq!(*len, active.sym_section.offset);
+            *len += nb_bytes;
         }
 
         active.advance_by(nb_bytes);
