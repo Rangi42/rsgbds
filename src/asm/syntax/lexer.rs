@@ -2211,7 +2211,9 @@ impl Lexer {
             }
         }
 
-        if is_local > 1 {
+        // `.` and `..` are not local.
+        let not_just_dots = name.contains(|ch| ch != '.');
+        if is_local > 1 && not_just_dots {
             let span = Span::Normal(span.clone());
             params.error(&span, |error| {
                 error.set_message("nested local labels are not supported");
@@ -2222,8 +2224,7 @@ impl Lexer {
             });
         }
 
-        // `.` and `..` are not local.
-        if first_char == '.' && name.contains(|ch| ch != '.') {
+        if first_char == '.' && not_just_dots {
             return tok!("local identifier"(name));
         }
 
@@ -2233,7 +2234,7 @@ impl Lexer {
             }
         }
         let identifier = params.identifiers.get_or_intern(&name);
-        if is_local != 0 {
+        if is_local != 0 && not_just_dots {
             tok!("scoped identifier"(identifier))
         } else {
             tok!("identifier"(identifier))
