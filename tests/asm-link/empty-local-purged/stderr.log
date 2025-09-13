@@ -5,11 +5,4 @@ error: local symbol in main scope
    │       ──┬──  
    │         ╰──── no global label before this
 ───╯
-error: cannot delete a symbol that doesn't exist
-   ╭─[ test.asm:3:7 ]
-   │
- 3 │ PURGE .test
-   │       ──┬──  
-   │         ╰──── no symbol named `.test` exists at this point
-───╯
-2 errors generated.
+1 error generated.

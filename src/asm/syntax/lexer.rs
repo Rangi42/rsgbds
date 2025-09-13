@@ -2194,6 +2194,7 @@ impl Lexer {
 
         let mut name = CompactString::default();
         let mut is_local = (first_char == '.') as u8;
+        let mut not_just_dots = first_char != '.';
 
         name.push(first_char);
         loop {
@@ -2201,6 +2202,7 @@ impl Lexer {
                 Some(ch @ chars!(ident)) => {
                     self.consume(span);
                     name.push(ch);
+                    not_just_dots = true;
                 }
                 Some('.') => {
                     self.consume(span);
@@ -2211,8 +2213,6 @@ impl Lexer {
             }
         }
 
-        // `.` and `..` are not local.
-        let not_just_dots = name.contains(|ch| ch != '.');
         if is_local > 1 && not_just_dots {
             let span = Span::Normal(span.clone());
             params.error(&span, |error| {
@@ -2234,7 +2234,21 @@ impl Lexer {
             }
         }
         let identifier = params.identifiers.get_or_intern(&name);
+        // `.` and `..` are not local.
         if is_local != 0 && not_just_dots {
+            let mut chars = name.chars();
+            while let Some(ch) = chars.next() {
+                if ch == '.' && !chars.next().is_some_and(|next| next != '.') {
+                    let span = Span::Normal(span.clone());
+                    params.error(&span, |error| {
+                        error.set_message("a component of this identifier is empty");
+                        error.add_label(
+                            diagnostics::error_label(&span)
+                                .with_message("dots cannot be trailing or consecutive"),
+                        );
+                    });
+                }
+            }
             tok!("scoped identifier"(identifier))
         } else {
             tok!("identifier"(identifier))

@@ -1,2 +1,8 @@
-FATAL: `Label.` is a nonsensical reference to an empty local label
-    at empty-local.asm(4)
+error: a component of this identifier is empty
+   ╭─[ test.asm:4:1 ]
+   │
+ 4 │ Label.:
+   │ ───┬──  
+   │    ╰──── dots cannot be trailing or consecutive
+───╯
+1 error generated.

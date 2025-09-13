@@ -1,2 +1,8 @@
-FATAL: `Referenced.` is a nonsensical reference to an empty local label
-    at empty-local-referenced.asm(3)
+error: a component of this identifier is empty
+   ╭─[ test.asm:3:4 ]
+   │
+ 3 │ dw Referenced.
+   │    ─────┬─────  
+   │         ╰─────── dots cannot be trailing or consecutive
+───╯
+1 error generated.
