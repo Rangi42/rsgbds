@@ -3,7 +3,12 @@ use std::{fmt::Display, fs::File, io::Read};
 use compact_str::CompactString;
 use either::Either;
 
-use crate::{common::S, diagnostics, expr::Expr, sources::Span};
+use crate::{
+    common::S,
+    diagnostics::{self, warning},
+    expr::Expr,
+    sources::Span,
+};
 
 use super::parse_ctx;
 
@@ -94,6 +99,7 @@ impl parse_ctx!() {
 
     pub fn emit_bytes(&mut self, bytes: Vec<Either<Expr, (CompactString, Span)>>, span_idx: usize) {
         if bytes.is_empty() {
+            self.warn_if_used_in_rom("db", 1, &self.line_spans[span_idx]);
             self.allocate_space(Either::Left(Either::Right(1)), span_idx);
         } else {
             let keyword_span = &self.line_spans[span_idx];
@@ -126,6 +132,7 @@ impl parse_ctx!() {
 
     pub fn emit_words(&mut self, words: Vec<Either<Expr, (CompactString, Span)>>, span_idx: usize) {
         if words.is_empty() {
+            self.warn_if_used_in_rom("dw", 2, &self.line_spans[span_idx]);
             self.allocate_space(Either::Left(Either::Right(1)), span_idx);
         } else {
             let keyword_span = &self.line_spans[span_idx];
@@ -158,6 +165,7 @@ impl parse_ctx!() {
 
     pub fn emit_longs(&mut self, longs: Vec<Either<Expr, (CompactString, Span)>>, span_idx: usize) {
         if longs.is_empty() {
+            self.warn_if_used_in_rom("dl", 4, &self.line_spans[span_idx]);
             self.allocate_space(Either::Left(Either::Right(1)), span_idx);
         } else {
             let keyword_span = &self.line_spans[span_idx];
@@ -185,6 +193,26 @@ impl parse_ctx!() {
                     ),
                 }
             }
+        }
+    }
+
+    fn warn_if_used_in_rom(&self, directive_name: &str, nb_bytes: u8, span: &Span) {
+        if self.sections.active_section.as_ref().is_some_and(|active| {
+            matches!(
+                self.sections.sections[active.sym_section.id].bytes,
+                crate::section::Contents::Data(..)
+            )
+        }) {
+            self.warn(warning!("empty-data-directive"), span, |warning| {
+                warning.set_message(format!("`{directive_name}` without data in ROM"));
+                warning.add_label(
+                    diagnostics::error_label(span)
+                        .with_message("was this intended for a RAM section?"),
+                );
+                warning.set_help(format!(
+                    "consider using `ds {nb_bytes}` instead, if this is intentional"
+                ));
+            });
         }
     }
 

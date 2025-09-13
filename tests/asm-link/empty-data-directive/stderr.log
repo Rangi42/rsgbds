@@ -1,6 +1,27 @@
-warning: `DB` directive without data in ROM [-Wempty-data-directive]
-    at empty-data-directive.asm(6)
-warning: `DW` directive without data in ROM [-Wempty-data-directive]
-    at empty-data-directive.asm(7)
-warning: `DL` directive without data in ROM [-Wempty-data-directive]
-    at empty-data-directive.asm(8)
+[-Wempty-data-directive] warning: `db` without data in ROM
+   ╭─[ test.asm:6:2 ]
+   │
+ 6 │     db
+   │     ─┬  
+   │      ╰── was this intended for a RAM section?
+   │ 
+   │ Help: consider using `ds 1` instead, if this is intentional
+───╯
+[-Wempty-data-directive] warning: `dw` without data in ROM
+   ╭─[ test.asm:7:2 ]
+   │
+ 7 │     dw
+   │     ─┬  
+   │      ╰── was this intended for a RAM section?
+   │ 
+   │ Help: consider using `ds 2` instead, if this is intentional
+───╯
+[-Wempty-data-directive] warning: `dl` without data in ROM
+   ╭─[ test.asm:8:2 ]
+   │
+ 8 │     dl
+   │     ─┬  
+   │      ╰── was this intended for a RAM section?
+   │ 
+   │ Help: consider using `ds 4` instead, if this is intentional
+───╯
