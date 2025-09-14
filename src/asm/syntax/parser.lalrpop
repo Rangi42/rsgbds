@@ -31,13 +31,17 @@ grammar(ctx: &mut ParseCtx<'_, '_, '_, '_, '_, '_>);
 //       https://lalrpop.github.io/lalrpop/tutorial/008_error_recovery.html
 
 
-pub Line = DiffMarker? <LineContents>;
+pub Line = DiffMarker? <LineContents> ExtraAtEol?;
 LineContents = {
 	SpecialDirective, // TODO: accept labels before those, to produce a clearer error message
 	LabelDef? <Directive>,
 	LabelDef? <Emittable>,
 	LabelDef? <MacroCall>,
 	LabelDef // LALRPOP doesn't allow productions to match no tokens, so empty lines are simply not passed to the parser.
+};
+ExtraAtEol: () = ! => {
+	let should_continue = ctx.report_parse_error(<>.error);
+	debug_assert!(should_continue); // Should not have been one of the assertions.
 };
 
 DiffMarker: () = {
