@@ -2964,7 +2964,7 @@ impl Lexer {
             loop {
                 let (line, remainder) = match block.split_once(is_newline) {
                     Some((line, remainder)) => (line, Some(remainder)),
-                    None => (text, None),
+                    None => (block, None),
                 };
 
                 let trimmed = line.trim_start_matches(is_whitespace);
