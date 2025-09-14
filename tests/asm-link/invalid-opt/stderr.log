@@ -94,7 +94,7 @@ error: invalid argument to option 'Q'
     │
  14 │ opt Q1234
     │     ──┬──  
-    │       ╰──── fixed-point precision must be between 1 and 31, not 1234
+    │       ╰──── number too large to fit in target type
 ────╯
 error: invalid argument to option 'Q'
     ╭─[ test.asm:15:5 ]
