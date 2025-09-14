@@ -1476,7 +1476,7 @@ impl Lexer {
                                         ),
                                     );
                                 });
-                                span.bytes.end = span.bytes.start;
+                                break token!("number"(0));
                             }
                         }
                         Some('o' | 'O') => {
@@ -1501,7 +1501,7 @@ impl Lexer {
                                         ),
                                     );
                                 });
-                                span.bytes.end = span.bytes.start;
+                                break token!("number"(0));
                             }
                         }
                         Some('b' | 'B') => {
@@ -1535,7 +1535,7 @@ impl Lexer {
                                         ),
                                     );
                                 });
-                                span.bytes.end = span.bytes.start;
+                                break token!("number"(0));
                             }
                         }
                         Some('0'..='9' | '.' | '_') => {
@@ -1652,7 +1652,7 @@ impl Lexer {
                                     "in rgbasm, the current address is notated `@`, not `$`",
                                 );
                             });
-                            span.make_empty();
+                            break token!("number"(0));
                         }
                     }
                 }
@@ -1694,7 +1694,7 @@ impl Lexer {
                                     gfx_char(3),
                                 ));
                             });
-                            span.make_empty();
+                            break token!("number"(0));
                         }
                     }
                 }
@@ -2014,27 +2014,24 @@ impl Lexer {
                 );
             });
         }
-        match super::semantics::fixed_point::clamp_fixpoint_precision(
+        let precision = super::semantics::fixed_point::clamp_fixpoint_precision(
             precision_raw,
             &span,
             params.nb_errors_left,
             params.options,
-        ) {
-            Some(precision) => {
-                if integer_part >= 1u32 << (32 - precision) {
-                    params.warn(warning!("large-constant"), &span, |warning| {
-                        warning.set_message("magnitude of fixed-point constant is too large");
-                        warning.add_label(diagnostics::warning_label(&span).with_message(format!(
-                            "the integer part of this was truncated to {}",
-                            integer_part % (1 << (32 - precision)),
-                        )))
-                    });
-                }
-                integer_part << precision
-                    | (value as f64 / divisor as f64 * 2.0f64.powi(precision.into())).round() as u32
-            }
-            None => integer_part,
+        )
+        .unwrap_or(params.options.runtime_opts.q_precision);
+        if integer_part >= 1u32 << (32 - precision) {
+            params.warn(warning!("large-constant"), &span, |warning| {
+                warning.set_message("magnitude of fixed-point constant is too large");
+                warning.add_label(diagnostics::warning_label(&span).with_message(format!(
+                    "the integer part of this was truncated to {}",
+                    integer_part % (1 << (32 - precision)),
+                )))
+            });
         }
+        integer_part << precision
+            | (value as f64 / divisor as f64 * 2.0f64.powi(precision.into())).round() as u32
     }
 
     fn read_bin_number(

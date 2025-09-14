@@ -1,27 +1,226 @@
-error: Invalid integer constant, no digits after '$'
-    at invalid-numbers.asm::try(2) <- invalid-numbers.asm(11)
-error: Invalid graphics constant, no digits after '`'
-    at invalid-numbers.asm::try(2) <- invalid-numbers.asm(12)
-error: Invalid integer constant, no digits after '%'
-    at invalid-numbers.asm::try(2) <- invalid-numbers.asm(13)
-error: Invalid integer constant, no digits after '&'
-    at invalid-numbers.asm::try(2) <- invalid-numbers.asm(14)
-error: Invalid integer constant, no digits after '$'
-    at invalid-numbers.asm::try(2) <- invalid-numbers.asm(15)
-warning: Integer constant is too large [-Wlarge-constant]
-    at invalid-numbers.asm::try(2) <- invalid-numbers.asm(18)
-warning: Integer constant is too large [-Wlarge-constant]
-    at invalid-numbers.asm::try(2) <- invalid-numbers.asm(19)
-warning: Integer constant is too large [-Wlarge-constant]
-    at invalid-numbers.asm::try(2) <- invalid-numbers.asm(20)
-warning: Integer constant is too large [-Wlarge-constant]
-    at invalid-numbers.asm::try(2) <- invalid-numbers.asm(21)
-warning: Graphics constant is too large; only first 8 pixels considered [-Wlarge-constant]
-    at invalid-numbers.asm::try(2) <- invalid-numbers.asm(22)
-warning: Magnitude of fixed-point constant is too large [-Wlarge-constant]
-    at invalid-numbers.asm::try(2) <- invalid-numbers.asm(23)
-error: Invalid fixed-point constant, no significant digits after 'q'
-    at invalid-numbers.asm::try(2) <- invalid-numbers.asm(26)
-error: Fixed-point constant precision must be between 1 and 31
-    at invalid-numbers.asm::try(2) <- invalid-numbers.asm(29)
-Assembly aborted with 7 errors!
+error: lone '$'
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ $
+    │ ┬  
+    │ ╰── expected a hex digit after this
+    │
+    ├─[ test.asm:2:10 ]
+    │
+  2 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 11 │ try $
+    │ ─┬─  
+    │  ╰─── macro called here
+    │ 
+    │ Help: in rgbasm, the current address is notated `@`, not `$`
+────╯
+error: lone '`'
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ `
+    │ ┬  
+    │ ╰── expected a graphics character after this
+    │
+    ├─[ test.asm:2:10 ]
+    │
+  2 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 12 │ try `
+    │ ─┬─  
+    │  ╰─── macro called here
+    │ 
+    │ Help: the graphics characters at this point are '0', '1', '2', and '3'
+────╯
+error: missing binary digit(s) after `0b` prefix
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 0b
+    │ ─┬  
+    │  ╰── expected at least one binary digit after this
+    │
+    ├─[ test.asm:2:10 ]
+    │
+  2 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 13 │ try 0b
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+error: missing octal digit(s) after `0o` prefix
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 0o
+    │ ─┬  
+    │  ╰── expected at least one octal digit after this
+    │
+    ├─[ test.asm:2:10 ]
+    │
+  2 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 14 │ try 0o
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+error: missing hexadecimal digit(s) after `0x` prefix
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 0x
+    │ ─┬  
+    │  ╰── expected at least one hex digit after this
+    │
+    ├─[ test.asm:2:10 ]
+    │
+  2 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 15 │ try 0x
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+[-Wlarge-constant] warning: integer constant is larger than 4294967295
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 999_876_543_210
+    │ ───────┬───────  
+    │        ╰───────── this was truncated to 3444130538
+    │
+    ├─[ test.asm:2:10 ]
+    │
+  2 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 18 │ try 999_876_543_210, 3444130538
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+[-Wlarge-constant] warning: integer constant is larger than 4294967295
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ $ffff_0000_0000
+    │ ───────┬───────  
+    │        ╰───────── this was truncated to 0
+    │
+    ├─[ test.asm:2:10 ]
+    │
+  2 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 19 │ try $ffff_0000_0000
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+[-Wlarge-constant] warning: integer constant is larger than 4294967295
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ &7777_0000_0000_0000
+    │ ──────────┬─────────  
+    │           ╰─────────── this was truncated to 0
+    │
+    ├─[ test.asm:2:10 ]
+    │
+  2 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 20 │ try &7777_0000_0000_0000
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+[-Wlarge-constant] warning: integer constant is larger than 4294967295
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ %1111_00000000_00000000_00000000_00000000
+    │ ────────────────────┬────────────────────  
+    │                     ╰────────────────────── this was truncated to 0
+    │
+    ├─[ test.asm:2:10 ]
+    │
+  2 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 21 │ try %1111_00000000_00000000_00000000_00000000
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+[-Wlarge-constant] warning: graphics constant contains more than 8 pixels
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ `0123_3210_0123
+    │ ───────┬───────  
+    │        ╰───────── this was truncated to $C3A5
+    │
+    ├─[ test.asm:2:10 ]
+    │
+  2 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 22 │ try `0123_3210_0123, `3210_0123
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+[-Wlarge-constant] warning: magnitude of fixed-point constant is too large
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 99999.0q16
+    │ ─────┬────  
+    │      ╰────── the integer part of this was truncated to 34463
+    │
+    ├─[ test.asm:2:10 ]
+    │
+  2 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 23 │ try 99999.0q16, 34463.0
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+error: missing digits after 'q'
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 3.14q
+    │ ──┬──  
+    │   ╰──── this fixed-point constant is invalid
+    │
+    ├─[ test.asm:2:10 ]
+    │
+  2 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 26 │ try 3.14q, 3.14
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+error: invalid fixed-point precision
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ 3.14q40
+    │ ───┬───  
+    │    ╰───── this must be between 1 and 31 inclusive, not 40
+    │
+    ├─[ test.asm:2:10 ]
+    │
+  2 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 29 │ try 3.14q40, 3.14
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+7 errors generated.
