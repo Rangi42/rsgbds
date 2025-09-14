@@ -1528,10 +1528,10 @@ impl Lexer {
                             } else {
                                 let err_span = Span::Normal(span.clone());
                                 params.error(&err_span, |error| {
-                                    error.set_message("missing octal digit(s) after `0o` prefix");
+                                    error.set_message("missing binary digit(s) after `0b` prefix");
                                     error.add_label(
                                         diagnostics::error_label(&err_span).with_message(
-                                            "expected at least one octal digit after this",
+                                            "expected at least one binary digit after this",
                                         ),
                                     );
                                 });
