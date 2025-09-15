@@ -1,6 +1,9 @@
 use std::cell::Cell;
 
+use compact_str::CompactString;
 use either::Either;
+use indexmap::IndexMap;
+use rustc_hash::FxBuildHasher;
 
 use crate::{
     charmap::Charmap,
@@ -13,7 +16,10 @@ use crate::{
     Identifiers, Options,
 };
 
-use super::{ActiveSection, Contents, LinkTimeExpr, Patch, PatchKind, SectionKind, Sections};
+use super::{
+    ActiveSection, Contents, LinkTimeExpr, Patch, PatchKind, Section, SectionKind, Sections,
+    UnionEntry,
+};
 
 const MAX_SECTION_SIZE: usize = 0x1_000_000;
 
@@ -52,52 +58,61 @@ impl Sections {
             return;
         };
 
-        let data_sect = &mut self.sections[active.data_section.id];
+        Self::pad_section(
+            &mut self.sections,
+            &active.data_section,
+            length,
+            &active.unions,
+            options,
+        );
+        if active.is_load_block_active() {
+            Self::pad_section(
+                &mut self.sections,
+                &active.sym_section,
+                length,
+                &active.unions,
+                options,
+            );
+        }
+
+        active.advance_by(length);
+    }
+    fn pad_section(
+        sections: &mut IndexMap<CompactString, Section, FxBuildHasher>,
+        active_section: &ActiveSection,
+        length: usize,
+        unions: &[UnionEntry],
+        options: &Options,
+    ) {
+        let data_sect = &mut sections[active_section.id];
         match &mut data_sect.bytes {
             Contents::Data(data) => {
-                if active
-                    .data_section
+                if active_section
                     .offset
                     .checked_add(length)
                     .is_some_and(|new_ofs| new_ofs <= MAX_SECTION_SIZE)
                 {
-                    debug_assert_eq!(data.len(), active.data_section.offset);
+                    debug_assert_eq!(data.len(), active_section.offset);
                     data.extend(std::iter::repeat(options.runtime_opts.pad_byte).take(length));
                 } else {
                     data.resize(MAX_SECTION_SIZE, options.runtime_opts.pad_byte);
                 }
             }
             Contents::NoData(len) => {
-                if matches!(data_sect.attrs.kind, SectionKind::Union) || !active.unions.is_empty() {
-                    *len = std::cmp::max(*len, active.data_section.offset + length);
-                } else if active
-                    .data_section
+                if matches!(data_sect.attrs.kind, SectionKind::Union) || !unions.is_empty() {
+                    *len = std::cmp::max(*len, active_section.offset + length);
+                } else if active_section
                     .offset
                     .checked_add(length)
                     .is_some_and(|new_ofs| new_ofs <= MAX_SECTION_SIZE)
                 {
-                    debug_assert_eq!(*len, active.data_section.offset);
+                    debug_assert_eq!(*len, active_section.offset);
                     *len += length;
                 } else {
                     *len = MAX_SECTION_SIZE;
                 }
             }
         }
-        if active.is_load_block_active() {
-            match &mut self.sections[active.sym_section.id].bytes {
-                Contents::NoData(len) => {
-                    debug_assert_eq!(*len, active.sym_section.offset);
-                    *len += length;
-                }
-                Contents::Data(data) => {
-                    // Generating such a situation produces an error, but we try to keep running nonetheless.
-                    debug_assert_eq!(data.len(), active.sym_section.offset);
-                    data.resize(data.len() + length, 0); // Dummy value.
-                }
-            }
-        }
-
-        active.advance_by(length);
     }
 
     pub fn emit_padding(
@@ -496,17 +511,13 @@ impl Sections {
             }
         }
         if active.is_load_block_active() {
-            match &mut self.sections[active.sym_section.id].bytes {
-                Contents::NoData(len) => {
-                    debug_assert_eq!(*len, active.sym_section.offset);
-                    *len += nb_bytes;
-                }
-                Contents::Data(data) => {
-                    // Generating such a situation produces an error, but we try to keep running nonetheless.
-                    debug_assert_eq!(data.len(), active.sym_section.offset);
-                    data.resize(data.len() + nb_bytes, 0); // Dummy value.
-                }
-            }
+            Self::pad_section(
+                &mut self.sections,
+                &active.sym_section,
+                nb_bytes,
+                &active.unions,
+                options,
+            );
         }
 
         active.advance_by(nb_bytes);
