@@ -1,3 +1,8 @@
-error: Bracketed symbol `foo` does not exist
-    at invalid-macro-arg-symbol.asm(1)
-Assembly aborted with 1 error!
+error: the symbol `foo` doesn't exist
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ \<foo>
+   │ ───┬──  
+   │    ╰──── this symbol is invalid
+───╯
+1 error generated.

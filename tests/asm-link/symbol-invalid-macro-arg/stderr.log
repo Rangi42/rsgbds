@@ -1,3 +1,10 @@
-error: Invalid bracketed macro argument "\<0>"
-    at symbol-invalid-macro-arg.asm(1)
-Assembly aborted with 1 error!
+error: macro argument #0 doesn't exist
+   ╭─[ test.asm:1:6 ]
+   │
+ 1 │ def x\<0> = 10
+   │      ──┬─  
+   │        ╰─── macro argument 0 doesn't exist
+   │ 
+   │ Help: macro arguments are 1-indexed: the first macro argument is `\1`
+───╯
+1 error generated.

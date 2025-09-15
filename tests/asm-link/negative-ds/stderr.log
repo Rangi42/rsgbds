@@ -1,2 +1,10 @@
-FATAL: Constant must not be negative: -1
-    at negative-ds.asm(5)
+error: negative sizes are not allowed for `ds`
+   ╭─[ test.asm:5:4 ]
+   │
+ 5 │ ds -1
+   │    ─┬  
+   │     ╰── cannot emit -1 bytes of padding
+   │ 
+   │ Help: if you want multiple blocks of data to share the same space, consider using `union`
+───╯
+1 error generated.

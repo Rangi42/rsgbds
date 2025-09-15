@@ -1,2 +1,11 @@
-warning: Where am I? [-Wuser]
-    at macro-purge.asm::m(4) <- macro-purge.asm(6)
+[-Wuser] warning: Where am I?
+   ╭─[ test.asm:4:2 ]
+   │
+ 4 │     WARN "Where am I?"
+   │     ──┬─  
+   │       ╰─── triggered here
+   │ 
+ 6 │     m
+   │     ┬  
+   │     ╰── macro called here
+───╯

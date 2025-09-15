@@ -1,5 +1,25 @@
-error: Invalid character '0' after line continuation
-    at macro-arg-0.asm::m(2) <- macro-arg-0.asm(5)
-error: Invalid bracketed macro argument "\<0>"
-    at macro-arg-0.asm::m(3) <- macro-arg-0.asm(5)
-Assembly aborted with 2 errors!
+error: unexpected character after line continuation
+   ╭─[ test.asm:2:10 ]
+   │
+ 2 │     def x = \0
+   │             ┬  
+   │             ╰── there can only be whitespace between this backslash and the end of the line
+   │ 
+ 5 │     m hello, world
+   │     ┬  
+   │     ╰── macro called here
+───╯
+error: macro argument #0 doesn't exist
+   ╭─[ test.asm:3:10 ]
+   │
+ 3 │     def y = \<0> + 42
+   │             ──┬─  
+   │               ╰─── macro argument 0 doesn't exist
+   │ 
+ 5 │     m hello, world
+   │     ┬  
+   │     ╰── macro called here
+   │ 
+   │ Help: macro arguments are 1-indexed: the first macro argument is `\1`
+───╯
+2 errors generated.

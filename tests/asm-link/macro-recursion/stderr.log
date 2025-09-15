@@ -1,2 +1,30 @@
-FATAL: Recursion limit (64) exceeded
-    at macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm::recurse(2) <- macro-recursion.asm(4)
+error: maximum recursion depth exceeded
+   ╭─[ test.asm:2:2 ]
+   │
+ 2 │     recurse
+   │     ───┬───  
+   │        ╰───── depth is 64 contexts here, cannot enter a new one
+   │        │     
+   │        ╰───── macro called here
+   │        │     
+   │        ╰───── macro called here
+   │        │     
+   │        ╰───── macro called here
+   │        │     
+   │        ╰───── macro called here
+   │        │     
+   │        ╰───── macro called here
+   │        │     
+   │        ╰───── macro called here
+   │        │     
+   │        ╰───── macro called here
+   │        │     
+   │        ╰───── macro called here
+   │        │     
+   │        ╰───── macro called here
+   │        │     
+   │        ╰───── macro called here
+   │ 
+   │ Note: ... 54 more levels of nesting omitted
+───╯
+1 error generated.

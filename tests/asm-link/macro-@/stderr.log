@@ -1,5 +1,21 @@
-error: Label `foo` created outside of a `SECTION`
-    at macro-@.asm(1)
+error: label defined outside of a section
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ foo: @bar
+   │ ─┬─  
+   │  ╰─── no section is active at this point
+───╯
 error: `@` is not a macro
-    at macro-@.asm(1)
-Assembly aborted with 2 errors!
+   ╭─[ test.asm:1:6 ]
+   │
+ 1 │ foo: @bar
+   │      ┬  
+   │      ╰── Macro call here
+   │
+   ├─[ <built-in>:1:1 ]
+   │
+ 1 │ 
+   │ │ 
+   │ ╰─ a symbol by this name was defined here
+───╯
+2 errors generated.

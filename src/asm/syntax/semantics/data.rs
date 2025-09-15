@@ -52,7 +52,7 @@ impl parse_ctx!() {
                     if value < 0 {
                         self.error(&span, |error| {
                             error.set_message("negative sizes are not allowed for `ds`");
-                            error.add_label(diagnostics::error_label(&span).with_message("cannot emit {value} bytes of padding"));
+                            error.add_label(diagnostics::error_label(&span).with_message(format!("cannot emit {value} bytes of padding")));
                             if self.sections
                                 .active_section
                                 .as_ref()

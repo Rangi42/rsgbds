@@ -1,8 +1,32 @@
-warning: Line 2 [-Wuser]
-    at macro-line-no.asm(2)
-warning: Line 6 [-Wuser]
-    at macro-line-no.asm(6)
-warning: Line 4 [-Wuser]
-    at macro-line-no.asm::m(4) <- macro-line-no.asm(7)
-warning: Line 8 [-Wuser]
-    at macro-line-no.asm(8)
+[-Wuser] warning: Line 2
+   ╭─[ test.asm:2:1 ]
+   │
+ 2 │ WARN "Line 2"
+   │ ──┬─  
+   │   ╰─── triggered here
+───╯
+[-Wuser] warning: Line 6
+   ╭─[ test.asm:6:1 ]
+   │
+ 6 │ WARN "Line 6"
+   │ ──┬─  
+   │   ╰─── triggered here
+───╯
+[-Wuser] warning: Line 4
+   ╭─[ test.asm:4:2 ]
+   │
+ 4 │     WARN "Line 4"
+   │     ──┬─  
+   │       ╰─── triggered here
+   │ 
+ 7 │     m
+   │     ┬  
+   │     ╰── macro called here
+───╯
+[-Wuser] warning: Line 8
+   ╭─[ test.asm:8:1 ]
+   │
+ 8 │ WARN "Line 8"
+   │ ──┬─  
+   │   ╰─── triggered here
+───╯

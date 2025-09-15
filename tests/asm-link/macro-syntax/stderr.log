@@ -1,3 +1,10 @@
+error: label defined outside of a section
+   ╭─[ test.asm:7:2 ]
+   │
+ 7 │     old: MACRO ; comment
+   │     ─┬─  
+   │      ╰─── no section is active at this point
+───╯
 error: syntax error: unexpected macro
    ╭─[ test.asm:7:7 ]
    │
@@ -26,4 +33,4 @@ error: macro `old` does not exist
     │     ─┬─  
     │      ╰─── attempting to call the macro here
 ────╯
-4 errors generated.
+5 errors generated.

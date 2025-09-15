@@ -1,3 +1,20 @@
-error: Invalid character '2' after line continuation
-    at macro-arg-recursion.asm::m(2) <- macro-arg-recursion.asm(6)
-Assembly aborted with 1 error!
+error: unexpected character after line continuation
+   ╭─[ <macro argument #1>:1:1 ]
+   │
+ 1 │ \2
+   │ ┬  
+   │ ╰── there can only be whitespace between this backslash and the end of the line
+   │
+   ├─[ test.asm:2:11 ]
+   │
+ 2 │     def x = (\1) * 2
+   │              ─┬  
+   │               ╰── expanded here
+   │ 
+ 6 │     m \\2, 6  ; should not prints 12
+   │     ┬  
+   │     ╰── macro called here
+   │ 
+   │ Help: characters inside of interpolations and macro args cannot start one themselves
+───╯
+1 error generated.
