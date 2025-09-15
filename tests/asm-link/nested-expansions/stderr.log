@@ -1,3 +1,30 @@
-error: Undefined macro `qux`
-    at nested-expansions.asm::test(4) <- nested-expansions.asm(6)
-Assembly aborted with 1 error!
+error: macro `qux` does not exist
+   ╭─[ bar:1:1 ]
+   │
+ 1 │ qux
+   │ ─┬─  
+   │  ╰─── attempting to call the macro here
+   │
+   ├─[ foo:1:1 ]
+   │
+ 1 │ bar
+   │ ─┬─  
+   │  ╰─── interpolated here
+   │
+   ├─[ <macro argument #1>:1:1 ]
+   │
+ 1 │ foo 0
+   │ ─┬─  
+   │  ╰─── interpolated here
+   │
+   ├─[ test.asm:4:2 ]
+   │
+ 4 │     \1
+   │     ─┬  
+   │      ╰── expanded here
+   │ 
+ 6 │     test foo 0
+   │     ──┬─  
+   │       ╰─── macro called here
+───╯
+1 error generated.

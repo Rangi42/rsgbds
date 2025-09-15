@@ -15,32 +15,32 @@ error: unexpected character '}'
    │           ╰──── this character was not expected at this point
 ───╯
 error: syntax error: unexpected end of line
-   ╭─[ test.asm:1:14 ]
+   ╭─[ test.asm:1:7 ]
    │
  1 │ def p = {{a}}
-   │              │ 
-   │              ╰─ expected a number or an expression here
+   │       ┬  
+   │       ╰── expected "number", "string", "character literal", "identifier", "scoped identifier", "local identifier", "anonymous label reference", ...49 others
 ───╯
 error: interpolated symbol is a reserved keyword
    ╭─[ test.asm:2:11 ]
    │
- 2 │ def q = "{b}"
+ 2 │ def q = '{b}'
    │           ┬  
    │           ╰── attempting to interpolate `b` here
    │ 
    │ Help: add a `#` prefix to use the name as a symbol anyway
 ───╯
-error: invalid string-to-number conversion
+error: empty character literal
    ╭─[ test.asm:2:9 ]
    │
- 2 │ def q = "{b}"
+ 2 │ def q = '{b}'
    │         ──┬──  
-   │           ╰──── this string encodes to 0 charmap units instead of 1
+   │           ╰──── this literal is empty
 ───╯
 error: interpolated symbol is a reserved keyword
    ╭─[ test.asm:3:12 ]
    │
- 3 │ def r = "{{c}}"
+ 3 │ def r = '{{c}}'
    │            ┬  
    │            ╰── attempting to interpolate `c` here
    │ 
@@ -49,7 +49,7 @@ error: interpolated symbol is a reserved keyword
 [-Wunescaped-brace] warning: unescaped closing brace
    ╭─[ test.asm:3:14 ]
    │
- 3 │ def r = "{{c}}"
+ 3 │ def r = '{{c}}'
    │              ┬  
    │              ╰── this isn't part of an interpolation
 ───╯

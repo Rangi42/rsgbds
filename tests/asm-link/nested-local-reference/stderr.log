@@ -1,2 +1,8 @@
-FATAL: `Parent.child.grandchild` is a nonsensical reference to a nested local label
-    at nested-local-reference.asm(8)
+error: nested local labels are not supported
+   ╭─[ test.asm:8:5 ]
+   │
+ 8 │     dw Parent.child.grandchild
+   │        ───────────┬───────────  
+   │                   ╰───────────── there can only be up to 1 dot per identifier
+───╯
+1 error generated.

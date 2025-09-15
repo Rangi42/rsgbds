@@ -1,7 +1,23 @@
-warning: Nested macros shouldn't work, whose argument would be \1? [-Wuser]
-    at nested-macrodef.asm::outer(22) <- nested-macrodef.asm(26)
-error: Unterminated macro definition
-    at nested-macrodef.asm::outer(24) <- nested-macrodef.asm(26)
-error: Undefined macro `inner`
-    at nested-macrodef.asm(27)
-Assembly aborted with 2 errors!
+[-Wuser] warning: Nested macros shouldn't work, whose argument would be \1?
+    ╭─[ test.asm:22:2 ]
+    │
+ 22 │     WARN "Nested macros shouldn't work, whose argument would be \\1?"
+    │     ──┬─  
+    │       ╰─── triggered here
+    │ 
+ 26 │     outer
+    │     ──┬──  
+    │       ╰──── macro called here
+────╯
+error: unterminated macro definition
+    ╭─[ test.asm:23:7 ]
+    │
+ 23 │ MACRO inner
+    │       ──┬──  
+    │         ╰──── macro definition starting here
+    │ 
+ 26 │     outer
+    │     ──┬──  
+    │       ╰──── macro called here
+────╯
+1 error generated.
