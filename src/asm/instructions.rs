@@ -114,7 +114,7 @@ impl Instruction {
     pub fn ld_r8_imm(dest: Reg8, src: Expr, span: Span) -> Self {
         Self {
             span,
-            bytes: [0x08 | dest.id() << 3, Default::default()]
+            bytes: [0x06 | dest.id() << 3, Default::default()]
                 .into_iter()
                 .collect(),
             patch: Some(Patch {
