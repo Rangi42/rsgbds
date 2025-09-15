@@ -84,11 +84,17 @@ impl Sections {
             }
         }
         if active.is_load_block_active() {
-            let Contents::NoData(len) = &mut self.sections[active.sym_section.id].bytes else {
-                unreachable!("LOAD section has data!?")
-            };
-            debug_assert_eq!(*len, active.sym_section.offset);
-            *len += length;
+            match &mut self.sections[active.sym_section.id].bytes {
+                Contents::NoData(len) => {
+                    debug_assert_eq!(*len, active.sym_section.offset);
+                    *len += length;
+                }
+                Contents::Data(data) => {
+                    // Generating such a situation produces an error, but we try to keep running nonetheless.
+                    debug_assert_eq!(data.len(), active.sym_section.offset);
+                    data.resize(data.len() + length, 0); // Dummy value.
+                }
+            }
         }
 
         active.advance_by(length);
@@ -490,11 +496,17 @@ impl Sections {
             }
         }
         if active.is_load_block_active() {
-            let Contents::NoData(len) = &mut self.sections[active.sym_section.id].bytes else {
-                unreachable!("LOAD section has data!?")
-            };
-            debug_assert_eq!(*len, active.sym_section.offset);
-            *len += nb_bytes;
+            match &mut self.sections[active.sym_section.id].bytes {
+                Contents::NoData(len) => {
+                    debug_assert_eq!(*len, active.sym_section.offset);
+                    *len += nb_bytes;
+                }
+                Contents::Data(data) => {
+                    // Generating such a situation produces an error, but we try to keep running nonetheless.
+                    debug_assert_eq!(data.len(), active.sym_section.offset);
+                    data.resize(data.len() + nb_bytes, 0); // Dummy value.
+                }
+            }
         }
 
         active.advance_by(nb_bytes);

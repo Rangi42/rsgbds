@@ -230,6 +230,86 @@ impl Sections {
         }
     }
 
+    pub fn open_load_block(
+        &mut self,
+        new_active_section: ActiveSection,
+        span: &Span,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        self.reject_active_union(span, nb_errors_left, options);
+
+        if let Some(active) = self.active_section.as_mut() {
+            if active.is_load_block_active() {
+                diagnostics::warn(
+                    warning!("unterminated-load"),
+                    span,
+                    |error| {
+                        error.set_message("`load` block terminated by another `load`");
+                        error.add_label(
+                            diagnostics::warning_label(span)
+                                .with_message("no `endl` before this point"),
+                        );
+                    },
+                    nb_errors_left,
+                    options,
+                );
+            }
+
+            let section = &self.sections[new_active_section.id];
+            if section.attrs.mem_region.has_data() {
+                diagnostics::error(
+                    span,
+                    |error| {
+                        error.set_message("`load` blocks cannot designate a data section");
+                        error.add_label(diagnostics::error_label(span).with_message(format!(
+                            "this section is in {}",
+                            section.attrs.mem_region.name(),
+                        )));
+                    },
+                    nb_errors_left,
+                    options,
+                );
+            }
+
+            if active.is_section_active(new_active_section.id)
+                || Self::is_in_stack(&self.section_stack, new_active_section.id)
+            {
+                diagnostics::error(
+                    span,
+                    |error| {
+                        error.set_message("`load` cannot designate an active section");
+                        error.add_label(diagnostics::error_label(span).with_message(format!(
+                            "section \"{}\" is {} at this point",
+                            self.sections.keys()[new_active_section.id],
+                            if active.is_section_active(new_active_section.id) {
+                                "active"
+                            } else {
+                                "in the stack"
+                            },
+                        )));
+                    },
+                    nb_errors_left,
+                    options,
+                );
+            } else {
+                active.sym_section = new_active_section;
+            }
+        } else {
+            diagnostics::error(
+                span,
+                |error| {
+                    error.set_message("`load` used outside of a section");
+                    error.add_label(
+                        diagnostics::error_label(span).with_message("this directive is invalid"),
+                    );
+                },
+                nb_errors_left,
+                options,
+            );
+        };
+    }
+
     pub fn find(&self, section_id: usize) -> &Section {
         &self.sections[section_id]
     }
@@ -320,7 +400,7 @@ impl Sections {
     ) {
         self.reject_active_union(keyword_span, nb_errors_left, options);
 
-        if self.is_in_stack(new_active.id) {
+        if Self::is_in_stack(&self.section_stack, new_active.id) {
             diagnostics::error(
                 keyword_span,
                 |error| {
@@ -363,18 +443,14 @@ impl Sections {
             opt.as_ref()
                 .is_some_and(|active| active.is_section_active(section_id))
         };
-        refs_section(&self.active_section)
-            || self
-                .section_stack
-                .iter()
-                .any(|entry| refs_section(&entry.active_section))
+        refs_section(&self.active_section) || Self::is_in_stack(&self.section_stack, section_id)
     }
-    fn is_in_stack(&self, section_id: usize) -> bool {
+    fn is_in_stack(section_stack: &[SectionStackEntry], section_id: usize) -> bool {
         let refs_section = |opt: &Option<ActiveSections>| {
             opt.as_ref()
                 .is_some_and(|active| active.is_section_active(section_id))
         };
-        self.section_stack
+        section_stack
             .iter()
             .any(|entry| refs_section(&entry.active_section))
     }
@@ -655,7 +731,7 @@ impl ActiveSections {
         self.data_section.id != self.sym_section.id
     }
 
-    pub fn is_section_active(&self, sect_id: usize) -> bool {
+    fn is_section_active(&self, sect_id: usize) -> bool {
         self.data_section.id == sect_id || self.sym_section.id == sect_id
     }
 

@@ -264,42 +264,8 @@ impl parse_ctx!() {
         );
 
         let span = &self.line_spans[span_idx];
-
-        if let Some(active) = self.sections.active_section.as_mut() {
-            if active.is_load_block_active() {
-                diagnostics::warn(
-                    warning!("unterminated-load"),
-                    span,
-                    |error| {
-                        error.set_message("`load` block terminated by another `load`");
-                        error.add_label(
-                            diagnostics::warning_label(span)
-                                .with_message("no `endl` before this point"),
-                        );
-                    },
-                    self.nb_errors_left,
-                    self.options,
-                );
-            }
-            if active.is_section_active(new_active_section.id) {
-                self.error(span, |error| {
-                    error.set_message("`load` cannot designate the active section");
-                    error.add_label(diagnostics::error_label(span).with_message(format!(
-                        "section \"{}\" is active here",
-                        self.sections.sections.keys()[new_active_section.id],
-                    )));
-                });
-            } else {
-                active.sym_section = new_active_section;
-            }
-        } else {
-            self.error(span, |error| {
-                error.set_message("`load` used outside of a section");
-                error.add_label(
-                    diagnostics::error_label(span).with_message("this directive is invalid"),
-                );
-            });
-        };
+        self.sections
+            .open_load_block(new_active_section, span, self.nb_errors_left, self.options);
 
         // TODO: save the symbol scope to be restored at `endl`, and reset it
     }
