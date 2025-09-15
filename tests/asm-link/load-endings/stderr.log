@@ -1,8 +1,28 @@
-warning: `LOAD` block without `ENDL` terminated by `LOAD` [-Wunterminated-load]
-    at load-endings.asm(23)
-warning: `LOAD` block without `ENDL` terminated by `SECTION` [-Wunterminated-load]
-    at load-endings.asm(28)
-warning: `LOAD` block without `ENDL` terminated by `POPS` [-Wunterminated-load]
-    at load-endings.asm(45)
-warning: `LOAD` block without `ENDL` terminated by `ENDSECTION` [-Wunterminated-load]
-    at load-endings.asm(50)
+[-Wunterminated-load] warning: `load` block terminated by another `load`
+    ╭─[ test.asm:23:2 ]
+    │
+ 23 │     LOAD "Q", WRAM0
+    │     ──┬─  
+    │       ╰─── no `endl` before this point
+────╯
+[-Wunterminated-load] warning: `load` block terminated by `section`
+    ╭─[ test.asm:28:1 ]
+    │
+ 28 │ SECTION "B", ROM0
+    │ ───┬───  
+    │    ╰───── no `endl` before this point
+────╯
+[-Wunterminated-load] warning: `load` block terminated by `pops`
+    ╭─[ test.asm:45:3 ]
+    │
+ 45 │        POPS
+    │        ──┬─  
+    │          ╰─── no `endl` before this point
+────╯
+[-Wunterminated-load] warning: `load` block terminated by `endsection`
+    ╭─[ test.asm:50:1 ]
+    │
+ 50 │ ENDSECTION
+    │ ─────┬────  
+    │      ╰────── no `endl` before this point
+────╯

@@ -396,6 +396,26 @@ impl Sections {
     ) -> Option<()> {
         self.reject_active_union(span, nb_errors_left, options);
 
+        if self
+            .active_section
+            .as_ref()
+            .is_some_and(|active| active.is_load_block_active())
+        {
+            diagnostics::warn(
+                warning!("unterminated-load"),
+                span,
+                |error| {
+                    error.set_message("`load` block terminated by `pops`");
+                    error.add_label(
+                        diagnostics::warning_label(span)
+                            .with_message("no `endl` before this point"),
+                    );
+                },
+                nb_errors_left,
+                options,
+            );
+        }
+
         let entry = self.section_stack.pop()?;
         self.active_section = entry.active_section;
         symbols.global_scope = entry.global_scope;
