@@ -1,15 +1,64 @@
-warning: `DB` directive without data in ROM [-Wempty-data-directive]
-    at load-overflow.asm(5)
-warning: `DB` directive without data in ROM [-Wempty-data-directive]
-    at load-overflow.asm(6)
-error: Section "Overflow" grew too big (max size = 0x8000 bytes, reached 0x8002)
-    at load-overflow.asm(26)
-error: Section "oops" grew too big (max size = 0x2000 bytes, reached 0x2002)
-    at load-overflow.asm(26)
-error: Section "Moar overflow" grew too big (max size = 0x8000 bytes, reached 0xD000)
-    at load-overflow.asm(26)
-error: Section "hmm" grew too big (max size = 0x2000 bytes, reached 0x4000)
-    at load-overflow.asm(26)
-error: Section "lol" grew too big (max size = 0x2000 bytes, reached 0x3000)
-    at load-overflow.asm(26)
-Assembly aborted with 5 errors!
+[-Wempty-data-directive] warning: `db` without data in ROM
+   ╭─[ test.asm:5:2 ]
+   │
+ 5 │     db
+   │     ─┬  
+   │      ╰── was this intended for a RAM section?
+   │ 
+   │ Help: consider using `ds 1` instead, if this is intentional
+───╯
+[-Wempty-data-directive] warning: `db` without data in ROM
+   ╭─[ test.asm:6:2 ]
+   │
+ 6 │     db
+   │     ─┬  
+   │      ╰── was this intended for a RAM section?
+   │ 
+   │ Help: consider using `ds 1` instead, if this is intentional
+───╯
+error: section "Overflow" is larger than maximum size
+   ╭─[ test.asm:1:9 ]
+   │
+ 1 │ SECTION "Overflow", ROM0
+   │         ─────┬────  
+   │              ╰────── this section grew to 32770 ($8002) bytes, over the limit of 32768
+   │ 
+   │ Help: consider splitting this section into multiple ones
+───╯
+error: section "oops" is larger than maximum size
+   ╭─[ test.asm:3:6 ]
+   │
+ 3 │ LOAD "oops",WRAM0
+   │      ───┬──  
+   │         ╰──── this section grew to 8194 ($2002) bytes, over the limit of 8192
+   │ 
+   │ Help: consider splitting this section into multiple ones
+───╯
+error: section "Moar overflow" is larger than maximum size
+   ╭─[ test.asm:9:9 ]
+   │
+ 9 │ SECTION "Moar overflow", ROM0
+   │         ───────┬───────  
+   │                ╰───────── this section grew to 53248 ($d000) bytes, over the limit of 32768
+   │ 
+   │ Help: consider splitting this section into multiple ones
+───╯
+error: section "hmm" is larger than maximum size
+    ╭─[ test.asm:12:6 ]
+    │
+ 12 │ LOAD "hmm", WRAM0
+    │      ──┬──  
+    │        ╰──── this section grew to 16384 ($4000) bytes, over the limit of 8192
+    │ 
+    │ Help: consider splitting this section into multiple ones
+────╯
+error: section "lol" is larger than maximum size
+    ╭─[ test.asm:20:6 ]
+    │
+ 20 │ LOAD "lol", WRAM0
+    │      ──┬──  
+    │        ╰──── this section grew to 12288 ($3000) bytes, over the limit of 8192
+    │ 
+    │ Help: consider splitting this section into multiple ones
+────╯
+5 errors generated.

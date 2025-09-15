@@ -199,7 +199,7 @@ impl parse_ctx!() {
     fn warn_if_used_in_rom(&self, directive_name: &str, nb_bytes: u8, span: &Span) {
         if self.sections.active_section.as_ref().is_some_and(|active| {
             matches!(
-                self.sections.sections[active.sym_section.id].bytes,
+                self.sections.sections[active.data_section.id].bytes,
                 crate::section::Contents::Data(..)
             )
         }) {
