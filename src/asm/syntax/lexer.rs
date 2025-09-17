@@ -2781,9 +2781,9 @@ impl Lexer {
                         } else {
                             chars = backup; // `read_macro_arg` may spuriously consume characters.
                             let ch = chars.next();
-                            if matches!(ch, Some((_, ','))) {
+                            if let Some((_ofs, escapee @ (',' | '(' | ')'))) = ch {
                                 // This escape is only valid in raw contexts.
-                                string.push(',');
+                                string.push(escapee);
                             } else if let Some(value) =
                                 Self::get_char_escape(ch, ofs, ctx, text, &mut chars, &params)
                             {

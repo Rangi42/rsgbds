@@ -1,5 +1,15 @@
-error: Illegal character escape 'w'
-    at macro-arg-illegal-escape.asm(5)
-error: Illegal character escape '\' at end of input
-    at macro-arg-illegal-escape.asm(5)
-Assembly aborted with 2 errors!
+error: invalid character escape
+   ╭─[ test.asm:5:27 ]
+   │
+ 5 │ mac \\\"\t\r\0\n\{\}\,\(\)\w\
+   │                           ─┬  
+   │                            ╰── cannot escape this character
+───╯
+error: invalid character escape
+   ╭─[ test.asm:5:29 ]
+   │
+ 5 │ mac \\\"\t\r\0\n\{\}\,\(\)\w\
+   │                             ┬  
+   │                             ╰── no character to escape
+───╯
+2 errors generated.
