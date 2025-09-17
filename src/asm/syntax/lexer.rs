@@ -2783,7 +2783,6 @@ impl Lexer {
                             let ch = chars.next();
                             if matches!(ch, Some((_, ','))) {
                                 // This escape is only valid in raw contexts.
-                                chars.next(); // Consume the comma.
                                 string.push(',');
                             } else if let Some(value) =
                                 Self::get_char_escape(ch, ofs, ctx, text, &mut chars, &params)
