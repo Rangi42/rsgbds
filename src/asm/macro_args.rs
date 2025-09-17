@@ -47,7 +47,8 @@ impl MacroArgs {
 
 impl MacroArgs {
     pub fn arg(&self, idx: usize) -> Option<&Rc<Source>> {
-        self.args.get(idx - 1 + self.shift)
+        idx.checked_sub(1)
+            .and_then(|physical_idx| self.args.get(physical_idx + self.shift))
     }
 
     pub fn max_valid(&self) -> usize {

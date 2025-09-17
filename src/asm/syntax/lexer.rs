@@ -677,33 +677,44 @@ impl Lexer {
         }
 
         let idx = match chars.next() {
-            Some((_ofs, ch @ '1'..='9')) => (ch as u32 - '0' as u32) as usize,
+            Some((_ofs, ch @ '1'..='9')) => (ch as u32 - '0' as u32) as isize,
 
             Some((_ofs, '<')) => {
-                fn digit(opt: Option<&(usize, char)>) -> Result<usize, Option<char>> {
+                fn digit(opt: Option<&(usize, char)>) -> Result<isize, Option<char>> {
                     match opt {
                         None => Err(None),
                         Some(&(_ofs, ch)) => match ch.to_digit(10) {
-                            Some(digit) => Ok(digit as usize),
+                            Some(digit) => Ok(digit as isize),
                             None => Err(Some(ch)),
                         },
                     }
                 }
 
-                match digit(chars.peek()) {
-                    Ok(mut idx) => loop {
-                        chars.next();
-                        match digit(chars.peek()) {
-                            Ok(digit) => idx = idx * 10 + digit,
-                            Err(Some('>')) => {
-                                chars.next();
-                                break idx;
+                match chars.peek() {
+                    Some((_ofs, ch @ ('0'..='9' | '-'))) => {
+                        let (mut idx, sign) = if *ch == '-' {
+                            chars.next();
+                            let Ok(first_digit) = digit(chars.peek()) else {
+                                return Some(Err(MacroArgError::NoDigitAfterMinus));
+                            };
+                            (first_digit, true)
+                        } else {
+                            (ch.to_digit(10).unwrap() as isize, false)
+                        };
+                        loop {
+                            chars.next();
+                            match digit(chars.peek()) {
+                                Ok(digit) => idx = idx * 10 + digit,
+                                Err(Some('>')) => {
+                                    chars.next();
+                                    break if sign { idx.wrapping_neg() } else { idx };
+                                }
+                                _ => return Some(Err(MacroArgError::Unterminated)),
                             }
-                            _ => return Some(Err(MacroArgError::Unterminated)),
                         }
-                    },
+                    }
 
-                    Err(Some(chars!(ident_start) | '@' | '#')) => {
+                    Some((_ofs, chars!(ident_start) | '@' | '#')) => {
                         let (ofs, first_char) = chars.next().unwrap();
                         let ofs = if first_char == '#' {
                             ofs + '#'.len_utf8()
@@ -742,16 +753,16 @@ impl Lexer {
                                 Some(Ok(None)) => {
                                     return Some(Err(SymbolError::NotConst(name).into()))
                                 }
-                                Some(Ok(Some(idx))) => idx as usize,
+                                Some(Ok(Some(idx))) => idx as isize,
                             },
                         }
                     }
 
-                    Err(Some('>')) => {
+                    Some((_ofs, '>')) => {
                         chars.next();
                         return Some(Err(MacroArgError::EmptyBracketed));
                     }
-                    Err(Some(';' | chars!(newline))) => {
+                    Some((_ofs, ';' | chars!(newline))) => {
                         return Some(Err(MacroArgError::Unterminated))
                     }
                     _ => return Some(Err(MacroArgError::InvalidBracketedChar)),
@@ -778,12 +789,19 @@ impl Lexer {
         if idx == 0 {
             Some(Err(MacroArgError::NoArg0))
         } else {
-            Some(args(macro_args).and_then(|args| match args.arg(idx) {
-                Some(arg) => Ok((SpanKind::MacroArg(idx), arg)),
-                None => Err(MacroArgError::NoSuchArg {
-                    idx,
-                    max_valid: args.max_valid(),
-                }),
+            Some(args(macro_args).and_then(|args| {
+                let physical_idx = if idx > 0 {
+                    idx as usize
+                } else {
+                    (args.max_valid() + 1).wrapping_add_signed(idx)
+                };
+                match args.arg(physical_idx) {
+                    Some(arg) => Ok((SpanKind::MacroArg(physical_idx), arg)),
+                    None => Err(MacroArgError::NoSuchArg {
+                        idx,
+                        max_valid: args.max_valid(),
+                    }),
+                }
             }))
         }
     }
@@ -3016,7 +3034,7 @@ enum MacroArgError<'text> {
     // (For `\<`.))
     Unterminated,
     /// macro argument #{idx} doesn't exist
-    NoSuchArg { idx: usize, max_valid: usize },
+    NoSuchArg { idx: isize, max_valid: usize },
     /// a macro argument was used outside of a macro
     MacroArgOutsideMacro,
     /// a unique identifier is not available in this context
@@ -3025,6 +3043,8 @@ enum MacroArgError<'text> {
     NoArg0,
     /// empty bracketed macro argument
     EmptyBracketed,
+    /// no digit after minus sign
+    NoDigitAfterMinus,
     /// invalid character in bracketed macro argument
     InvalidBracketedChar,
     /// {0}
@@ -3039,10 +3059,11 @@ impl MacroArgError<'_> {
             }
             Self::MacroArgOutsideMacro => "cannot use a macro argument here".into(),
             Self::NoUniqueId => "cannot use `\\@` here".into(),
-            Self::NoArg0 => "macro argument 0 doesn't exist".into(),
+            Self::NoArg0 => "this reference is invalid".into(),
             Self::EmptyBracketed => {
                 "expected a number or symbol name between the angle brackets".into()
             }
+            Self::NoDigitAfterMinus => "no digits in this".into(),
             Self::InvalidBracketedChar => "this bracketed macro argument is invalid".into(),
             // TODO: more specific label messages
             Self::SymErr(_err) => "this symbol is invalid".into(),

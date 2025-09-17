@@ -1,26 +1,126 @@
-error: Invalid bracketed macro argument "\<0>"
-    at negative-macro-args.asm::mac(7) <- negative-macro-args.asm(21)
-error: Invalid bracketed macro argument "\<0>"
-    at negative-macro-args.asm::mac(7) <- negative-macro-args.asm(21)
-error: Macro argument `\<-8>` not defined
-    at negative-macro-args.asm::mac(9) <- negative-macro-args.asm(21)
-error: Macro argument `\<-8>` not defined
-    at negative-macro-args.asm::mac(9) <- negative-macro-args.asm(21)
-error: Macro argument `\<2147483647>` not defined
-    at negative-macro-args.asm::mac(11) <- negative-macro-args.asm(21)
-error: Macro argument `\<2147483647>` not defined
-    at negative-macro-args.asm::mac(11) <- negative-macro-args.asm(21)
-error: Macro argument `\<-2147483648>` not defined
-    at negative-macro-args.asm::mac(14) <- negative-macro-args.asm(21)
-error: Number in bracketed macro argument is too large
-    at negative-macro-args.asm::mac(14) <- negative-macro-args.asm(21)
-    while expanding symbol `i`
-error: Macro argument `\<-2147483648>` not defined
-    at negative-macro-args.asm::mac(15) <- negative-macro-args.asm(21)
-error: Number in bracketed macro argument is too large
-    at negative-macro-args.asm::mac(15) <- negative-macro-args.asm(21)
-    while expanding symbol `i`
-error: Number in bracketed macro argument is too large
-    at negative-macro-args.asm::mac(18) <- negative-macro-args.asm(21)
-    while expanding symbol `i`
-Assembly aborted with 11 errors!
+error: macro argument #0 doesn't exist
+    ╭─[ test.asm:7:18 ]
+    │
+  7 │     println "{d:i}: \<i> == \<0>"
+    │                     ──┬─  
+    │                       ╰─── this reference is invalid
+    │ 
+ 21 │ mac A, B, C, D, E, F, G
+    │ ─┬─  
+    │  ╰─── macro called here
+    │ 
+    │ Help: macro arguments are 1-indexed: the first macro argument is `\1`
+────╯
+error: macro argument #0 doesn't exist
+    ╭─[ test.asm:7:26 ]
+    │
+  7 │     println "{d:i}: \<i> == \<0>"
+    │                             ──┬─  
+    │                               ╰─── this reference is invalid
+    │ 
+ 21 │ mac A, B, C, D, E, F, G
+    │ ─┬─  
+    │  ╰─── macro called here
+    │ 
+    │ Help: macro arguments are 1-indexed: the first macro argument is `\1`
+────╯
+error: macro argument #-8 doesn't exist
+    ╭─[ test.asm:9:18 ]
+    │
+  9 │     println "{d:i}: \<i> == \<-8>"
+    │                     ──┬─  
+    │                       ╰─── 7 macro arguments are available
+    │ 
+ 21 │ mac A, B, C, D, E, F, G
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+error: macro argument #-8 doesn't exist
+    ╭─[ test.asm:9:26 ]
+    │
+  9 │     println "{d:i}: \<i> == \<-8>"
+    │                             ──┬──  
+    │                               ╰──── 7 macro arguments are available
+    │ 
+ 21 │ mac A, B, C, D, E, F, G
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+error: macro argument #2147483647 doesn't exist
+    ╭─[ test.asm:11:18 ]
+    │
+ 11 │     println "{d:i}: \<i> == \<2147483647>"
+    │                     ──┬─  
+    │                       ╰─── 7 macro arguments are available
+    │ 
+ 21 │ mac A, B, C, D, E, F, G
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+error: macro argument #2147483647 doesn't exist
+    ╭─[ test.asm:11:26 ]
+    │
+ 11 │     println "{d:i}: \<i> == \<2147483647>"
+    │                             ──────┬──────  
+    │                                   ╰──────── 7 macro arguments are available
+    │ 
+ 21 │ mac A, B, C, D, E, F, G
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+error: macro argument #-2147483648 doesn't exist
+    ╭─[ test.asm:14:18 ]
+    │
+ 14 │     println "{d:i}: \<i> == \<-2147483648>"
+    │                     ──┬─  
+    │                       ╰─── 7 macro arguments are available
+    │ 
+ 21 │ mac A, B, C, D, E, F, G
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+error: macro argument #-2147483648 doesn't exist
+    ╭─[ test.asm:14:26 ]
+    │
+ 14 │     println "{d:i}: \<i> == \<-2147483648>"
+    │                             ───────┬──────  
+    │                                    ╰──────── 7 macro arguments are available
+    │ 
+ 21 │ mac A, B, C, D, E, F, G
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+error: macro argument #-2147483648 doesn't exist
+    ╭─[ test.asm:15:18 ]
+    │
+ 15 │     println "{u:i}: \<i> == \<2147483648>"
+    │                     ──┬─  
+    │                       ╰─── 7 macro arguments are available
+    │ 
+ 21 │ mac A, B, C, D, E, F, G
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+error: macro argument #2147483648 doesn't exist
+    ╭─[ test.asm:15:26 ]
+    │
+ 15 │     println "{u:i}: \<i> == \<2147483648>"
+    │                             ──────┬──────  
+    │                                   ╰──────── 7 macro arguments are available
+    │ 
+ 21 │ mac A, B, C, D, E, F, G
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+error: macro argument #4294967295 doesn't exist
+    ╭─[ test.asm:18:26 ]
+    │
+ 18 │     println "{u:i}: \<i> == \<4294967295>"
+    │                             ──────┬──────  
+    │                                   ╰──────── 7 macro arguments are available
+    │ 
+ 21 │ mac A, B, C, D, E, F, G
+    │ ─┬─  
+    │  ╰─── macro called here
+────╯
+11 errors generated.
