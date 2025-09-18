@@ -533,13 +533,7 @@ impl Lexer {
                     // Consume all the characters implicated in the interpolation.
                     ctx.cur_byte += interpolation_len;
 
-                    let (span_kind, name) = match res {
-                        Ok(ident) => (
-                            SpanKind::Expansion(ident),
-                            params.identifiers.resolve(ident).unwrap(),
-                        ),
-                        Err(()) => (SpanKind::Invalid, "<invalid>"),
-                    };
+                    let (span_kind, name) = Self::interpolation_span_kind(res, params.identifiers);
                     // If this fails to push, we'll just read more characters.
                     let _ = self.push_context(
                         NormalSpan::new(
@@ -803,6 +797,19 @@ impl Lexer {
                     }),
                 }
             }))
+        }
+    }
+
+    fn interpolation_span_kind(
+        res: Result<Identifier, ()>,
+        identifiers: &Identifiers,
+    ) -> (SpanKind, &str) {
+        match res {
+            Ok(ident) => (
+                SpanKind::Expansion(ident),
+                identifiers.resolve(ident).unwrap(),
+            ),
+            Err(()) => (SpanKind::Invalid, "<invalid>"),
         }
     }
 
@@ -2599,7 +2606,8 @@ impl Lexer {
 
         let depth = self.contexts.len();
         let mut starting_whitespace_len = 0;
-        let mut end_offset = 0; // Dummy value, it will always be written to in the closure.
+        let mut end_offset = usize::MAX; // Dummy value, it will always be written to in the closure.
+        let mut extra_expanded = None;
         self.with_active_context_raw(&mut span, |ctx, text| {
             let mut chars = text.char_indices().peekable();
 
@@ -2607,12 +2615,10 @@ impl Lexer {
             while let Some(&(ofs, ch)) = chars.peek() {
                 starting_whitespace_len = ofs;
                 match ch {
-                    chars!(whitespace) => {
-                        chars.next();
-                    }
+                    chars!(whitespace) => _ = chars.next(),
                     '\\' => {
-                        let backup = chars.clone();
                         // If the backslash isn't a line continuation, we'll want to process it normally.
+                        let backup = chars.clone();
                         chars.next(); // Consume the backslash.
                         if !matches!(chars.peek(), Some((_, chars!(line_cont)))) {
                             chars = backup;
@@ -2630,28 +2636,6 @@ impl Lexer {
                                     diagnostics::error_label(&span).with_message(err.label_msg()),
                                 );
                             });
-                        }
-                    }
-                    '{' => {
-                        chars.next(); // Consume the brace.
-                        let _ = Self::read_interpolation(
-                            &mut chars,
-                            text,
-                            ctx,
-                            &mut string,
-                            depth,
-                            &mut params,
-                        );
-                        match string
-                            .char_indices()
-                            .find_map(|(ofs, ch)| matches!(ch, chars!(whitespace)).then_some(ofs))
-                        {
-                            Some(first_non_white_idx) => {
-                                drop(string.drain(..first_non_white_idx)); // We just care about the range being removed.
-                                                                           // Treat the brace as the first character of the span.
-                                break;
-                            }
-                            None => string.clear(), // ...and continue iterating.
                         }
                     }
                     _ => break,
@@ -2766,7 +2750,43 @@ impl Lexer {
                             params.sections,
                         ) {
                             match res {
-                                Ok((_kind, source)) => string.push_str(source.contents.text()),
+                                Ok((kind, source)) => {
+                                    let contents = source.contents.text();
+                                    // If the expansion contains a comma, we need to terminate the argument there.
+                                    let position =
+                                        contents.char_indices().find(|(_ofs, ch)| *ch == ',');
+                                    if let Some((comma_ofs, _comma)) = position {
+                                        let end_ofs =
+                                            chars.next().map_or(text.len(), |(ofs, _ch)| ofs);
+
+                                        if comma_ofs + ','.len_utf8() != contents.len() {
+                                            debug_assert!(comma_ofs < contents.len());
+
+                                            extra_expanded = Some(NormalSpan {
+                                                node: FileNode {
+                                                    src: Rc::clone(source),
+                                                    kind,
+                                                    parent: Some(Rc::new(
+                                                        ctx.new_span_ofs(ofs..end_ofs),
+                                                    )),
+                                                },
+                                                bytes: comma_ofs..contents.len(),
+                                            });
+                                            debug_assert!(!extra_expanded
+                                                .as_ref()
+                                                .unwrap()
+                                                .bytes
+                                                .is_empty());
+                                        }
+
+                                        string.push_str(&contents[..comma_ofs]); // Push the argument up to the comma.
+
+                                        last_char = Some(',');
+                                        return end_ofs; // Consume the entire expansion.
+                                    }
+
+                                    string.push_str(contents); // Push the entire arg, since it doesn't contain a comma.
+                                }
                                 Err(err) => {
                                     let span = Span::Normal(ctx.new_span_len(ofs, '\\'.len_utf8()));
                                     params.error(&span, |error| {
@@ -2793,8 +2813,7 @@ impl Lexer {
                         false
                     }
                     '{' => {
-                        let len_before_interpolation = string.len();
-                        let _ = Self::read_interpolation(
+                        let res = Self::read_interpolation(
                             &mut chars,
                             text,
                             ctx,
@@ -2802,8 +2821,38 @@ impl Lexer {
                             depth,
                             &mut params,
                         );
-                        !string[len_before_interpolation..]
-                            .contains(|ch| !matches!(ch, chars!(whitespace)))
+
+                        // If the expansion contains a comma, we need to terminate the argument there.
+                        let position = string.char_indices().find(|(_ofs, ch)| *ch == ',');
+                        if let Some((comma_ofs, _comma)) = position {
+                            let end_ofs = chars.next().map_or(text.len(), |(ofs, _ch)| ofs);
+
+                            if comma_ofs + ','.len_utf8() != string.len() {
+                                debug_assert!(comma_ofs < string.len());
+
+                                let (kind, name) =
+                                    Self::interpolation_span_kind(res, params.identifiers);
+                                extra_expanded = Some(NormalSpan {
+                                    node: FileNode {
+                                        src: Rc::new(Source {
+                                            name: name.into(),
+                                            contents: string.clone().into(),
+                                        }),
+                                        kind,
+                                        parent: Some(Rc::new(ctx.new_span_ofs(ofs..end_ofs))),
+                                    },
+                                    bytes: comma_ofs..string.len(),
+                                });
+                                debug_assert!(!extra_expanded.as_ref().unwrap().bytes.is_empty());
+                            }
+
+                            string.truncate(comma_ofs);
+
+                            last_char = Some(',');
+                            return end_ofs; // Consume the entire expansion.
+                        }
+
+                        false
                     }
 
                     _ => {
@@ -2817,6 +2866,12 @@ impl Lexer {
             }
             text.len()
         });
+
+        // If there are remaining chars in an expansion, perform the expansion.
+        if let Some(span) = extra_expanded {
+            // If it fails, we'll miss some macro args. But we can't bubble the error up.
+            let _ = self.push_context(span, LoopInfo::default(), nb_errors_left, options);
+        }
 
         // Trim right whitespace.
         let trimmed_len = string.trim_end_matches(is_whitespace).len();
