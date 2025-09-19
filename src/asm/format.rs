@@ -420,9 +420,10 @@ struct StringFormatter<'string> {
 impl Display for StringFormatter<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.escape {
-            write!(f, "{}", self.string.escape_default())
+            let string = self.string.escape_default().to_string();
+            f.pad(&string)
         } else {
-            write!(f, "{}", self.string)
+            f.pad(self.string)
         }
     }
 }
