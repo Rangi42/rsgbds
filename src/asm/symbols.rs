@@ -818,6 +818,7 @@ impl SymbolData {
     pub fn def_span(&self) -> &Span {
         match self {
             Self::User { definition, .. } => definition,
+            Self::Deleted(span) => span,
             _ => &Span::Builtin,
         }
     }
