@@ -1959,6 +1959,7 @@ impl Lexer {
         let mut empty_precision = false;
         let mut underscore_after_q = false;
         let precision_raw = if matches!(first_nondigit, Some('q' | 'Q')) {
+            prev_underscore = false; // An underscore before the `q` is not actually trailing.
             self.consume(span);
             // Allow `q1`, but also `q.1`.
             let mut first_digit = match self.peek(params) {
