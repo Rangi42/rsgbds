@@ -1,120 +1,120 @@
 error: invalid argument to option 'b'
-   ╭─[ test.asm:1:5 ]
+   ╭─[ test.asm:1:4 ]
    │
  1 │ opt b123
-   │     ──┬─  
-   │       ╰─── the argument must be exactly 2 characters long, not 3
+   │    ──┬──  
+   │      ╰──── the argument must be exactly 2 characters long, not 3
 ───╯
 error: invalid argument to option 'b'
-   ╭─[ test.asm:2:5 ]
+   ╭─[ test.asm:2:4 ]
    │
  2 │ opt b_1
-   │     ─┬─  
+   │    ──┬─  
    │      ╰─── only alphanumeric ASCII characters and `.@#` are allowed, not '_'
 ───╯
 error: invalid argument to option 'b'
-   ╭─[ test.asm:3:5 ]
+   ╭─[ test.asm:3:4 ]
    │
  3 │ opt b10
-   │     ─┬─  
+   │    ──┬─  
    │      ╰─── digits such as '1' must appear in their original position
 ───╯
 error: invalid argument to option 'b'
-   ╭─[ test.asm:4:5 ]
+   ╭─[ test.asm:4:4 ]
    │
  4 │ opt b00
-   │     ─┬─  
+   │    ──┬─  
    │      ╰─── '0' was specified twice
 ───╯
 error: invalid argument to option 'g'
-   ╭─[ test.asm:5:5 ]
+   ╭─[ test.asm:5:4 ]
    │
  5 │ opt g12345
-   │     ───┬──  
-   │        ╰──── the argument must be exactly 4 characters long, not 5
+   │    ───┬───  
+   │       ╰───── the argument must be exactly 4 characters long, not 5
 ───╯
 error: invalid argument to option 'g'
-   ╭─[ test.asm:6:5 ]
+   ╭─[ test.asm:6:4 ]
    │
  6 │ opt g012_
-   │     ──┬──  
+   │    ───┬──  
    │       ╰──── only alphanumeric ASCII characters and `.@#` are allowed, not '_'
 ───╯
 error: invalid argument to option 'g'
-   ╭─[ test.asm:7:5 ]
+   ╭─[ test.asm:7:4 ]
    │
  7 │ opt g$123
-   │     ──┬──  
+   │    ───┬──  
    │       ╰──── only alphanumeric ASCII characters and `.@#` are allowed, not '$'
 ───╯
 error: invalid argument to option 'g'
-   ╭─[ test.asm:8:5 ]
+   ╭─[ test.asm:8:4 ]
    │
  8 │ opt g0234
-   │     ──┬──  
+   │    ───┬──  
    │       ╰──── digits such as '2' must appear in their original position
 ───╯
 error: invalid argument to option 'g'
-   ╭─[ test.asm:9:5 ]
+   ╭─[ test.asm:9:4 ]
    │
  9 │ opt gxxyy
-   │     ──┬──  
+   │    ───┬──  
    │       ╰──── 'x' was specified twice
 ───╯
 error: invalid argument to option 'g'
-    ╭─[ test.asm:10:5 ]
+    ╭─[ test.asm:10:4 ]
     │
  10 │ opt gxyzy
-    │     ──┬──  
+    │    ───┬──  
     │       ╰──── 'y' was specified twice
 ────╯
 error: invalid argument to option 'p'
-    ╭─[ test.asm:11:5 ]
+    ╭─[ test.asm:11:4 ]
     │
  11 │ opt pxy
-    │     ─┬─  
+    │    ──┬─  
     │      ╰─── invalid digit found in string
 ────╯
 error: invalid argument to option 'p'
-    ╭─[ test.asm:12:5 ]
+    ╭─[ test.asm:12:4 ]
     │
  12 │ opt p1234
-    │     ──┬──  
+    │    ───┬──  
     │       ╰──── number too large to fit in target type
 ────╯
 error: invalid argument to option 'Q'
-    ╭─[ test.asm:13:5 ]
+    ╭─[ test.asm:13:4 ]
     │
  13 │ opt Qxy
-    │     ─┬─  
+    │    ──┬─  
     │      ╰─── invalid digit found in string
 ────╯
 error: invalid argument to option 'Q'
-    ╭─[ test.asm:14:5 ]
+    ╭─[ test.asm:14:4 ]
     │
  14 │ opt Q1234
-    │     ──┬──  
+    │    ───┬──  
     │       ╰──── number too large to fit in target type
 ────╯
 error: invalid argument to option 'Q'
-    ╭─[ test.asm:15:5 ]
+    ╭─[ test.asm:15:4 ]
     │
  15 │ opt Q32
-    │     ─┬─  
+    │    ──┬─  
     │      ╰─── fixed-point precision must be between 1 and 31, not 32
 ────╯
 error: invalid argument to option 'r'
-    ╭─[ test.asm:16:5 ]
+    ╭─[ test.asm:16:4 ]
     │
  16 │ opt r99999999999999999999999999
-    │     ─────────────┬─────────────  
+    │    ──────────────┬─────────────  
     │                  ╰─────────────── number too large to fit in target type
 ────╯
 error: invalid argument to option 'W'
-    ╭─[ test.asm:17:5 ]
+    ╭─[ test.asm:17:4 ]
     │
  17 │ opt W
-    │     ┬  
+    │    ─┬  
     │     ╰── unknown warning name ``
 ────╯
 error: syntax error: unexpected end of line

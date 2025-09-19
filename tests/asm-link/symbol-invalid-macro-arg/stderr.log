@@ -3,7 +3,7 @@ error: macro argument #0 doesn't exist
    │
  1 │ def x\<0> = 10
    │      ──┬─  
-   │        ╰─── macro argument 0 doesn't exist
+   │        ╰─── this reference is invalid
    │ 
    │ Help: macro arguments are 1-indexed: the first macro argument is `\1`
 ───╯

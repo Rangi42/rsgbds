@@ -1,2 +1,7 @@
-warning: Division of -2147483648 by -1 yields -2147483648 [-Wdiv]
-    at opt.asm(12)
+[-Wdiv] warning: division of -2_147_483_648 by -1 yields itself
+    ╭─[ test.asm:12:10 ]
+    │
+ 12 │     println $8000_0000 / -1
+    │             ───────┬───────  
+    │                    ╰───────── the sign of this quotient may be surprising
+────╯

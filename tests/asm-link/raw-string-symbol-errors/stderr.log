@@ -1,31 +1,121 @@
-warning: Treating strings as numbers is deprecated [-Wobsolete]
-    at raw-string-symbol-errors.asm(7)
-error: Strings as numbers must be a single charmap unit
-    at raw-string-symbol-errors.asm(7)
-error: `m` is not a numeric symbol
-    at raw-string-symbol-errors.asm(8)
+[-Wobsolete] warning: treating strings as numbers is deprecated
+   ╭─[ test.asm:7:9 ]
+   │
+ 7 │ assert (#s) == 0
+   │         ─┬  
+   │          ╰── consider using a character literal instead of this
+   │ 
+   │ Help: use the `charval` function to make this conversion explicit
+───╯
+error: "hello" isn't a single char mapping
+   ╭─[ test.asm:7:9 ]
+   │
+ 7 │ assert (#s) == 0
+   │         ─┬  
+   │          ╰── the longest mapping found is "h"
+───╯
+error: the symbol `m` isn't numeric
+   ╭─[ test.asm:8:9 ]
+   │
+ 3 │ macro m
+   │       ┬  
+   │       ╰── defined as macro here
+   │ 
+ 8 │ assert (#m) == 0
+   │         ─┬  
+   │          ╰── referenced in a numeric expression here
+───╯
 error: `n` is not a string symbol
-    at raw-string-symbol-errors.asm(11)
+    ╭─[ test.asm:11:15 ]
+    │
+ 11 │ assert strlen(#n) == 0
+    │               ─┬  
+    │                ╰── this symbol is invalid
+────╯
 error: `m` is not a string symbol
-    at raw-string-symbol-errors.asm(13)
-error: `u` is not a string symbol
-    at raw-string-symbol-errors.asm(14)
-warning: Treating strings as numbers is deprecated [-Wobsolete]
-    at raw-string-symbol-errors.asm(17)
-error: Strings as numbers must be a single charmap unit
-    at raw-string-symbol-errors.asm(17)
-error: `m` is not a numeric symbol
-    at raw-string-symbol-errors.asm(18)
-error: Expected constant expression: undefined symbol `u`
-    at raw-string-symbol-errors.asm(19)
+    ╭─[ test.asm:13:15 ]
+    │
+ 13 │ assert strlen(#m) == 0
+    │               ─┬  
+    │                ╰── this symbol is invalid
+────╯
+error: the symbol `u` doesn't exist
+    ╭─[ test.asm:14:15 ]
+    │
+ 14 │ assert strlen(#u) == 0
+    │               ─┬  
+    │                ╰── referenced in a string expression here
+────╯
+[-Wobsolete] warning: treating strings as numbers is deprecated
+    ╭─[ test.asm:17:12 ]
+    │
+ 17 │ def d_s = (#s)
+    │            ─┬  
+    │             ╰── consider using a character literal instead of this
+    │ 
+    │ Help: use the `charval` function to make this conversion explicit
+────╯
+error: "hello" isn't a single char mapping
+    ╭─[ test.asm:17:12 ]
+    │
+ 17 │ def d_s = (#s)
+    │            ─┬  
+    │             ╰── the longest mapping found is "h"
+────╯
+error: the symbol `m` isn't numeric
+    ╭─[ test.asm:18:12 ]
+    │
+  3 │ macro m
+    │       ┬  
+    │       ╰── defined as macro here
+    │ 
+ 18 │ def d_m = (#m)
+    │            ─┬  
+    │             ╰── referenced in a numeric expression here
+────╯
+error: no symbol called `u`
+    ╭─[ test.asm:19:12 ]
+    │
+ 19 │ def d_u = (#u)
+    │            ─┬  
+    │             ╰── no symbol by this name exists at this point
+────╯
 error: `n` is not a string symbol
-    at raw-string-symbol-errors.asm(21)
+    ╭─[ test.asm:21:14 ]
+    │
+ 21 │ def s_n equs #n
+    │              ─┬  
+    │               ╰── this symbol is invalid
+────╯
 error: `m` is not a string symbol
-    at raw-string-symbol-errors.asm(23)
-error: `u` is not a string symbol
-    at raw-string-symbol-errors.asm(24)
-error: Undefined symbol `s` was already purged
-    at raw-string-symbol-errors.asm(27)
+    ╭─[ test.asm:23:14 ]
+    │
+ 23 │ def s_m equs #m
+    │              ─┬  
+    │               ╰── this symbol is invalid
+────╯
+error: the symbol `u` doesn't exist
+    ╭─[ test.asm:24:14 ]
+    │
+ 24 │ def s_u equs #u
+    │              ─┬  
+    │               ╰── referenced in a string expression here
+────╯
+error: `s` was already deleted
+    ╭─[ test.asm:27:7 ]
+    │
+ 26 │ purge #s
+    │       ─┬  
+    │        ╰── ...because of this one
+ 27 │ purge #s
+    │       ─┬  
+    │        ╰── cannot perform this deletion...
+────╯
 error: `s` is not a string symbol
-    at raw-string-symbol-errors.asm(29)
-Assembly aborted with 13 errors!
+    ╭─[ test.asm:29:15 ]
+    │
+ 29 │ assert strlen(#s) == 0
+    │               ─┬  
+    │                ╰── this symbol is invalid
+────╯
+13 errors generated.

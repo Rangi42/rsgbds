@@ -1,22 +1,22 @@
 error: invalid argument to option 'r'
-   ╭─[ test.asm:5:5 ]
+   ╭─[ test.asm:5:4 ]
    │
  5 │ OPT r ; Missing arg
-   │     ┬  
+   │    ─┬  
    │     ╰── cannot parse integer from empty string
 ───╯
 error: invalid argument to option 'r'
-   ╭─[ test.asm:6:5 ]
+   ╭─[ test.asm:6:4 ]
    │
  6 │ OPT r 2a ; Bad decimal
-   │     ──┬─  
-   │       ╰─── invalid digit found in string
+   │    ──┬──  
+   │      ╰──── invalid digit found in string
 ───╯
 error: context stack is deeper than new limit
-   ╭─[ test.asm:9:5 ]
+   ╭─[ test.asm:9:4 ]
    │
  9 │ OPT r 0
-   │     ─┬─  
+   │    ──┬─  
    │      ╰─── depth is 1 context at this point
 ───╯
 error: maximum recursion depth exceeded

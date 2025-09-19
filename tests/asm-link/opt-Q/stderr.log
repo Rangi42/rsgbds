@@ -1,5 +1,23 @@
-error: Argument for option 'Q' must be between 1 and 31
-    at opt-Q.asm::test(3) <- opt-Q.asm(17)
-error: Argument for option 'Q' must be between 1 and 31
-    at opt-Q.asm::test(3) <- opt-Q.asm(18)
-Assembly aborted with 2 errors!
+error: invalid argument to option 'Q'
+    ╭─[ test.asm:3:5 ]
+    │
+  3 │     OPT Q\1
+    │        ──┬─  
+    │          ╰─── fixed-point precision must be between 1 and 31, not 0
+    │ 
+ 17 │     test .0 ; error
+    │     ──┬─  
+    │       ╰─── macro called here
+────╯
+error: invalid argument to option 'Q'
+    ╭─[ test.asm:3:5 ]
+    │
+  3 │     OPT Q\1
+    │        ──┬─  
+    │          ╰─── fixed-point precision must be between 1 and 31, not 32
+    │ 
+ 18 │     test 32 ; error
+    │     ──┬─  
+    │       ╰─── macro called here
+────╯
+2 errors generated.

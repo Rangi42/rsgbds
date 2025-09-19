@@ -1,13 +1,67 @@
-error: `mac` is not a numeric symbol
-    at non-numeric-symbol.asm(4)
-error: `mac` is not a numeric symbol
-    at non-numeric-symbol.asm(5)
-error: `mac` is not a numeric symbol
-    at non-numeric-symbol.asm(6)
-error: `mac` is not a numeric symbol
-    at non-numeric-symbol.asm(9)
-error: `mac` is not a numeric symbol
-    at non-numeric-symbol.asm(10)
-error: `mac` is not a numeric symbol
-    at non-numeric-symbol.asm(11)
-Assembly aborted with 6 errors!
+error: the symbol `mac` isn't numeric
+   ╭─[ test.asm:4:11 ]
+   │
+ 1 │ MACRO mac
+   │       ─┬─  
+   │        ╰─── defined as macro here
+   │ 
+ 4 │ DEF n EQU mac
+   │           ─┬─  
+   │            ╰─── referenced in a numeric expression here
+───╯
+error: the symbol `mac` isn't numeric
+   ╭─[ test.asm:5:13 ]
+   │
+ 1 │ MACRO mac
+   │       ─┬─  
+   │        ╰─── defined as macro here
+   │ 
+ 5 │ DEF v = 2 + mac
+   │             ─┬─  
+   │              ╰─── referenced in a numeric expression here
+───╯
+error: the symbol `mac` isn't numeric
+   ╭─[ test.asm:6:10 ]
+   │
+ 1 │ MACRO mac
+   │       ─┬─  
+   │        ╰─── defined as macro here
+   │ 
+ 6 │ DEF k RB mac * 2
+   │          ─┬─  
+   │           ╰─── referenced in a numeric expression here
+───╯
+error: the symbol `mac` isn't numeric
+   ╭─[ test.asm:9:4 ]
+   │
+ 1 │ MACRO mac
+   │       ─┬─  
+   │        ╰─── defined as macro here
+   │ 
+ 9 │ db mac
+   │    ─┬─  
+   │     ╰─── referenced in a numeric expression here
+───╯
+error: the symbol `mac` isn't numeric
+    ╭─[ test.asm:10:8 ]
+    │
+  1 │ MACRO mac
+    │       ─┬─  
+    │        ╰─── defined as macro here
+    │ 
+ 10 │ dw 2 + mac
+    │        ─┬─  
+    │         ╰─── referenced in a numeric expression here
+────╯
+error: the symbol `mac` isn't numeric
+    ╭─[ test.asm:11:4 ]
+    │
+  1 │ MACRO mac
+    │       ─┬─  
+    │        ╰─── defined as macro here
+    │ 
+ 11 │ dl mac * 2
+    │    ─┬─  
+    │     ╰─── referenced in a numeric expression here
+────╯
+6 errors generated.
