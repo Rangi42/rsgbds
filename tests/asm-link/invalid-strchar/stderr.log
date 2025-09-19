@@ -1,4 +1,14 @@
-warning: STRCHAR: Index 3 is past the end of the string [-Wbuiltin-args]
-    at invalid-strchar.asm(1)
-warning: STRCHAR: Index starts at 0 [-Wbuiltin-args]
-    at invalid-strchar.asm(2)
+[-Wbuiltin-args] warning: index passed to `strchar` is larger than the string
+   ╭─[ test.asm:1:12 ]
+   │
+ 1 │ DEF S EQUS STRCHAR("ABC", 3)
+   │            ────────┬────────  
+   │                    ╰────────── attempting to get the 3rd charmap unit of a string that has only 3
+───╯
+[-Wbuiltin-args] warning: index passed to `strchar` is larger than the string
+   ╭─[ test.asm:2:12 ]
+   │
+ 2 │ DEF T EQUS STRCHAR("ABC", -4)
+   │            ─────────┬────────  
+   │                     ╰────────── attempting to get the -4th charmap unit of a string that has only 3
+───╯

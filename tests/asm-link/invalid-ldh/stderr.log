@@ -1,5 +1,15 @@
-error: Source address $11 not between $FF00 to $FFFF
-    at invalid-ldh.asm(2)
-error: Source address $22 not between $FF00 to $FFFF
-    at invalid-ldh.asm(3)
-Assembly aborted with 2 errors!
+error: $0011 is not a valid address for `ldh`
+   ╭─[ test.asm:2:6 ]
+   │
+ 2 │ ldh [$11], a
+   │      ─┬─  
+   │       ╰─── this must be between $FF00 and $FFFF inclusive
+───╯
+error: $0022 is not a valid address for `ldh`
+   ╭─[ test.asm:3:9 ]
+   │
+ 3 │ ldh a, [$22]
+   │         ─┬─  
+   │          ╰─── this must be between $FF00 and $FFFF inclusive
+───╯
+2 errors generated.

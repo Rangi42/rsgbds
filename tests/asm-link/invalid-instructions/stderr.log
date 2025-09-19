@@ -1,35 +1,115 @@
-error: Address $10000 is not 16-bit
-    at invalid-instructions.asm(1)
-error: "LD [HL], [HL]" is not a valid instruction
-    at invalid-instructions.asm(2)
-error: Base value must be equal to $FF00 for [$FF00+C]
-    at invalid-instructions.asm(3)
-error: syntax error, unexpected c, expecting hl
-    at invalid-instructions.asm(4)
-error: syntax error, unexpected bc, expecting hl
-    at invalid-instructions.asm(5)
-error: syntax error, unexpected number, expecting hl
-    at invalid-instructions.asm(6)
-warning: Expression must be 3-bit [-Wtruncation]
-    at invalid-instructions.asm(7)
-error: Invalid bit index 8 for `BIT`
-    at invalid-instructions.asm(7)
-error: Invalid address $40 for `RST`
-    at invalid-instructions.asm(8)
-error: "LD BC, BC" is not a valid instruction; use "LD B, B" and "LD C, C"
-    at invalid-instructions.asm(10)
-error: "LD DE, HL" is not a valid instruction; use "LD D, H" and "LD E, L"
-    at invalid-instructions.asm(11)
-error: "LD HL, DE" is not a valid instruction; use "LD H, D" and "LD L, E"
-    at invalid-instructions.asm(12)
-error: "LD HL, SP" is not a valid instruction; use "LD HL, SP + 0"
-    at invalid-instructions.asm(14)
-error: "LD SP, BC" is not a valid instruction
-    at invalid-instructions.asm(17)
-error: syntax error, unexpected sp
-    at invalid-instructions.asm(18)
-error: syntax error, unexpected af
-    at invalid-instructions.asm(20)
-error: syntax error, unexpected af
-    at invalid-instructions.asm(21)
-Assembly aborted with 16 errors!
+error: invalid address constraint for section
+   ╭─[ test.asm:1:25 ]
+   │
+ 1 │ SECTION "invalid", ROM0[$10000]
+   │                         ───┬──  
+   │                            ╰──── ROM0 sections can be between $0000 and $7fff, not $10000
+───╯
+error: `ld [hl], [hl]` doesn't exist
+   ╭─[ test.asm:2:2 ]
+   │
+ 2 │     ld [hl], [hl]
+   │     ──────┬──────  
+   │           ╰──────── this instruction is invalid
+   │ 
+   │ Note: trivia: its would-be encoding is occupied by `halt` instead
+───╯
+error: base address is not equal to $ff00
+   ╭─[ test.asm:3:9 ]
+   │
+ 3 │     ld a, [$00ff+c]
+   │            ──┬──  
+   │              ╰──── this evaluates to $00ff
+───╯
+error: syntax error: unexpected c
+   ╭─[ test.asm:4:9 ]
+   │
+ 4 │     ld b, [c]
+   │            ┬  
+   │            ╰── expected "hl"
+───╯
+error: syntax error: unexpected bc
+   ╭─[ test.asm:5:9 ]
+   │
+ 5 │     ld b, [bc]
+   │            ─┬  
+   │             ╰── expected "hl"
+───╯
+error: syntax error: unexpected number
+   ╭─[ test.asm:6:9 ]
+   │
+ 6 │     ld b, [$4000]
+   │            ──┬──  
+   │              ╰──── expected "hl"
+───╯
+error: 8 is not a valid bit number
+   ╭─[ test.asm:7:6 ]
+   │
+ 7 │     bit 8, a
+   │         ┬  
+   │         ╰── this must be between 0 and 7 inclusive
+───╯
+error: destination address $0040 is not valid for `rst`
+   ╭─[ test.asm:8:6 ]
+   │
+ 8 │     rst $40
+   │         ─┬─  
+   │          ╰─── this must be one of $00, $08, $10, $18, $20, $28, $30, or $38
+───╯
+error: syntax error: unexpected bc
+    ╭─[ test.asm:10:9 ]
+    │
+ 10 │     ld bc, bc
+    │            ─┬  
+    │             ╰── expected "number", "string", "character literal", "identifier", "scoped identifier", "local identifier", "anonymous label reference", ...49 others
+────╯
+error: syntax error: unexpected hl
+    ╭─[ test.asm:11:9 ]
+    │
+ 11 │     ld de, hl
+    │            ─┬  
+    │             ╰── expected "number", "string", "character literal", "identifier", "scoped identifier", "local identifier", "anonymous label reference", ...49 others
+────╯
+error: syntax error: unexpected de
+    ╭─[ test.asm:12:9 ]
+    │
+ 12 │     ld hl, de
+    │            ─┬  
+    │             ╰── expected "number", "string", "character literal", "identifier", "scoped identifier", "local identifier", "anonymous label reference", ...50 others
+────╯
+error: syntax error: unexpected end of line
+    ╭─[ test.asm:14:9 ]
+    │
+ 14 │     ld hl, sp ; no offset!
+    │            ─┬  
+    │             ╰── expected "+", or "-"
+────╯
+error: syntax error: unexpected bc
+    ╭─[ test.asm:17:9 ]
+    │
+ 17 │     ld sp, bc
+    │            ─┬  
+    │             ╰── expected "number", "string", "character literal", "identifier", "scoped identifier", "local identifier", "anonymous label reference", ...50 others
+────╯
+error: syntax error: unexpected sp
+    ╭─[ test.asm:18:9 ]
+    │
+ 18 │     ld bc, sp
+    │            ─┬  
+    │             ╰── expected "number", "string", "character literal", "identifier", "scoped identifier", "local identifier", "anonymous label reference", ...49 others
+────╯
+error: syntax error: unexpected af
+    ╭─[ test.asm:20:5 ]
+    │
+ 20 │     ld af, bc
+    │        ─┬  
+    │         ╰── expected "[", "b", "c", "d", "e", "h", "l", ...7 others
+────╯
+error: syntax error: unexpected af
+    ╭─[ test.asm:21:9 ]
+    │
+ 21 │     ld bc, af
+    │            ─┬  
+    │             ╰── expected "number", "string", "character literal", "identifier", "scoped identifier", "local identifier", "anonymous label reference", ...49 others
+────╯
+16 errors generated.

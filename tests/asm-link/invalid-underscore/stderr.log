@@ -1,31 +1,106 @@
-error: Invalid integer constant, '_' after another '_'
-    at invalid-underscore.asm(14)
-error: Invalid integer constant, '_' after another '_'
-    at invalid-underscore.asm(15)
-error: Invalid integer constant, '_' after another '_'
-    at invalid-underscore.asm(16)
-error: Invalid integer constant, '_' after another '_'
-    at invalid-underscore.asm(17)
-error: Invalid integer constant, '_' after another '_'
-    at invalid-underscore.asm(18)
-error: Invalid integer constant, '_' after another '_'
-    at invalid-underscore.asm(19)
-error: Invalid integer constant, '_' after another '_'
-    at invalid-underscore.asm(20)
-error: Invalid integer constant, trailing '_'
-    at invalid-underscore.asm(23)
-error: Invalid integer constant, trailing '_'
-    at invalid-underscore.asm(24)
-error: Invalid integer constant, trailing '_'
-    at invalid-underscore.asm(25)
-error: Invalid integer constant, trailing '_'
-    at invalid-underscore.asm(26)
-error: Invalid graphics constant, trailing '_'
-    at invalid-underscore.asm(27)
-error: Invalid fixed-point constant, trailing '_'
-    at invalid-underscore.asm(28)
-error: Invalid integer constant, trailing '_'
-    at invalid-underscore.asm(31)
-error: Invalid integer constant, '_' after another '_'
-    at invalid-underscore.asm(32)
-Assembly aborted with 15 errors!
+error: consecutive underscores are not allowed
+    ╭─[ test.asm:14:9 ]
+    │
+ 14 │ println 123__456
+    │         ────┬───  
+    │             ╰───── this number is invalid
+────╯
+error: consecutive underscores are not allowed
+    ╭─[ test.asm:15:9 ]
+    │
+ 15 │ println %1010__1010
+    │         ─────┬─────  
+    │              ╰─────── this number is invalid
+────╯
+error: consecutive underscores are not allowed
+    ╭─[ test.asm:16:9 ]
+    │
+ 16 │ println &123__456
+    │         ────┬────  
+    │             ╰────── this number is invalid
+────╯
+error: consecutive underscores are not allowed
+    ╭─[ test.asm:17:9 ]
+    │
+ 17 │ println $abc__def
+    │         ────┬────  
+    │             ╰────── this number is invalid
+────╯
+error: consecutive underscores are not allowed
+    ╭─[ test.asm:18:9 ]
+    │
+ 18 │ println `0101__2323
+    │         ─────┬─────  
+    │              ╰─────── this number is invalid
+────╯
+error: consecutive underscores are not allowed
+    ╭─[ test.asm:19:9 ]
+    │
+ 19 │ println 3.14__15
+    │         ────┬───  
+    │             ╰───── this fixed-point constant is invalid
+────╯
+error: consecutive underscores are not allowed
+    ╭─[ test.asm:20:9 ]
+    │
+ 20 │ println 2.718__Q16
+    │         ─────┬────  
+    │              ╰────── this fixed-point constant is invalid
+────╯
+error: trailing underscores are not allowed
+    ╭─[ test.asm:23:9 ]
+    │
+ 23 │ println 12345_
+    │         ───┬──  
+    │            ╰──── this number is invalid
+────╯
+error: trailing underscores are not allowed
+    ╭─[ test.asm:24:9 ]
+    │
+ 24 │ println 0b101010_
+    │         ────┬────  
+    │             ╰────── this number is invalid
+────╯
+error: trailing underscores are not allowed
+    ╭─[ test.asm:25:9 ]
+    │
+ 25 │ println 0o123456_
+    │         ────┬────  
+    │             ╰────── this number is invalid
+────╯
+error: trailing underscores are not allowed
+    ╭─[ test.asm:26:9 ]
+    │
+ 26 │ println 0xabcdef_
+    │         ────┬────  
+    │             ╰────── this number is invalid
+────╯
+error: trailing underscores are not allowed
+    ╭─[ test.asm:27:9 ]
+    │
+ 27 │ println `01230123_
+    │         ─────┬────  
+    │              ╰────── this number is invalid
+────╯
+error: trailing underscores are not allowed
+    ╭─[ test.asm:28:9 ]
+    │
+ 28 │ println 123.456_
+    │         ────┬───  
+    │             ╰───── this fixed-point constant is invalid
+────╯
+error: trailing underscores are not allowed
+    ╭─[ test.asm:31:9 ]
+    │
+ 31 │ println 1_.618
+    │         ─┬  
+    │          ╰── this number is invalid
+────╯
+error: expected a digit after '.', not an underscore
+    ╭─[ test.asm:32:9 ]
+    │
+ 32 │ println 2._718
+    │         ───┬──  
+    │            ╰──── this fixed-point constant is invalid
+────╯
+15 errors generated.

@@ -29,16 +29,23 @@ error: unexpected character '.' as a print type
 error: missing number after 'q'
    ╭─[ test.asm:5:16 ]
    │
- 5 │ println STRFMT("%qf %q.16f", 42.0, 42.0)
-   │                ──────┬─────  
-   │                      ╰─────── bad format specifier 0 bytes into this format string
+ 5 │ println STRFMT("%qf %q.16f %qq16f", 42.0, 42.0, 42.0)
+   │                ─────────┬─────────  
+   │                         ╰─────────── bad format specifier 0 bytes into this format string
 ───╯
 error: missing number after 'q'
    ╭─[ test.asm:5:16 ]
    │
- 5 │ println STRFMT("%qf %q.16f", 42.0, 42.0)
-   │                ──────┬─────  
-   │                      ╰─────── bad format specifier 4 bytes into this format string
+ 5 │ println STRFMT("%qf %q.16f %qq16f", 42.0, 42.0, 42.0)
+   │                ─────────┬─────────  
+   │                         ╰─────────── bad format specifier 4 bytes into this format string
+───╯
+error: missing number after 'q'
+   ╭─[ test.asm:5:16 ]
+   │
+ 5 │ println STRFMT("%qf %q.16f %qq16f", 42.0, 42.0, 42.0)
+   │                ─────────┬─────────  
+   │                         ╰─────────── bad format specifier 11 bytes into this format string
 ───╯
 error: unexpected character '5' after the print type
    ╭─[ test.asm:8:18 ]
@@ -103,4 +110,4 @@ error: a fixed-point precision can only be used with fixed-point formatting
     │                ───┬──  
     │                   ╰──── bad format specifier 0 bytes into this format string
 ────╯
-15 errors generated.
+16 errors generated.
