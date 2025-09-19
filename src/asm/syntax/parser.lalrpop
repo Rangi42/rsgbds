@@ -39,7 +39,7 @@ LineContents = {
 	LabelDef? <MacroCall>,
 	LabelDef // LALRPOP doesn't allow productions to match no tokens, so empty lines are simply not passed to the parser.
 };
-ExtraAtEol: () = ! => {
+ExtraAtEol: () = ! => { // Necessary so that a syntax error at EOL doesn't cause an immediate abort.
 	let should_continue = ctx.report_parse_error(<>.error);
 	debug_assert!(should_continue); // Should not have been one of the assertions.
 };
@@ -546,7 +546,7 @@ ExprExponent<Atom>: Expr = { // Note the reversed expression tokens, which make 
 	Atom
 };
 ExprAtom: Expr = {
-	<span_idx:@L> <ident:"identifier"> => Expr::symbol(ident, ctx.line_spans[span_idx].clone()),
+	<span_idx:@L> <ident:"identifier"> => ctx.ident(ident, span_idx),
 	<StringExprNoIdent> => ctx.str_to_num(<>),
 	ExprAtomNoIdent
 };

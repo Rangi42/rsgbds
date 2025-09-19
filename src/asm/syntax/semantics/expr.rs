@@ -127,6 +127,33 @@ impl parse_ctx!() {
         Expr::number(value, self.span_from_to(l_span_idx, r_span_idx))
     }
 
+    pub fn ident(&self, ident: Identifier, span_idx: usize) -> Expr {
+        let span = self.line_spans[span_idx].clone();
+        if let Some(res) = self.symbols.find(&ident).and_then(|sym| {
+            sym.get_string(
+                self.symbols.global_scope,
+                self.symbols.local_scope,
+                self.identifiers,
+            )
+        }) {
+            match res {
+                Ok(string) => self.str_to_num((string, span)),
+                Err(err) => {
+                    self.error(&span, |error| {
+                        error.set_message(&err);
+                        error.add_label(
+                            diagnostics::error_label(&span)
+                                .with_message("referenced in a numeric expression here"),
+                        )
+                    });
+                    Expr::nothing(span)
+                }
+            }
+        } else {
+            Expr::symbol(ident, span)
+        }
+    }
+
     pub fn local_ident(&self, ident: Option<Identifier>, span_idx: usize) -> Expr {
         let span = self.line_spans[span_idx].clone();
         if let Some(name) = ident {

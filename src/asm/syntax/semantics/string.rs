@@ -577,7 +577,8 @@ impl parse_ctx!() {
                     self.identifiers.resolve(name).unwrap(),
                 ));
                 error.add_label(
-                    diagnostics::error_label(span).with_message("this symbol is invalid"),
+                    diagnostics::error_label(span)
+                        .with_message("referenced in a string expression here"),
                 );
             });
             return (Default::default(), span.clone());
