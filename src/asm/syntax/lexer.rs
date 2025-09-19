@@ -2375,6 +2375,27 @@ impl Lexer {
 
         let mut end_ofs = text.len();
         while let Some((ofs, ch)) = chars.next() {
+            let append_expansion = |dest: &mut CompactString, contents| {
+                if !passthrough {
+                    dest.push_str(contents);
+                } else {
+                    dest.reserve(contents.len()); // TODO(perf): is this helping?
+                    for ch in contents.chars() {
+                        match ch {
+                            '\n' => dest.push_str("\\n"),
+                            '\r' => dest.push_str("\\r"),
+                            '\t' => dest.push_str("\\t"),
+                            '\0' => dest.push_str("\\0"),
+                            '\\' | '"' | '\'' | '{' | '}' => {
+                                dest.push('\\');
+                                dest.push(ch);
+                            }
+                            _ => dest.push(ch),
+                        }
+                    }
+                }
+            };
+
             match ch {
                 ch if ch == delim_char => {
                     if multiline {
@@ -2425,7 +2446,7 @@ impl Lexer {
                         params.sections,
                     ) {
                         match res {
-                            Ok((_kind, src)) => string.push_str(src.contents.text()),
+                            Ok((_kind, src)) => append_expansion(string, src.contents.text()),
                             Err(err) => {
                                 let macro_arg_len = match macro_chars.peek() {
                                     Some(&(ofs, _ch)) => ofs,
@@ -2472,7 +2493,7 @@ impl Lexer {
                         ctx_depth,
                         params,
                     );
-                    string.push_str(&expanded);
+                    append_expansion(string, &expanded);
                 }
                 '}' if !raw => {
                     let span = Span::Normal(ctx.new_span_len(ofs, '}'.len_utf8()));
