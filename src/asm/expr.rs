@@ -515,6 +515,11 @@ impl Expr {
                                 kind: match &op.kind {
                                     // Eagerly evaluate symbols that can be.
                                     OpKind::Symbol(name) => match symbols.find(name) {
+                                        // TODO: we might want to create a `Ref` here;
+                                        // but we'd need to also ensure it doesn't get deleted, even after it gets replaced...
+                                        None | Some(SymbolData::Deleted(..)) => {
+                                            OpKind::Symbol(*name)
+                                        }
                                         Some(sym) => match sym.get_number(macro_args, sections) {
                                             None => {
                                                 return Err(Error {
@@ -535,9 +540,6 @@ impl Expr {
                                             Some(Ok(Some(value))) => OpKind::Number(value),
                                             Some(Ok(None)) => OpKind::Symbol(*name),
                                         },
-                                        // TODO: we might want to create a `Ref` here;
-                                        // but we'd need to also ensure it doesn't get deleted, even after it gets replaced...
-                                        None => OpKind::Symbol(*name),
                                     },
                                     kind => kind.clone(),
                                 },
@@ -1027,7 +1029,6 @@ impl ErrKind {
                     diagnostics::note_label(span).with_message("it has been deleted here"),
                 ]);
             }
-            // TODO: highlight its definition point
             Self::NonNumericSym(ident, kind_name, span) => {
                 error.set_message(format!(
                     "the symbol `{}` isn't numeric",
