@@ -686,21 +686,35 @@ impl Lexer {
 
                 match chars.peek() {
                     Some((_ofs, ch @ ('0'..='9' | '-'))) => {
-                        let (mut idx, sign) = if *ch == '-' {
+                        let (mut idx, sign, mut underscore_allowed) = if *ch == '-' {
                             chars.next();
                             let Ok(first_digit) = digit(chars.peek()) else {
                                 return Some(Err(MacroArgError::NoDigitAfterMinus));
                             };
-                            (first_digit, true)
+                            (first_digit, true, false)
                         } else {
-                            (ch.to_digit(10).unwrap() as isize, false)
+                            (ch.to_digit(10).unwrap() as isize, false, true)
                         };
+                        let mut consecutive_underscores = false;
                         loop {
                             chars.next();
                             match digit(chars.peek()) {
-                                Ok(digit) => idx = idx * 10 + digit,
+                                Ok(digit) => {
+                                    idx = idx * 10 + digit;
+                                    underscore_allowed = true;
+                                }
+                                Err(Some('_')) => {
+                                    consecutive_underscores |= !underscore_allowed;
+                                    underscore_allowed = false;
+                                }
                                 Err(Some('>')) => {
                                     chars.next();
+                                    if consecutive_underscores {
+                                        return Some(Err(MacroArgError::ConsecutiveUnderscores));
+                                    }
+                                    if !underscore_allowed {
+                                        return Some(Err(MacroArgError::TrailingUnderscore));
+                                    }
                                     break if sign { idx.wrapping_neg() } else { idx };
                                 }
                                 _ => return Some(Err(MacroArgError::Unterminated)),
@@ -3122,6 +3136,10 @@ enum MacroArgError<'text> {
     NoDigitAfterMinus,
     /// invalid character in bracketed macro argument
     InvalidBracketedChar,
+    /// consecutive underscores are not allowed
+    ConsecutiveUnderscores,
+    /// trailing underscore
+    TrailingUnderscore,
     /// {0}
     SymErr(SymbolError<'text, 'text>),
 }
@@ -3140,6 +3158,8 @@ impl MacroArgError<'_> {
             }
             Self::NoDigitAfterMinus => "no digits in this".into(),
             Self::InvalidBracketedChar => "this bracketed macro argument is invalid".into(),
+            Self::ConsecutiveUnderscores => "this bracketed macro argument is invalid".into(),
+            Self::TrailingUnderscore => "this bracketed macro argument is invalid".into(),
             // TODO: more specific label messages
             Self::SymErr(_err) => "this symbol is invalid".into(),
         }
