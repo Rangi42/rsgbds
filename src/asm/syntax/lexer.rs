@@ -1665,7 +1665,7 @@ impl Lexer {
                     match self.peek(&mut params) {
                         Some('_') => {
                             self.consume(&mut span);
-                            let value = self.read_number(8, 0, true, &mut span, &mut params);
+                            let value = self.read_number(16, 0, true, &mut span, &mut params);
                             break token!("number"(value));
                         }
                         Some(ch @ ('0'..='9' | 'A'..='F' | 'a'..='f')) => {
