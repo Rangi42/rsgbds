@@ -2646,37 +2646,6 @@ impl Lexer {
         self.with_active_context_raw(&mut span, |ctx, text| {
             let mut chars = text.char_indices().peekable();
 
-            // Trim leading whitespace (but stop at a block comment).
-            while let Some(&(ofs, ch)) = chars.peek() {
-                starting_whitespace_len = ofs;
-                match ch {
-                    chars!(whitespace) => _ = chars.next(),
-                    '\\' => {
-                        // If the backslash isn't a line continuation, we'll want to process it normally.
-                        let backup = chars.clone();
-                        chars.next(); // Consume the backslash.
-                        if !matches!(chars.peek(), Some((_, chars!(line_cont)))) {
-                            chars = backup;
-                            break;
-                        }
-
-                        // Line continuations count as “whitespace”.
-                        if let Err(err) = Self::read_line_continuation(&mut chars) {
-                            let span = Span::Normal(ctx.new_span_ofs(
-                                ofs..chars.peek().map_or(text.len(), |(ofs, _ch)| *ofs),
-                            ));
-                            params.error(&span, |error| {
-                                error.set_message(&err);
-                                error.add_label(
-                                    diagnostics::error_label(&span).with_message(err.label_msg()),
-                                );
-                            });
-                        }
-                    }
-                    _ => break,
-                }
-            }
-
             let mut parens_depth = 0usize;
             end_offset = chars.peek().map_or(text.len(), |(ofs, _ch)| *ofs);
             while let Some((ofs, ch)) = chars.next() {
@@ -2911,6 +2880,10 @@ impl Lexer {
         // Trim right whitespace.
         let trimmed_len = string.trim_end_matches(is_whitespace).len();
         string.truncate(trimmed_len);
+        // Trim left whitespace.
+        let trimmed = string.trim_start_matches(is_whitespace);
+        // SAFETY: `trimmed` is derived from `string`.
+        drop(string.drain(..unsafe { trimmed.as_ptr().offset_from(string.as_ptr()) } as usize));
 
         // Adjust the span to remove the whitespace.
         span.bytes.end = span.bytes.start + end_offset;
