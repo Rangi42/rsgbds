@@ -3,7 +3,7 @@ error: syntax error: unexpected end of line
    │
  1 │     SECTION
    │     ───┬───  
-   │        ╰───── expected "string", "identifier", "fragment", "union", or "strcat"
+   │        ╰───── expected "string", "identifier", "fragment", "section", "union", "revchar", "strcat", ...6 others
    │
    ├─[ test.asm:5:2 ]
    │

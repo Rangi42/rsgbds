@@ -3,7 +3,7 @@ error: syntax error: unexpected af
    │
  7 │ def m = AF {newline} def n = 2
    │         ─┬  
-   │          ╰── expected "number", "identifier", "local identifier", "(", "+", "-", "!", ...5 others
+   │          ╰── expected "number", "string", "character literal", "identifier", "scoped identifier", "local identifier", "anonymous label reference", ...49 others
 ───╯
 error: syntax error: unexpected af
     ╭─[ test.asm:11:5 ]

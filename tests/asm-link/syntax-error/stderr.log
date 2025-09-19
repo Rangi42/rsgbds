@@ -3,6 +3,6 @@ error: syntax error: unexpected a
    │
  2 │ print a
    │       ┬  
-   │       ╰── expected "number", "string", "identifier", "local identifier", "(", "+", "-", ...7 others
+   │       ╰── expected "number", "string", "character literal", "identifier", "scoped identifier", "local identifier", "anonymous label reference", ...49 others
 ───╯
 1 error generated.

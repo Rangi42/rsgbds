@@ -1,18 +1,99 @@
-warning: Line 2 [-Wuser]
-    at rept-line-no.asm(2)
-warning: Line 5 [-Wuser]
-    at rept-line-no.asm::REPT~1(5) <- rept-line-no.asm(3)
-warning: Line 5 [-Wuser]
-    at rept-line-no.asm::REPT~2(5) <- rept-line-no.asm(3)
-warning: Line 5 [-Wuser]
-    at rept-line-no.asm::REPT~3(5) <- rept-line-no.asm(3)
-warning: Line 8 [-Wuser]
-    at rept-line-no.asm(8)
-warning: Line 12 [-Wuser]
-    at rept-line-no.asm::REPT~1::REPT~1::REPT~1(12) <- rept-line-no.asm::REPT~1(11) <- rept-line-no.asm(10)
-warning: Line 12 [-Wuser]
-    at rept-line-no.asm::REPT~1::REPT~1::REPT~2(12) <- rept-line-no.asm::REPT~1(11) <- rept-line-no.asm(10)
-warning: Line 12 [-Wuser]
-    at rept-line-no.asm::REPT~2::REPT~2::REPT~1(12) <- rept-line-no.asm::REPT~2(11) <- rept-line-no.asm(10)
-warning: Line 12 [-Wuser]
-    at rept-line-no.asm::REPT~2::REPT~2::REPT~2(12) <- rept-line-no.asm::REPT~2(11) <- rept-line-no.asm(10)
+[-Wuser] warning: Line 2
+   ╭─[ test.asm:2:2 ]
+   │
+ 2 │     WARN "Line 2"
+   │     ──┬─  
+   │       ╰─── triggered here
+───╯
+[-Wuser] warning: Line 5
+   ╭─[ test.asm:5:2 ]
+   │
+ 3 │ REPT 3
+   │ ──┬─  
+   │   ╰─── in the 1st iteration of this loop
+   │ 
+ 5 │     WARN "Line 5"
+   │     ──┬─  
+   │       ╰─── triggered here
+───╯
+[-Wuser] warning: Line 5
+   ╭─[ test.asm:5:2 ]
+   │
+ 3 │ REPT 3
+   │ ──┬─  
+   │   ╰─── in the 2nd iteration of this loop
+   │ 
+ 5 │     WARN "Line 5"
+   │     ──┬─  
+   │       ╰─── triggered here
+───╯
+[-Wuser] warning: Line 5
+   ╭─[ test.asm:5:2 ]
+   │
+ 3 │ REPT 3
+   │ ──┬─  
+   │   ╰─── in the 3rd iteration of this loop
+   │ 
+ 5 │     WARN "Line 5"
+   │     ──┬─  
+   │       ╰─── triggered here
+───╯
+[-Wuser] warning: Line 8
+   ╭─[ test.asm:8:2 ]
+   │
+ 8 │     WARN "Line 8"
+   │     ──┬─  
+   │       ╰─── triggered here
+───╯
+[-Wuser] warning: Line 12
+    ╭─[ test.asm:12:3 ]
+    │
+ 10 │ REPT 2
+    │ ──┬─  
+    │   ╰─── in the 1st iteration of this loop
+ 11 │     REPT 2
+    │     ──┬─  
+    │       ╰─── in the 1st iteration of this loop
+ 12 │        WARN "Line 12"
+    │        ──┬─  
+    │          ╰─── triggered here
+────╯
+[-Wuser] warning: Line 12
+    ╭─[ test.asm:12:3 ]
+    │
+ 10 │ REPT 2
+    │ ──┬─  
+    │   ╰─── in the 1st iteration of this loop
+ 11 │     REPT 2
+    │     ──┬─  
+    │       ╰─── in the 2nd iteration of this loop
+ 12 │        WARN "Line 12"
+    │        ──┬─  
+    │          ╰─── triggered here
+────╯
+[-Wuser] warning: Line 12
+    ╭─[ test.asm:12:3 ]
+    │
+ 10 │ REPT 2
+    │ ──┬─  
+    │   ╰─── in the 2nd iteration of this loop
+ 11 │     REPT 2
+    │     ──┬─  
+    │       ╰─── in the 1st iteration of this loop
+ 12 │        WARN "Line 12"
+    │        ──┬─  
+    │          ╰─── triggered here
+────╯
+[-Wuser] warning: Line 12
+    ╭─[ test.asm:12:3 ]
+    │
+ 10 │ REPT 2
+    │ ──┬─  
+    │   ╰─── in the 2nd iteration of this loop
+ 11 │     REPT 2
+    │     ──┬─  
+    │       ╰─── in the 2nd iteration of this loop
+ 12 │        WARN "Line 12"
+    │        ──┬─  
+    │          ╰─── triggered here
+────╯

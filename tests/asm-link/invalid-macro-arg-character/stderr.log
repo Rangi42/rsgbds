@@ -10,6 +10,6 @@ error: syntax error: unexpected !
    │
  1 │ \<10!>
    │ ──┬──  
-   │   ╰──── expected "identifier", "local identifier", ":", "+", "-", "adc", "add", ...89 others
+   │   ╰──── expected "identifier", "scoped identifier", "local identifier", ":", "+", "-", "adc", ...90 others
 ───╯
 2 errors generated.

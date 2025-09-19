@@ -14,7 +14,7 @@ error: macro argument #0 doesn't exist
    │
  3 │     def y = \<0> + 42
    │             ──┬─  
-   │               ╰─── macro argument 0 doesn't exist
+   │               ╰─── this reference is invalid
    │ 
  5 │     m hello, world
    │     ┬  

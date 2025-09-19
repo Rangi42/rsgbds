@@ -3,7 +3,7 @@ error: syntax error: unexpected *
    │
  2 │ def n equ 2 + * / ^ 3 ; oops
    │               ┬  
-   │               ╰── expected "number", "identifier", "local identifier", "(", "+", "-", "!", ...5 others
+   │               ╰── expected "number", "string", "character literal", "identifier", "scoped identifier", "local identifier", "anonymous label reference", ...49 others
 ───╯
 error: unterminated string literal
    ╭─[ test.asm:3:12 ]
