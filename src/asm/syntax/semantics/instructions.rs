@@ -27,7 +27,7 @@ impl parse_ctx!() {
         match self.try_const_eval(&expr) {
             Ok((0xff00, _span)) => {} // Aight.
             Ok((value, span)) => self.error(&span, |error| {
-                error.set_message("expression is not equal to $ff00");
+                error.set_message("base address is not equal to $ff00");
                 error.add_label(
                     diagnostics::error_label(&span)
                         .with_message(format!("this evaluates to ${value:04x}")),
