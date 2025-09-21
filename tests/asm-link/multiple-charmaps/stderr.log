@@ -1,21 +1,151 @@
-error: Strings as numbers must be a single charmap unit
-    at multiple-charmaps.asm::print_mapped(34) <- multiple-charmaps.asm(46)
-error: Strings as numbers must be a single charmap unit
-    at multiple-charmaps.asm::print_mapped(34) <- multiple-charmaps.asm(54)
-warning: Overriding charmap mapping [-Wcharmap-redef]
-    at multiple-charmaps.asm(64)
-error: Strings as numbers must be a single charmap unit
-    at multiple-charmaps.asm::print_mapped(34) <- multiple-charmaps.asm(73)
-error: Strings as numbers must be a single charmap unit
-    at multiple-charmaps.asm::print_mapped(34) <- multiple-charmaps.asm(95)
-error: Strings as numbers must be a single charmap unit
-    at multiple-charmaps.asm::print_mapped(34) <- multiple-charmaps.asm(96)
-error: Strings as numbers must be a single charmap unit
-    at multiple-charmaps.asm::print_mapped(34) <- multiple-charmaps.asm(104)
-error: Charmap `map1` is already defined
-    at multiple-charmaps.asm::new_(9) <- multiple-charmaps.asm(106)
-error: Undefined charmap `map5`
-    at multiple-charmaps.asm::set_(15) <- multiple-charmaps.asm(108)
-error: No entries in the charmap stack
-    at multiple-charmaps.asm::pop_(30) <- multiple-charmaps.asm(110)
-Assembly aborted with 9 errors!
+error: "ab" isn't a single char mapping
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ "ab"
+    │ ──┬─  
+    │   ╰─── the longest mapping found is "a"
+    │
+    ├─[ test.asm:34:10 ]
+    │
+ 34 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 46 │     print_mapped "ab" ; error
+    │     ──────┬─────  
+    │           ╰─────── macro called here
+────╯
+error: "ab" isn't a single char mapping
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ "ab"
+    │ ──┬─  
+    │   ╰─── the longest mapping found is "a"
+    │
+    ├─[ test.asm:34:10 ]
+    │
+ 34 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 54 │     print_mapped "ab" ; error
+    │     ──────┬─────  
+    │           ╰─────── macro called here
+────╯
+[-Wcharmap-redef] warning: overriding charmap mapping
+    ╭─[ test.asm:64:9 ]
+    │
+ 64 │ charmap "ab", $1
+    │         ──┬─  
+    │           ╰─── a mapping for "ab" was previously defined
+────╯
+error: "cd" isn't a single char mapping
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ "cd"
+    │ ──┬─  
+    │   ╰─── the longest mapping found is "c"
+    │
+    ├─[ test.asm:34:10 ]
+    │
+ 34 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 73 │     print_mapped "cd" ; error
+    │     ──────┬─────  
+    │           ╰─────── macro called here
+────╯
+error: "cd" isn't a single char mapping
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ "cd"
+    │ ──┬─  
+    │   ╰─── the longest mapping found is "c"
+    │
+    ├─[ test.asm:34:10 ]
+    │
+ 34 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 95 │     print_mapped "cd" ; error
+    │     ──────┬─────  
+    │           ╰─────── macro called here
+────╯
+error: "ef" isn't a single char mapping
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ "ef"
+    │ ──┬─  
+    │   ╰─── the longest mapping found is "e"
+    │
+    ├─[ test.asm:34:10 ]
+    │
+ 34 │     def x = \1
+    │             ─┬  
+    │              ╰── expanded here
+    │ 
+ 96 │     print_mapped "ef" ; error
+    │     ──────┬─────  
+    │           ╰─────── macro called here
+────╯
+error: "ab" isn't a single char mapping
+     ╭─[ <macro argument #1>:1:1 ]
+     │
+   1 │ "ab"
+     │ ──┬─  
+     │   ╰─── the longest mapping found is "a"
+     │
+     ├─[ test.asm:34:10 ]
+     │
+  34 │     def x = \1
+     │             ─┬  
+     │              ╰── expanded here
+     │ 
+ 104 │     print_mapped "ab" ; error
+     │     ──────┬─────  
+     │           ╰─────── macro called here
+─────╯
+error: a charmap called "map1" already exists
+     ╭─[ test.asm:9:2 ]
+     │
+   9 │     newcharmap \1
+     │     ─────┬────  
+     │          ╰────── attempting to create it here...
+     │          │      
+     │          ╰────── ...but it was previously defined here
+     │ 
+ 106 │     new_ map1
+     │     ──┬─  
+     │       ╰─── macro called here
+─────╯
+error: no charmap named "map5" exists
+     ╭─[ <macro argument #1>:1:1 ]
+     │
+   1 │ map5
+     │ ──┬─  
+     │   ╰─── cannot switch to this charmap
+     │
+     ├─[ test.asm:15:13 ]
+     │
+  15 │     setcharmap \1
+     │                ─┬  
+     │                 ╰── expanded here
+     │ 
+ 108 │     set_ map5
+     │     ──┬─  
+     │       ╰─── macro called here
+─────╯
+error: no entries in the charmap stack
+     ╭─[ test.asm:30:2 ]
+     │
+  30 │     popc
+     │     ──┬─  
+     │       ╰─── cannot pop
+     │ 
+ 110 │     pop_
+     │     ──┬─  
+     │       ╰─── macro called here
+─────╯
+9 errors generated.

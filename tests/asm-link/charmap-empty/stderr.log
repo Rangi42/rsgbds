@@ -10,6 +10,6 @@ error: syntax error: unexpected end of line
    │
  2 │ charmap "nonempty", ; nothing
    │                   ┬  
-   │                   ╰── expected "number", "string", "character literal", "identifier", "local identifier", "anonymous label reference", "(", ...48 others
+   │                   ╰── expected "number", "string", "character literal", "identifier", "scoped identifier", "local identifier", "anonymous label reference", ...49 others
 ───╯
 2 errors generated.

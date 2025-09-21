@@ -13,7 +13,7 @@ $1
 $2
 setcharmap map3
 $1
-$0
+$1
 setcharmap main
 $0
 modify main charmap
@@ -24,8 +24,8 @@ pushc
 setcharmap map2
 pushc map3
 $1
-$0
-$0
+$1
+$1
 popc
 $0
 popc
