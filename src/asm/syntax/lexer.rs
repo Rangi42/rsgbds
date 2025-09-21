@@ -2567,7 +2567,11 @@ impl Lexer {
             Some((_ofs, 't')) => Some('\t'),
             Some((_ofs, '0')) => Some('\0'),
 
-            Some((_ofs, chars!(newline))) => None, // The newline has already been consumed, the line continuation is already complete.
+            Some((_ofs, '\r')) => {
+                chars.next_if(|(_ofs, ch)| *ch == '\n'); // Handle CRLF.
+                None
+            }
+            Some((_ofs, '\n')) => None, // The newline has already been consumed, the line continuation is already complete.
             // `line_cont` contains `newline`, which is intentionally handled above.
             #[allow(unreachable_patterns)]
             Some((_ofs, chars!(line_cont))) => {
