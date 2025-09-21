@@ -122,7 +122,10 @@ impl Cli {
             );
         }
         for flag in &self.warning {
-            handle_error(runtime_opts.parse_w(flag), &mut fail);
+            handle_error(
+                runtime_opts.parse_w(flag, &Span::CommandLine, self.backtrace_depth),
+                &mut fail,
+            );
         }
         fn handle_error<E: Display>(r: Result<(), E>, fail: &mut bool) {
             if let Err(error) = r {
@@ -286,7 +289,12 @@ pub enum RecDepthParseErr {
 }
 
 impl RuntimeOptions {
-    pub fn parse_w<'arg>(&mut self, arg: &'arg str) -> Result<(), WarningParseErr<'arg>> {
+    pub fn parse_w<'arg>(
+        &mut self,
+        arg: &'arg str,
+        span: &Span,
+        backtrace_depth: usize,
+    ) -> Result<(), WarningParseErr<'arg>> {
         if arg == "error" {
             // `-Werror` promotes warnings to errors.
             self.warnings_are_errors = true;
@@ -357,9 +365,21 @@ impl RuntimeOptions {
                     None => default_level,
                     Some(level) => {
                         if level > nb_levels {
-                            return Err(WarningParseErr::ParamOutOfRange(name, level, nb_levels));
+                            diagnostics::warn_special(span, backtrace_depth, |warning| {
+                                warning.set_message(format!(
+                                    "{level} is too large a level for `-W{flag}`; capping at the maximum of {nb_levels}",
+                                ));
+                                if let Span::Normal(..) = span {
+                                    warning.add_label(
+                                        diagnostics::warning_label(span)
+                                            .with_message("invalid argument"),
+                                    );
+                                }
+                            });
+                            nb_levels
+                        } else {
+                            level
                         }
-                        level
                     }
                 };
 
@@ -404,9 +424,6 @@ impl RuntimeOptions {
 pub enum WarningParseErr<'arg> {
     /// invalid warning level: {0}
     BadLevel(std::num::ParseIntError),
-    /// {1} is too large a parameter for `-W{0}`, the maximum is {2}
-    #[from(ignore)]
-    ParamOutOfRange(&'static str, usize, usize),
     /// unknown warning name `{0}`
     #[from(ignore)]
     Unknown(&'arg str),

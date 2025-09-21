@@ -64,7 +64,9 @@ impl parse_ctx!() {
                 self.options,
             ),
             Some('W') => handle_error(
-                self.options.runtime_opts.parse_w(option_arg),
+                self.options
+                    .runtime_opts
+                    .parse_w(option_arg, span, self.options.backtrace_depth),
                 'W',
                 span,
                 self.nb_errors_left,
