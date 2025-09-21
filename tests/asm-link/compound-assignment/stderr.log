@@ -1,3 +1,15 @@
-error: Expected constant expression: undefined symbol `UnDeFiNeD`
-    at compound-assignment.asm(35)
-Assembly aborted with 1 error!
+error: no symbol called `UnDeFiNeD`
+    ╭─[ test.asm:35:5 ]
+    │
+ 35 │ def UnDeFiNeD ^= 300
+    │     ────┬────  
+    │         ╰────── no symbol by this name exists at this point
+────╯
+error: no symbol called `UnDeFiNeD`
+    ╭─[ test.asm:36:9 ]
+    │
+ 36 │ println UnDeFiNeD
+    │         ────┬────  
+    │             ╰────── no symbol by this name exists at this point
+────╯
+2 errors generated.
