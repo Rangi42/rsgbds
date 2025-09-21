@@ -125,7 +125,7 @@ Directive: () = {
 	"setcharmap" <span_idx:@L> <name:"identifier"> => ctx.switch_to_charmap(name, span_idx),
 	<span_idx:@L> "pushc" => ctx.push_charmap(),
 	<span_idx:@L> "pushc" <name:"identifier"> <src:("," <"identifier">)?> => {
-		ctx.push_charmap(); ctx.create_charmap(name, src, span_idx)
+		ctx.push_charmap(); ctx.switch_to_charmap(name, span_idx)
 	},
 	<span_idx:@L> "popc" => ctx.pop_charmap(span_idx),
 	// `context.rs`
