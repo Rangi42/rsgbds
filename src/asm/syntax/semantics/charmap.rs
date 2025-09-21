@@ -9,7 +9,7 @@ impl parse_ctx!() {
         if self
             .charmaps
             .active_charmap_mut()
-            .add_mapping(&string, values)
+            .add_mapping(&string, values, &span, self.nb_errors_left, self.options)
             .is_none()
         {
             self.error(&span, |error| {

@@ -146,7 +146,14 @@ impl Charmap {
         self.name
     }
 
-    pub fn add_mapping(&mut self, string: &str, values: Vec<i32>) -> Option<()> {
+    pub fn add_mapping(
+        &mut self,
+        string: &str,
+        values: Vec<i32>,
+        span: &Span,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) -> Option<()> {
         let mut chars = string.chars();
         let mut node_id = *self.root_node.entry(chars.next()?).or_insert_with(|| {
             self.nodes.push(Node::new());
@@ -163,8 +170,22 @@ impl Charmap {
                 }
             };
         }
-        // TODO: warn if a mapping already exists
-        self.nodes[node_id].mapping = values;
+
+        if !std::mem::replace(&mut self.nodes[node_id].mapping, values).is_empty() {
+            diagnostics::warn(
+                warning!("charmap-redef"),
+                span,
+                |warning| {
+                    warning.set_message("overriding charmap mapping");
+                    warning.add_label(diagnostics::warning_label(span).with_message(format!(
+                        "a mapping for \"{string}\" was previously defined",
+                    )));
+                },
+                nb_errors_left,
+                options,
+            );
+        }
+
         Some(())
     }
 
