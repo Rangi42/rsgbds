@@ -606,7 +606,8 @@ impl Lexer {
             // The span is pointing at the active buffer.
 
             // This check works in most cases, but breaks down in the presence of expansions.
-            // debug_assert_eq!(span.bytes.end, ctx.cur_byte); // The span should be pointing at the char before this one.
+            #[cfg(any())]
+            debug_assert_eq!(span.bytes.end, ctx.cur_byte); // The span should be pointing at the char before this one.
 
             span.bytes.end = ctx.cur_byte + c.len_utf8(); // Advance the span by as much, so it encompasses the character we just shifted.
         } else {
@@ -645,6 +646,17 @@ impl Lexer {
 
         // Advance the context's offset by that one character.
         ctx.cur_byte += c.len_utf8();
+    }
+
+    fn ignore_thus_far(&mut self, span: &mut NormalSpan) {
+        span.make_empty();
+        debug_assert!(span.bytes.is_empty());
+
+        let ctx = self.active_context().unwrap();
+        if !Rc::ptr_eq(&span.node.src, &ctx.span.node.src) {
+            // We exited the previously active cotext; repoint the span to the new active context.
+            *span = ctx.new_span();
+        }
     }
 
     /// Tries to read a macro argument (the part after the backslash, which is expected to have already been consumed)
@@ -1172,7 +1184,7 @@ impl Lexer {
         };
 
         let ctx = self
-            .active_context() // Do this after `peek`, in case it triggered an expansion.
+            .active_context()
             .expect("Attempting to lex a token without an active context!?");
         let mut span = ctx.new_span();
 
@@ -1201,8 +1213,8 @@ impl Lexer {
                 Some(chars!(whitespace)) => {
                     debug_assert!(span.bytes.is_empty());
                     self.consume(&mut span);
-                    // Move the start of the span as well.
-                    span.make_empty();
+                    // Ignore the character.
+                    self.ignore_thus_far(&mut span);
                 }
 
                 Some(';') => {
@@ -1215,7 +1227,7 @@ impl Lexer {
                         }
                     });
                     // Ignore the comment.
-                    span.make_empty();
+                    self.ignore_thus_far(&mut span);
                 }
 
                 Some('\\') => {
@@ -1251,7 +1263,7 @@ impl Lexer {
                     });
 
                     // Ignore the line continuation.
-                    span.make_empty();
+                    self.ignore_thus_far(&mut span);
                 }
 
                 // Unambiguous single-char tokens.
@@ -1368,7 +1380,7 @@ impl Lexer {
                         }
                     } else {
                         // Ignore the block comment.
-                        span.make_empty();
+                        self.ignore_thus_far(&mut span);
                     }
                 }
                 Some('|') => {
@@ -1780,7 +1792,7 @@ impl Lexer {
                                             ),
                                         );
                                     });
-                                    span.make_empty();
+                                    self.ignore_thus_far(&mut span);
                                     continue;
                                 }
                             }
@@ -1831,7 +1843,7 @@ impl Lexer {
                     // Borrowck is not happy without this, but this should hopefully compile to nothing.
                     span = err_span.extract_normal();
                     // Make the span empty, as we ignore the character that's just been consumed.
-                    span.make_empty();
+                    self.ignore_thus_far(&mut span);
                 }
             }
         }
