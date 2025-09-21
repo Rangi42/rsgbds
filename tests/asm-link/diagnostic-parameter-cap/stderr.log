@@ -1,5 +1,25 @@
-warning: Invalid warning flag parameter "truncation=256"; capping at maximum 2
-warning: Expression must be 8-bit; use `LOW()` to force 8-bit [-Wtruncation]
-    at diagnostic-parameter-cap.asm(3)
-warning: Expression must be 8-bit; use `LOW()` to force 8-bit [-Wtruncation]
-    at diagnostic-parameter-cap.asm(4)
+warning: 256 is too large a level for `-Wtruncation`; capping at the maximum of 2
+   ╭─[ test.asm:1:4 ]
+   │
+ 1 │ opt Wtruncation=256
+   │    ────────┬───────  
+   │            ╰───────── invalid argument
+───╯
+[-Wtruncation=1] warning: this expression's value is not 8-bit
+   ╭─[ test.asm:3:4 ]
+   │
+ 3 │ db 999
+   │    ─┬─  
+   │     ╰─── this expression evaluates to 999, which is not between -256 and 255
+   │ 
+   │ Help: you can use the `low()` function to truncate an expression
+───╯
+[-Wtruncation=2] warning: this expression's value doesn't seem to be 8-bit
+   ╭─[ test.asm:4:4 ]
+   │
+ 4 │ db -254
+   │    ──┬─  
+   │      ╰─── this expression evaluates to -254, which is not between -128 and 255
+   │ 
+   │ Help: you can use the `low()` function to truncate an expression
+───╯

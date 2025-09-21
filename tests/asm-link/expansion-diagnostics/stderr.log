@@ -1,14 +1,60 @@
-warning: hello [-Wuser]
-    at expansion-diagnostics.asm::outer::inner::REPT~1(5)
-    <- expansion-diagnostics.asm::outer::inner(4)
-    <- expansion-diagnostics.asm::outer(3)
-    <- expansion-diagnostics.asm(7)
-warning: hello [-Wuser]
-    at expansion-diagnostics.asm::outer::inner::REPT~1(5)
-    <- expansion-diagnostics.asm::outer::inner(4)
-    <- expansion-diagnostics.asm::outer(5)
-    <- expansion-diagnostics.asm(7)
-warning: hello [-Wuser]
-    at expansion-diagnostics.asm::outer::inner::REPT~1(5)
-    <- expansion-diagnostics.asm::outer::inner(4)
-    <- expansion-diagnostics.asm(8)
+[-Wuser] warning: hello
+   ╭─[ s:3:1 ]
+   │
+ 2 │ REPT 1
+   │ ──┬─  
+   │   ╰─── in the 1st iteration of this loop
+ 3 │ WARN "hello"
+   │ ──┬─  
+   │   ╰─── triggered here
+   │ 
+ 6 │ inner
+   │ ──┬──  
+   │   ╰──── macro called here
+   │
+   ├─[ test.asm:3:5 ]
+   │
+ 3 │     {s}
+   │     ─┬─  
+   │      ╰─── interpolated here
+   │ 
+ 7 │ outer
+   │ ──┬──  
+   │   ╰──── macro called here
+───╯
+[-Wuser] warning: hello
+   ╭─[ s:3:1 ]
+   │
+ 2 │ REPT 1
+   │ ──┬─  
+   │   ╰─── in the 1st iteration of this loop
+ 3 │ WARN "hello"
+   │ ──┬─  
+   │   ╰─── triggered here
+   │
+   ├─[ test.asm:5:5 ]
+   │
+ 5 │     inner
+   │     ──┬──  
+   │       ╰──── macro called here
+   │ 
+ 7 │ outer
+   │ ──┬──  
+   │   ╰──── macro called here
+───╯
+[-Wuser] warning: hello
+   ╭─[ s:3:1 ]
+   │
+ 2 │ REPT 1
+   │ ──┬─  
+   │   ╰─── in the 1st iteration of this loop
+ 3 │ WARN "hello"
+   │ ──┬─  
+   │   ╰─── triggered here
+   │
+   ├─[ test.asm:8:1 ]
+   │
+ 8 │ inner
+   │ ──┬──  
+   │   ╰──── macro called here
+───╯
