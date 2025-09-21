@@ -332,12 +332,28 @@ impl Sections {
                     let offset = offset + usize::from(patch.offset);
                     match eval_res {
                         Ok(Either::Left((value, span))) => match patch.kind {
-                            PatchKind::Byte => ctx.data[offset] = value as u8,
+                            PatchKind::Byte => {
+                                ctx.check_8_bit(
+                                    value,
+                                    &span,
+                                    "instruction operand",
+                                    "expression evaluates to",
+                                    Some("you can use the `low()` function to truncate an expression"),
+                                );
+                                ctx.data[offset] = value as u8;
+                            }
                             PatchKind::Word => {
-                                ctx.data[offset..].copy_from_slice(&(value as i16).to_le_bytes())
+                                ctx.check_16_bit(
+                                    value,
+                                    &span,
+                                    "instruction operand",
+                                    "expression evaluates to",
+                                    None,
+                                );
+                                ctx.data[offset..].copy_from_slice(&(value as i16).to_le_bytes());
                             }
                             PatchKind::Long => {
-                                ctx.data[offset..].copy_from_slice(&value.to_le_bytes())
+                                ctx.data[offset..].copy_from_slice(&value.to_le_bytes());
                             }
                             // To write the byte, we'd have to know PC's value as well, and we can't reborrow the sections right now.
                             // Thus, defer this to later.

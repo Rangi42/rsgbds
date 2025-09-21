@@ -1,5 +1,19 @@
-warning: Invalid warning flag parameter "truncation=99"; capping at maximum 2
-warning: Expression must be 8-bit; use `LOW()` to force 8-bit [-Wtruncation]
-    at invalid-param.asm(2)
-warning: Expression must be 8-bit; use `LOW()` to force 8-bit [-Wtruncation]
-    at invalid-param.asm(3)
+warning: 99 is too large a level for `-Wtruncation`; capping at the maximum of 2
+[-Wtruncation=1] warning: this instruction operand is not 8-bit
+   ╭─[ test.asm:2:7 ]
+   │
+ 2 │ ld a, 256
+   │       ─┬─  
+   │        ╰─── this expression evaluates to 256, which is not between -256 and 255
+   │ 
+   │ Help: you can use the `low()` function to truncate an expression
+───╯
+[-Wtruncation=2] warning: this instruction operand doesn't seem to be 8-bit
+   ╭─[ test.asm:3:7 ]
+   │
+ 3 │ ld a, -129
+   │       ──┬─  
+   │         ╰─── this expression evaluates to -129, which is not between -128 and 255
+   │ 
+   │ Help: you can use the `low()` function to truncate an expression
+───╯
