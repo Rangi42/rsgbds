@@ -142,15 +142,27 @@ impl<D: std::fmt::Display> std::fmt::Debug for BinDiff<D> {
         let mut expected = self.expected.iter();
         let mut actual = self.actual.iter();
         while !expected.as_slice().is_empty() || !actual.as_slice().is_empty() {
-            for _ in 0..NB_BYTES_PER_LINE {
+            let matching: [_; NB_BYTES_PER_LINE] =
+                std::array::from_fn(|i| expected.as_slice().get(i) == actual.as_slice().get(i));
+            for matches in matching {
                 match actual.next() {
-                    Some(&byte) => write!(f, "{byte:02x} ")?,
+                    Some(&byte) => {
+                        if matches {
+                            write!(f, "{byte:02x} ")?;
+                        } else {
+                            write!(f, "{} ", palette.actual(format_args!("{byte:02x}")))?;
+                        }
+                    }
                     None => write!(f, "   ")?,
                 }
             }
             write!(f, "|")?;
-            for &byte in expected.by_ref().take(NB_BYTES_PER_LINE) {
-                write!(f, " {byte:02x}")?;
+            for (&byte, matches) in expected.by_ref().take(NB_BYTES_PER_LINE).zip(matching) {
+                if matches {
+                    write!(f, " {byte:02x}")?;
+                } else {
+                    write!(f, " {}", palette.expected(format_args!("{byte:02x}")))?;
+                }
             }
             writeln!(f)?;
         }
