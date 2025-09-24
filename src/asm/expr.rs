@@ -461,7 +461,7 @@ impl Expr {
                 &OpKind::BitCheck(or_mask) => {
                     let value = eval_stack.pop().unwrap();
                     match value {
-                        Ok((number @ 0..=7, span)) => Ok((number | i32::from(or_mask), span)),
+                        Ok((number @ 0..=7, span)) => Ok((number << 3 | i32::from(or_mask), span)),
                         Ok((number, span)) => Err(Error {
                             span,
                             kind: ErrKind::BitRange(number),
