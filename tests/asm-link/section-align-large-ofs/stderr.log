@@ -1,3 +1,7 @@
-error: The absolute alignment offset (99) must be less than alignment size (4)
-    at section-align-large-ofs.asm(1)
-Assembly aborted with 1 error!
+[-Walign-ofs] warning: alignment offset is larger than alignment size
+   ╭─[ test.asm:1:32 ]
+   │
+ 1 │ section "test", rom0, align[2, 99]
+   │                                ─┬  
+   │                                 ╰── requested an alignment to 4 bytes and an offset of 99 bytes
+───╯
