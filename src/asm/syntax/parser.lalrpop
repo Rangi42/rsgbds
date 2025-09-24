@@ -121,6 +121,10 @@ ForParams: (Option<Expr>, Expr, Option<Expr>) = {
 Directive: () = {
 	// `charmap.rs`
 	"charmap" <what:StringExpr> "," <mapping:NonEmptyCommaList<ConstExpr>> => ctx.charmap_entry(what, mapping),
+	"charmap" <span_idx:@L> <what:"character literal"> "," <mapping:NonEmptyCommaList<ConstExpr>> => {
+		let span = ctx.nth_span(span_idx);
+		ctx.charmap_entry((what, span), mapping)
+	},
 	<span_idx:@L> "newcharmap" <name:"identifier"> <src:("," <"identifier">)?> => ctx.create_charmap(name, src, span_idx),
 	"setcharmap" <span_idx:@L> <name:"identifier"> => ctx.switch_to_charmap(name, span_idx),
 	<span_idx:@L> "pushc" => ctx.push_charmap(),
