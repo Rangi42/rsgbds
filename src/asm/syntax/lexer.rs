@@ -764,11 +764,7 @@ impl Lexer {
                                 return Some(Err(SymbolError::Deleted(name, span).into()))
                             }
                             Some(sym) => match sym.get_number(macro_args.as_deref(), sections) {
-                                None => {
-                                    return Some(Err(
-                                        SymbolError::NotNumeric(sym.kind_name()).into()
-                                    ))
-                                }
+                                None => return Some(Err(SymbolError::NotNumeric(name).into())),
                                 Some(Err(err)) => return Some(Err(err.into())),
                                 Some(Ok(None)) => {
                                     return Some(Err(SymbolError::NotConst(name).into()))
