@@ -1,3 +1,20 @@
-error: Invalid character '2' after line continuation
-    at blue-paint-limits.asm::nth(40) <- blue-paint-limits.asm(43)
-Assembly aborted with 1 error!
+error: unexpected character after line continuation
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ \2
+    │ ┬  
+    │ ╰── there can only be whitespace between this backslash and the end of the line
+    │
+    ├─[ test.asm:40:11 ]
+    │
+ 40 │   println \1
+    │           ─┬  
+    │            ╰── expanded here
+    │ 
+ 43 │ nth \\2, lol
+    │ ─┬─  
+    │  ╰─── macro called here
+    │ 
+    │ Help: characters inside of interpolations and macro args cannot start one themselves
+────╯
+1 error generated.
