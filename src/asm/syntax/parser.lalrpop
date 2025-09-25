@@ -15,7 +15,6 @@ use either::Either;
 
 use crate::{
 	common::section::MemRegion,
-	diagnostics::{self, warning},
 	expr::{BinOp, Expr, UnOp},
 	instructions::{Condition, Instruction, Reg16Arith, Reg16Mem, Reg16Stack, Reg8},
 	macro_args::MacroArgs,
@@ -82,19 +81,8 @@ MacroCall: () = <span_idx:@L> <name:"identifier"> <args:MacroArgs?> => {
 	ctx.call_macro(name, span_idx, args.unwrap_or_else(MacroArgs::new));
 };
 MacroArgs: MacroArgs = {
-	<MacroArg> => { let args = MacroArgs::new(); args.push_arg(<>) },
-	<args:MacroArgs> <arg:MacroArg> => args.push_arg(arg)
-};
-MacroArg: CompactString = @L "string" => {
-	let (span_idx, arg) = (<>);
-    if arg.is_empty() {
-		let span = &ctx.line_spans[span_idx];
-        ctx.warn(warning!("empty-macro-arg"), &span, |warning| {
-            warning.set_message("empty macro argument");
-            warning.add_label(diagnostics::warning_label(&span).with_message("here"));
-        });
-    }
-    arg
+	@L "string" => { let args = MacroArgs::new(); ctx.push_macro_arg(args, <>) },
+	MacroArgs @L "string" => ctx.push_macro_arg(<>)
 };
 
 // All of these directives make calls to the lexer to process their “bodies”.

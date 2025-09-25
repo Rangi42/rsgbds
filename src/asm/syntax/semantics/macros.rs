@@ -1,8 +1,45 @@
-use crate::{diagnostics, expr::Expr};
+use compact_str::CompactString;
+
+use crate::{
+    diagnostics::{self, warning},
+    expr::Expr,
+    macro_args::MacroArgs,
+    sources::{FileNode, NormalSpan, Span, SpanKind},
+};
 
 use super::parse_ctx;
 
 impl parse_ctx!() {
+    pub fn push_macro_arg(
+        &self,
+        args: MacroArgs,
+        span_idx: usize,
+        arg: CompactString,
+    ) -> MacroArgs {
+        if arg.is_empty() {
+            let span = &self.line_spans[span_idx];
+            // Do not report this if it originates from combined macro args, as an empty macro arg there
+            // must stem from one passed to this macro, which must already have generated a warning.
+            if !matches!(
+                span,
+                Span::Normal(NormalSpan {
+                    node: FileNode {
+                        kind: SpanKind::CombinedMacroArgs,
+                        ..
+                    },
+                    ..
+                })
+            ) {
+                self.warn(warning!("empty-macro-arg"), span, |warning| {
+                    warning.set_message("empty macro argument");
+                    warning.add_label(diagnostics::warning_label(span).with_message("here"));
+                });
+            }
+        }
+
+        args.push_arg(arg)
+    }
+
     pub fn shift_macro_args(&mut self, amount: Option<Expr>, span_idx: usize) {
         let span = &self.line_spans[span_idx];
 
