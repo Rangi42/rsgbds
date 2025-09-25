@@ -1,8 +1,32 @@
-warning: done 5 [-Wuser]
-    at break.asm(9)
-warning: OK [-Wuser]
-    at break.asm(28)
-error: `BREAK` can only be used inside a loop (`REPT`/`FOR` block)
-    at break.asm(29)
-FATAL: Ended block with 1 unterminated conditional (`IF`/`ELIF`/`ELSE` block)
-    at break.asm::REPT~1(34) <- break.asm(30)
+[-Wuser] warning: done 5
+   ╭─[ test.asm:9:1 ]
+   │
+ 9 │ WARN "done {d:V}"
+   │ ──┬─  
+   │   ╰─── triggered here
+───╯
+[-Wuser] warning: OK
+    ╭─[ test.asm:28:1 ]
+    │
+ 28 │ warn "OK"
+    │ ──┬─  
+    │   ╰─── triggered here
+────╯
+error: `break` used outside of a loop
+    ╭─[ test.asm:29:1 ]
+    │
+ 29 │ break ; not in a rept/for
+    │ ──┬──  
+    │   ╰──── this is not directly inside of a loop
+────╯
+error: unterminated conditional block
+    ╭─[ test.asm:31:3 ]
+    │
+ 30 │ rept 1
+    │ ──┬─  
+    │   ╰─── in the 1st iteration of this loop
+ 31 │   if 1
+    │   ─┬  
+    │    ╰── this `if` is missing a corresponding `endc`
+────╯
+2 errors generated.

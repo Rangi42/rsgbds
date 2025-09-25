@@ -335,7 +335,7 @@ impl parse_ctx!() {
     pub fn break_loop(&mut self, span_idx: usize) {
         let span = self.nth_span(span_idx);
 
-        match self.lexer.break_loop() {
+        match self.lexer.break_loop(self.nb_errors_left,self.options) {
             Ok(()) => self.unique_id.exit_unique_ctx(),
 
             Err(is_some_parent_a_loop) => self.error(&span, |error| {

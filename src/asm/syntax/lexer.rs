@@ -133,29 +133,50 @@ impl Lexer {
         self.push_context(contents, loop_info, nb_errors_left, options)
     }
 
-    pub fn break_loop(&mut self) -> Result<(), bool> {
+    pub fn break_loop(
+        &mut self,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) -> Result<(), bool> {
         let (i, context) = self
             .contexts
             .iter_mut()
             .enumerate()
-            .rev()
-            .find(|(_i, ctx)| !ctx.span.node.kind.ends_implicitly())
+            .rfind(|(_i, ctx)| !ctx.span.node.kind.ends_implicitly())
             .unwrap();
 
-        if matches!(
-            context,
-            Context {
-                span: NormalSpan {
-                    node: FileNode {
-                        kind: SpanKind::Loop(..),
-                        ..
-                    },
-                    ..
-                },
-                ..
-            }
-        ) {
-            self.cond_stack.truncate(context.cond_stack_depth);
+        if matches!(context.span.node.kind, SpanKind::Loop(..)) {
+            let expected_cond_depth = context.cond_stack_depth;
+            let mut span = context.new_span(); // Dummy.
+
+            // We are intentionally stopping at the end of the buffer.
+            let _ =
+                Self::skimming_lines(context, &mut span, "", |trimmed_line, _ofs_of_line, ctx| {
+                    if Self::starts_with_keyword(trimmed_line, "endc") {
+                        let span = Span::Normal(ctx.new_span()); // TODO
+                        crate::cond::exit_conditional(
+                            &mut self.cond_stack,
+                            expected_cond_depth,
+                            &span,
+                            nb_errors_left,
+                            options,
+                        );
+                    } else if Self::starts_with_keyword(trimmed_line, "if") {
+                        let opening_span = Span::Normal(ctx.new_span()); // TODO
+                        self.cond_stack.push(Condition {
+                            opening_span,
+                            entered_block: false,
+                            else_span: None,
+                        });
+                    }
+                    None
+                });
+            Self::report_unterminated_conditionals(
+                &mut self.cond_stack,
+                expected_cond_depth,
+                nb_errors_left,
+                options,
+            );
             self.contexts.truncate(i);
             Ok(())
         } else {
@@ -210,6 +231,27 @@ impl Context {
     fn remaining_text(&self) -> &str {
         &self.span.node.src.contents.text()[self.cur_byte..self.span.bytes.end]
     }
+    fn with_raw_text<F: FnOnce(&Context, &str) -> usize>(
+        &mut self,
+        span: &mut NormalSpan,
+        callback: F,
+    ) {
+        debug_assert!(
+            span.bytes.is_empty(),
+            "Do not consume a char before calling `with_(active_)context_raw`: it may read from a different buffer!"
+        );
+        let text = self.remaining_text();
+
+        let nb_bytes_consumed = callback(self, text);
+        debug_assert!(
+            nb_bytes_consumed <= text.len(),
+            "Consumed {nb_bytes_consumed} bytes out of a {}-byte string!?",
+            text.len()
+        );
+
+        *span = self.new_span_len(0, nb_bytes_consumed);
+        self.cur_byte += nb_bytes_consumed;
+    }
 
     fn new_span(&self) -> NormalSpan {
         self.span.sub_span(self.cur_byte..self.cur_byte)
@@ -226,9 +268,11 @@ impl Context {
 }
 
 impl Lexer {
+    /// Returns the topmost character from which characters should be read.
+    /// If this returns an empty context, then it should be popped with [`pop_context`][Self::pop_context].
     fn active_context(&mut self) -> Option<&mut Context> {
         // Any contexts that we are at the end of are only kept to prevent some infinite expansion cases,
-        // but they should be ignored..
+        // but they should be ignored.
         self.contexts
             .iter_mut()
             .rev()
@@ -352,7 +396,12 @@ impl Lexer {
 
         debug_assert!(matches!(ctx.span.node.kind, SpanKind::Loop(..)));
 
-        Lexer::report_unterminated_conditionals(&mut self.cond_stack, ctx, nb_errors_left, options);
+        Lexer::report_unterminated_conditionals(
+            &mut self.cond_stack,
+            ctx.cond_stack_depth,
+            nb_errors_left,
+            options,
+        );
 
         ctx.cur_byte = ctx.span.bytes.start;
         ctx.ofs_scanned_for_expansion = ctx.span.bytes.start;
@@ -377,23 +426,28 @@ impl Lexer {
             );
         };
 
-        Self::report_unterminated_conditionals(&mut self.cond_stack, &ctx, nb_errors_left, options);
+        Self::report_unterminated_conditionals(
+            &mut self.cond_stack,
+            ctx.cond_stack_depth,
+            nb_errors_left,
+            options,
+        );
 
         !self.contexts.is_empty()
     }
 
     fn report_unterminated_conditionals(
         cond_stack: &mut Vec<Condition>,
-        ctx: &Context,
+        expected_depth: usize,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
         debug_assert!(
-            cond_stack.len() >= ctx.cond_stack_depth,
+            cond_stack.len() >= expected_depth,
             "Fewer conditionals active than when the context was created!?",
         );
 
-        while cond_stack.len() > ctx.cond_stack_depth {
+        while cond_stack.len() > expected_depth {
             let condition = cond_stack.pop().unwrap();
             diagnostics::error(
                 &condition.opening_span,
@@ -2307,7 +2361,11 @@ impl Lexer {
     ) -> Option<TokenPayload> {
         let mut string = CompactString::default();
         let depth = self.contexts.len();
-        self.with_active_context_raw(span, |ctx, text| {
+
+        let ctx = self
+            .active_context()
+            .expect("No active context to read string from");
+        ctx.with_raw_text(span, |ctx, text| {
             fn is_quote(&(_, ch): &(usize, char)) -> bool {
                 ch == '"'
             }
@@ -2340,7 +2398,11 @@ impl Lexer {
     ) -> TokenPayload {
         let mut string = CompactString::default();
         let depth = self.contexts.len();
-        self.with_active_context_raw(span, |ctx, text| {
+
+        let ctx = self
+            .active_context()
+            .expect("No active context to read char from");
+        ctx.with_raw_text(span, |ctx, text| {
             let mut chars = text.char_indices().peekable();
             let opt = chars.next();
             debug_assert_eq!(opt, Some((0, '\'')));
@@ -2645,18 +2707,18 @@ impl Lexer {
             options,
         };
 
-        let mut span = self
+        let depth = self.contexts.len();
+        let ctx = self
             .active_context()
-            .expect("Cannot lex a raw string without a context active")
-            .new_span();
+            .expect("Cannot lex a raw string without a context active");
+        let mut span = ctx.new_span();
         let mut string = CompactString::default();
         let mut last_char = None;
 
-        let depth = self.contexts.len();
         let mut starting_whitespace_len = 0;
         let mut end_offset = usize::MAX; // Dummy value, it will always be written to in the closure.
         let mut extra_expanded = None;
-        self.with_active_context_raw(&mut span, |ctx, text| {
+        ctx.with_raw_text(&mut span, |ctx, text| {
             let mut chars = text.char_indices().peekable();
 
             let mut parens_depth = 0usize;
@@ -2933,20 +2995,14 @@ impl Lexer {
 }
 
 impl Lexer {
-    pub fn capture_until_keyword(
-        &mut self,
-        end_keyword: &str,
-        nesting_keywords: &[&str],
-        kind: &'static str,
-    ) -> (NormalSpan, Result<(), CaptureBlockErr>) {
-        let mut span = self
-            .active_context()
-            .expect("Cannot capture a block without a context active")
-            .new_span();
-
-        let mut capture_len = 0;
+    fn skimming_lines<F: FnMut(&str, usize, &Context) -> Option<usize>>(
+        ctx: &mut Context,
+        span: &mut NormalSpan,
+        name: &'static str,
+        mut callback: F,
+    ) -> Result<(), CaptureBlockErr> {
         let mut res = Ok(());
-        self.with_active_context_raw(&mut span, |ctx, text| {
+        ctx.with_raw_text(span, |ctx, text| {
             debug_assert!(
                 matches!(
                     ctx.span.node.src.contents.text()[ctx.cur_byte - 1..ctx.cur_byte]
@@ -2957,70 +3013,95 @@ impl Lexer {
                 "Block capture not started at beginning of line",
             );
 
-            let mut capture = text;
-            let mut nesting_depth = 0usize;
+            let mut block = text;
             loop {
-                let (line, remainder) = match capture.split_once(is_newline) {
+                let (line, remainder) = match block.split_once(is_newline) {
                     Some((line, remainder)) => (line, Some(remainder)),
-                    None => (capture, None),
+                    None => (block, None),
                 };
+                let trimmed_line = line.trim_start_matches(is_whitespace);
 
-                // Capture everything before the start of this line.
                 // SAFETY: `line` is derived from `text` via offsetting.
-                capture_len = unsafe { line.as_ptr().offset_from(text.as_ptr()) } as usize;
-                debug_assert!(capture_len as isize >= 0); // `line` comes after `text`.
+                let ofs_of_line = unsafe { line.as_ptr().offset_from(text.as_ptr()) } as usize;
+                debug_assert!(ofs_of_line as isize >= 0); // `line` comes after `text`.
 
-                let trimmed = line.trim_start_matches(is_whitespace);
-                let starts_with_keyword = |keyword: &str| {
-                    // The line begins with a word the size of the keyword...
-                    trimmed.get(..keyword.len()).is_some_and(|first_word| {
-                        // ...which matches the keyword...
-                        unicase::eq_ascii(first_word, keyword)
-                            // ...and the keyword doesn't happen to just be a prefix.
-                            && !matches!(
-                                trimmed[keyword.len()..].chars().next(),
-                                Some(chars!(ident))
-                            )
-                    })
-                };
-                let nb_trimmed = line.len() - trimmed.len();
-                if starts_with_keyword(end_keyword) {
-                    // Found the ending keyword!
-                    match nesting_depth.checked_sub(1) {
-                        Some(new_depth) => nesting_depth = new_depth,
-                        None => break capture_len + nb_trimmed + end_keyword.len(),
-                    }
-                } else {
-                    for keyword in nesting_keywords {
-                        if starts_with_keyword(keyword) {
-                            nesting_depth += 1;
-                            break; // As an optimisation.
-                        }
-                    }
+                let nb_trimmed = line.len() - trimmed_line.len();
+                if let Some(offset) = callback(trimmed_line, ofs_of_line, ctx) {
+                    break ofs_of_line + nb_trimmed + offset;
                 }
 
                 // Try again with the next line.
                 let Some(remainder) = remainder else {
-                    res = Err(CaptureBlockErr::Unterminated { name: kind });
-                    capture_len = text.len();
+                    res = Err(CaptureBlockErr::Unterminated { name });
                     break text.len();
                 };
-                capture = remainder;
+                block = remainder;
             }
         });
-        // Don't capture the closing keyword.
-        span.bytes.end = span.bytes.start + capture_len;
+        res
+    }
+    fn starts_with_keyword(string: &str, keyword: &str) -> bool {
+        // The line begins with a word the size of the keyword...
+        string.get(..keyword.len()).is_some_and(|first_word| {
+            // ...which matches the keyword...
+            unicase::eq_ascii(first_word, keyword)
+            // ...and the keyword doesn't happen to just be a prefix.
+            && !matches!(
+                string[keyword.len()..].chars().next(),
+                Some(chars!(ident))
+            )
+        })
+    }
+
+    pub fn capture_until_keyword(
+        &mut self,
+        end_keyword: &str,
+        nesting_keywords: &[&str],
+        kind: &'static str,
+    ) -> (NormalSpan, Result<(), CaptureBlockErr>) {
+        let ctx = self
+            .active_context()
+            .expect("Cannot capture a block without a context active");
+        let mut span = ctx.new_span();
+
+        let mut capture_len = 0;
+        let mut nesting_depth = 0usize;
+        let res = Self::skimming_lines(ctx, &mut span, kind, |trimmed_line, ofs_of_line, _ctx| {
+            // Capture everything before the start of this line.
+            capture_len = ofs_of_line;
+
+            if Self::starts_with_keyword(trimmed_line, end_keyword) {
+                // Found the ending keyword!
+                match nesting_depth.checked_sub(1) {
+                    Some(new_depth) => nesting_depth = new_depth,
+                    None => return Some(end_keyword.len()),
+                }
+            } else {
+                for keyword in nesting_keywords {
+                    if Self::starts_with_keyword(trimmed_line, keyword) {
+                        nesting_depth += 1;
+                        break; // As an optimisation.
+                    }
+                }
+            }
+            None
+        });
+
+        if res.is_ok() {
+            // Don't capture the closing keyword, if one was found.
+            span.bytes.end = span.bytes.start + capture_len;
+        }
 
         (span, res)
     }
 
     pub fn skip_to_eol(&mut self) {
-        let mut span = self
+        let ctx = self
             .active_context()
-            .expect("Cannot skip to EOL without a context active")
-            .new_span();
+            .expect("Cannot skip to EOL without a context active");
+        let mut span = ctx.new_span();
 
-        self.with_active_context_raw(&mut span, |_ctx, text| {
+        ctx.with_raw_text(&mut span, |_ctx, text| {
             match text.char_indices().find(|(_ofs, ch)| is_newline(*ch)) {
                 Some((ofs, _ch)) => ofs,
                 None => text.len(),
@@ -3029,77 +3110,34 @@ impl Lexer {
     }
 
     pub fn skip_conditional_block(&mut self) -> Result<(), CaptureBlockErr> {
-        let mut span = self
+        let ctx = self
             .active_context()
-            .expect("Cannot skip a block without a context active")
-            .new_span();
+            .expect("Cannot skip a block without a context active");
+        let mut span = ctx.new_span();
 
-        let mut capture_len = 0;
-        let mut res = Ok(());
-        self.with_active_context_raw(&mut span, |ctx, text| {
-            debug_assert!(
-                matches!(
-                    ctx.span.node.src.contents.text()[ctx.cur_byte - 1..ctx.cur_byte]
-                        .chars()
-                        .next(),
-                    Some(chars!(newline))
-                ),
-                "Conditional block not started at beginning of line",
-            );
-
-            const END_KEYWORD: &str = "endc";
-            const NESTING_KEYWORD: &str = "if";
-            let mut block = text;
-            let mut nesting_depth = 0usize;
-            loop {
-                let (line, remainder) = match block.split_once(is_newline) {
-                    Some((line, remainder)) => (line, Some(remainder)),
-                    None => (block, None),
-                };
-
-                let trimmed = line.trim_start_matches(is_whitespace);
-                // SAFETY: `trimmed` is derived from `text`.
-                let block_len = unsafe { trimmed.as_ptr().offset_from(text.as_ptr()) } as usize;
-
-                let starts_with_keyword = |keyword: &str| {
-                    // The line begins with a word the size of the keyword...
-                    trimmed.get(..keyword.len()).is_some_and(|first_word| {
-                        // ...which matches the keyword...
-                        unicase::eq_ascii(first_word, keyword)
-                            // ...and the keyword doesn't happen to just be a prefix.
-                            && !matches!(
-                                trimmed[keyword.len()..].chars().next(),
-                                Some(chars!(ident))
-                            )
-                    })
-                };
-                if starts_with_keyword(END_KEYWORD) {
+        let mut nesting_depth = 0usize;
+        Self::skimming_lines(
+            ctx,
+            &mut span,
+            "conditional block",
+            |trimmed_line, _ofs_of_line, _ctx| {
+                if Self::starts_with_keyword(trimmed_line, "endc") {
                     // Found the ending keyword!
                     match nesting_depth.checked_sub(1) {
                         Some(new_depth) => nesting_depth = new_depth,
-                        None => break block_len,
+                        None => return Some(0),
                     }
                 } else if nesting_depth == 0
-                    && (starts_with_keyword("elif") || starts_with_keyword("else"))
+                    && (Self::starts_with_keyword(trimmed_line, "elif")
+                        || Self::starts_with_keyword(trimmed_line, "else"))
                 {
-                    break block_len;
-                } else if starts_with_keyword(NESTING_KEYWORD) {
+                    return Some(0);
+                } else if Self::starts_with_keyword(trimmed_line, "if") {
                     nesting_depth += 1;
                 }
-
-                // Try again with the next line.
-                let Some(remainder) = remainder else {
-                    res = Err(CaptureBlockErr::Unterminated {
-                        name: "conditional block",
-                    });
-                    capture_len = text.len();
-                    break text.len();
-                };
-                block = remainder;
-            }
-        });
-
-        res
+                None
+            },
+        )
     }
 }
 

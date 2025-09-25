@@ -65,7 +65,15 @@ impl parse_ctx!() {
                         .with_message("this `elif` is missing a corresponding `endc`"),
                 );
             });
-            let _ = crate::cond::exit_conditional(&mut self.lexer.cond_stack); // Avoid reporting the error a second time.
+            // Avoid reporting the error a second time.
+            let min_stack_depth = self.lexer.top_context_mut().cond_stack_depth;
+            crate::cond::exit_conditional(
+                &mut self.lexer.cond_stack,
+                min_stack_depth,
+                span,
+                self.nb_errors_left,
+                self.options,
+            );
         } else if let Some(cond) = self.lexer.active_condition_mut() {
             if let Some(else_span) = &cond.else_span {
                 // Can't borrow all of `self`, so we must explicitly borrow the parts of `self`.
@@ -143,12 +151,13 @@ impl parse_ctx!() {
     pub fn process_endc(&mut self, span_idx: usize) {
         let span = &self.line_spans[span_idx];
 
-        if !crate::cond::exit_conditional(&mut self.lexer.cond_stack) {
-            self.error(span, |error| {
-                error.set_message("`endc` found outside of a conditional block");
-                error
-                    .add_label(diagnostics::error_label(span).with_message("no `if` matches this"));
-            });
-        }
+        let min_stack_depth = self.lexer.top_context_mut().cond_stack_depth;
+        crate::cond::exit_conditional(
+            &mut self.lexer.cond_stack,
+            min_stack_depth,
+            span,
+            self.nb_errors_left,
+            self.options,
+        );
     }
 }
