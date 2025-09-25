@@ -141,7 +141,7 @@ impl MacroArgs {
 impl UniqueId {
     pub fn new() -> Self {
         Self {
-            cur_id: Vec::with_capacity(4),
+            cur_id: Vec::with_capacity(4), // TODO(perf): `smallvec`?
             next_id: 0,
         }
     }
