@@ -150,10 +150,13 @@ impl Lexer {
             let mut span = context.new_span(); // Dummy.
 
             // We are intentionally stopping at the end of the buffer.
-            let _ =
-                Self::skimming_lines(context, &mut span, "", |trimmed_line, _ofs_of_line, ctx| {
+            let _ = context.skimming_lines(
+                &mut span,
+                "",
+                |trimmed_line, ofs_of_line, nb_trimmed, ctx| {
                     if Self::starts_with_keyword(trimmed_line, "endc") {
-                        let span = Span::Normal(ctx.new_span()); // TODO
+                        let span =
+                            Span::Normal(ctx.new_span_len(ofs_of_line + nb_trimmed, "endc".len()));
                         crate::cond::exit_conditional(
                             &mut self.cond_stack,
                             expected_cond_depth,
@@ -162,7 +165,8 @@ impl Lexer {
                             options,
                         );
                     } else if Self::starts_with_keyword(trimmed_line, "if") {
-                        let opening_span = Span::Normal(ctx.new_span()); // TODO
+                        let opening_span =
+                            Span::Normal(ctx.new_span_len(ofs_of_line + nb_trimmed, "if".len()));
                         self.cond_stack.push(Condition {
                             opening_span,
                             entered_block: false,
@@ -170,7 +174,8 @@ impl Lexer {
                         });
                     }
                     None
-                });
+                },
+            );
             Self::report_unterminated_conditionals(
                 &mut self.cond_stack,
                 expected_cond_depth,
@@ -251,6 +256,51 @@ impl Context {
 
         *span = self.new_span_len(0, nb_bytes_consumed);
         self.cur_byte += nb_bytes_consumed;
+    }
+    fn skimming_lines<F: FnMut(&str, usize, usize, &Context) -> Option<usize>>(
+        &mut self,
+        span: &mut NormalSpan,
+        name: &'static str,
+        mut callback: F,
+    ) -> Result<(), CaptureBlockErr> {
+        let mut res = Ok(());
+        self.with_raw_text(span, |ctx, text| {
+            debug_assert!(
+                matches!(
+                    ctx.span.node.src.contents.text()[ctx.cur_byte - 1..ctx.cur_byte]
+                        .chars()
+                        .next(),
+                    Some(chars!(newline))
+                ),
+                "Block capture not started at beginning of line",
+            );
+
+            let mut block = text;
+            loop {
+                let (line, remainder) = match block.split_once(is_newline) {
+                    Some((line, remainder)) => (line, Some(remainder)),
+                    None => (block, None),
+                };
+                let trimmed_line = line.trim_start_matches(is_whitespace);
+
+                // SAFETY: `line` is derived from `text` via offsetting.
+                let ofs_of_line = unsafe { line.as_ptr().offset_from(text.as_ptr()) } as usize;
+                debug_assert!(ofs_of_line as isize >= 0); // `line` comes after `text`.
+
+                let nb_trimmed = line.len() - trimmed_line.len();
+                if let Some(offset) = callback(trimmed_line, ofs_of_line, nb_trimmed, ctx) {
+                    break ofs_of_line + nb_trimmed + offset;
+                }
+
+                // Try again with the next line.
+                let Some(remainder) = remainder else {
+                    res = Err(CaptureBlockErr::Unterminated { name });
+                    break text.len();
+                };
+                block = remainder;
+            }
+        });
+        res
     }
 
     fn new_span(&self) -> NormalSpan {
@@ -2989,51 +3039,6 @@ impl Lexer {
 }
 
 impl Lexer {
-    fn skimming_lines<F: FnMut(&str, usize, &Context) -> Option<usize>>(
-        ctx: &mut Context,
-        span: &mut NormalSpan,
-        name: &'static str,
-        mut callback: F,
-    ) -> Result<(), CaptureBlockErr> {
-        let mut res = Ok(());
-        ctx.with_raw_text(span, |ctx, text| {
-            debug_assert!(
-                matches!(
-                    ctx.span.node.src.contents.text()[ctx.cur_byte - 1..ctx.cur_byte]
-                        .chars()
-                        .next(),
-                    Some(chars!(newline))
-                ),
-                "Block capture not started at beginning of line",
-            );
-
-            let mut block = text;
-            loop {
-                let (line, remainder) = match block.split_once(is_newline) {
-                    Some((line, remainder)) => (line, Some(remainder)),
-                    None => (block, None),
-                };
-                let trimmed_line = line.trim_start_matches(is_whitespace);
-
-                // SAFETY: `line` is derived from `text` via offsetting.
-                let ofs_of_line = unsafe { line.as_ptr().offset_from(text.as_ptr()) } as usize;
-                debug_assert!(ofs_of_line as isize >= 0); // `line` comes after `text`.
-
-                let nb_trimmed = line.len() - trimmed_line.len();
-                if let Some(offset) = callback(trimmed_line, ofs_of_line, ctx) {
-                    break ofs_of_line + nb_trimmed + offset;
-                }
-
-                // Try again with the next line.
-                let Some(remainder) = remainder else {
-                    res = Err(CaptureBlockErr::Unterminated { name });
-                    break text.len();
-                };
-                block = remainder;
-            }
-        });
-        res
-    }
     fn starts_with_keyword(string: &str, keyword: &str) -> bool {
         // The line begins with a word the size of the keyword...
         string.get(..keyword.len()).is_some_and(|first_word| {
@@ -3060,26 +3065,30 @@ impl Lexer {
 
         let mut capture_len = 0;
         let mut nesting_depth = 0usize;
-        let res = Self::skimming_lines(ctx, &mut span, kind, |trimmed_line, ofs_of_line, _ctx| {
-            // Capture everything before the start of this line.
-            capture_len = ofs_of_line;
+        let res = ctx.skimming_lines(
+            &mut span,
+            kind,
+            |trimmed_line, ofs_of_line, _nb_trimmed, _ctx| {
+                // Capture everything before the start of this line.
+                capture_len = ofs_of_line;
 
-            if Self::starts_with_keyword(trimmed_line, end_keyword) {
-                // Found the ending keyword!
-                match nesting_depth.checked_sub(1) {
-                    Some(new_depth) => nesting_depth = new_depth,
-                    None => return Some(end_keyword.len()),
-                }
-            } else {
-                for keyword in nesting_keywords {
-                    if Self::starts_with_keyword(trimmed_line, keyword) {
-                        nesting_depth += 1;
-                        break; // As an optimisation.
+                if Self::starts_with_keyword(trimmed_line, end_keyword) {
+                    // Found the ending keyword!
+                    match nesting_depth.checked_sub(1) {
+                        Some(new_depth) => nesting_depth = new_depth,
+                        None => return Some(end_keyword.len()),
+                    }
+                } else {
+                    for keyword in nesting_keywords {
+                        if Self::starts_with_keyword(trimmed_line, keyword) {
+                            nesting_depth += 1;
+                            break; // As an optimisation.
+                        }
                     }
                 }
-            }
-            None
-        });
+                None
+            },
+        );
 
         if res.is_ok() {
             // Don't capture the closing keyword, if one was found.
@@ -3110,11 +3119,10 @@ impl Lexer {
         let mut span = ctx.new_span();
 
         let mut nesting_depth = 0usize;
-        Self::skimming_lines(
-            ctx,
+        ctx.skimming_lines(
             &mut span,
             "conditional block",
-            |trimmed_line, _ofs_of_line, _ctx| {
+            |trimmed_line, _ofs_of_line, _nb_trimmed, _ctx| {
                 if Self::starts_with_keyword(trimmed_line, "endc") {
                     // Found the ending keyword!
                     match nesting_depth.checked_sub(1) {
