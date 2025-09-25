@@ -1,13 +1,69 @@
-error: Bracketed symbol `nonnumeric` is not numeric
-    at bracketed-macro-args.asm::bad(26) <- bracketed-macro-args.asm(33)
-error: Invalid bracketed macro argument "\<0>"
-    at bracketed-macro-args.asm::bad(27) <- bracketed-macro-args.asm(33)
-error: Bracketed symbol `undefined` does not exist
-    at bracketed-macro-args.asm::bad(28) <- bracketed-macro-args.asm(33)
-error: Macro argument `\<2>` not defined
-    at bracketed-macro-args.asm::bad(29) <- bracketed-macro-args.asm(33)
-error: Macro argument `\<2>` not defined
-    at bracketed-macro-args.asm::bad(30) <- bracketed-macro-args.asm(33)
-error: Bracketed symbol `abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz` does not exist
-    at bracketed-macro-args.asm::toolong(36) <- bracketed-macro-args.asm(39)
-Assembly aborted with 6 errors!
+error: `nonnumeric` is not a numeric symbol
+    ╭─[ test.asm:24:24 ]
+    │
+ 24 │     println "nonnumeric", \<nonnumeric>
+    │                           ──────┬──────  
+    │                                 ╰──────── this symbol is invalid
+    │ 
+ 31 │     bad 42
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+error: macro argument #0 doesn't exist
+    ╭─[ test.asm:25:18 ]
+    │
+ 25 │     println "zero", \<zero>
+    │                     ───┬───  
+    │                        ╰───── this reference is invalid
+    │ 
+ 31 │     bad 42
+    │     ─┬─  
+    │      ╰─── macro called here
+    │ 
+    │ Help: macro arguments are 1-indexed: the first macro argument is `\1`
+────╯
+error: the symbol `undefined` doesn't exist
+    ╭─[ test.asm:26:23 ]
+    │
+ 26 │     println "undefined", \<undefined>
+    │                          ──────┬─────  
+    │                                ╰─────── this symbol is invalid
+    │ 
+ 31 │     bad 42
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+error: macro argument #2 doesn't exist
+    ╭─[ test.asm:27:17 ]
+    │
+ 27 │     println "two", \<two>
+    │                    ───┬──  
+    │                       ╰──── 1 macro arguments are available
+    │ 
+ 31 │     bad 42
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+error: macro argument #2 doesn't exist
+    ╭─[ test.asm:28:15 ]
+    │
+ 28 │     println "2", \<2>
+    │                  ──┬─  
+    │                    ╰─── 1 macro arguments are available
+    │ 
+ 31 │     bad 42
+    │     ─┬─  
+    │      ╰─── macro called here
+────╯
+error: the symbol `abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz` doesn't exist
+    ╭─[ test.asm:34:10 ]
+    │
+ 34 │     println \<abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz>
+    │             ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  
+    │                                                                                                                                                ╰───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── this symbol is invalid
+    │ 
+ 37 │     toolong 42
+    │     ───┬───  
+    │        ╰───── macro called here
+────╯
+6 errors generated.
