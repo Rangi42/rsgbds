@@ -809,15 +809,16 @@ impl Lexer {
 
                 match chars.peek() {
                     Some((_ofs, ch @ ('0'..='9' | '-'))) => {
-                        let (mut idx, sign, mut underscore_allowed) = if *ch == '-' {
+                        let (mut idx, sign) = if *ch == '-' {
                             chars.next();
                             let Ok(first_digit) = digit(chars.peek()) else {
                                 return Some(Err(MacroArgError::NoDigitAfterMinus));
                             };
-                            (first_digit, true, false)
+                            (first_digit, true)
                         } else {
-                            (ch.to_digit(10).unwrap() as isize, false, true)
+                            (ch.to_digit(10).unwrap() as isize, false)
                         };
+                        let mut underscore_allowed = true;
                         let mut consecutive_underscores = false;
                         loop {
                             chars.next();
