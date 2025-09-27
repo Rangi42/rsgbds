@@ -280,7 +280,7 @@ impl Expr {
             let res = match &op.kind {
                 &OpKind::Number(value) => Ok((value, op.span.clone())),
                 &OpKind::Symbol(name) => match symbols.find(&name) {
-                    None => Err(Error {
+                    None | Some(SymbolData::ExportPlaceholder(..)) => Err(Error {
                         span: op.span.clone(),
                         kind: ErrKind::SymNotFound(name),
                     }),
@@ -515,11 +515,11 @@ impl Expr {
                                 kind: match &op.kind {
                                     // Eagerly evaluate symbols that can be.
                                     OpKind::Symbol(name) => match symbols.find(name) {
-                                        // TODO: we might want to create a `Ref` here;
-                                        // but we'd need to also ensure it doesn't get deleted, even after it gets replaced...
-                                        None | Some(SymbolData::Deleted(..)) => {
-                                            OpKind::Symbol(*name)
-                                        }
+                                        None
+                                        | Some(
+                                            SymbolData::Deleted(..)
+                                            | SymbolData::ExportPlaceholder(..),
+                                        ) => OpKind::Symbol(*name),
                                         Some(sym) => match sym.get_number(macro_args, sections) {
                                             None => {
                                                 return Err(Error {
