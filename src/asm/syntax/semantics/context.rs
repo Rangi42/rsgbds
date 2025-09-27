@@ -1,6 +1,6 @@
 use std::{cmp::Ordering, rc::Rc};
 
-use compact_str::CompactString;
+use compact_str::{CompactString, ToCompactString};
 
 use crate::{
     diagnostics::{self, warning},
@@ -191,12 +191,16 @@ impl parse_ctx!() {
     pub fn include_file(&mut self, (path, path_span): (CompactString, Span), span_idx: usize) {
         let span = self.nth_span(span_idx);
 
-        match Source::load_file(&path) {
-            Ok(source) => push_file(self, source, Some(Rc::new(span.extract_normal()))),
-            Err(err) => self.error(&path_span, |error| {
-                error.set_message(format!("unable to read the file at \"{path}\""));
-                error.add_label(diagnostics::error_label(&path_span).with_message(err));
-            }),
+        match self.options.search_file(path.as_ref()) {
+            None => self.report_file_not_found_error(&path_span, path),
+            Some(res) => match res
+                .map_err(|(err, err_path)| (err, err_path.display().to_compact_string()))
+                .and_then(|(file, loaded_path)| {
+                    Source::load_file(file, loaded_path.display().to_compact_string())
+                }) {
+                Err((err, err_path)) => self.report_file_read_failure(&path_span, err_path, err),
+                Ok(source) => push_file(self, source, Some(Rc::new(span.extract_normal()))),
+            },
         }
     }
 }

@@ -152,4 +152,31 @@ impl parse_ctx!() {
             ParseError::User { error: () } => false,
         }
     }
+
+    fn report_file_not_found_error(&self, span: &Span, path: impl Display) {
+        self.error(span, |error| {
+            error.set_message(format!("unable to find \"{path}\""));
+            error.add_label(
+                diagnostics::error_label(span).with_message("no such file or directory"),
+            );
+            match self.options.inc_paths.as_slice() {
+                [] => {}
+                [only] => error.add_note(format!(
+                    "unable to find it in \"{}\" either",
+                    only.display(),
+                )),
+                list => error.add_note(format!(
+                    "unable to find it under any of the {} include paths either",
+                    list.len(),
+                )),
+            }
+            // TODO: look for similarly-named files
+        });
+    }
+    fn report_file_read_failure(&self, span: &Span, path: impl Display, err: std::io::Error) {
+        self.error(span, |error| {
+            error.set_message(format!("unable to read \"{path}\""));
+            error.add_label(diagnostics::error_label(span).with_message(err));
+        });
+    }
 }

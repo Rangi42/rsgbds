@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, iter::FusedIterator, ops::Range, path::Path, rc::Rc};
+use std::{cmp::Ordering, fs::File, io::Read, iter::FusedIterator, ops::Range, rc::Rc};
 
 use compact_str::{CompactString, ToCompactString};
 
@@ -48,9 +48,15 @@ pub enum SpanKind {
 }
 
 impl Source {
-    pub fn load_file<P: AsRef<Path>>(path: P) -> std::io::Result<Rc<Self>> {
-        let contents = std::fs::read_to_string(&path)?.to_compact_string().into();
-        let name = path.as_ref().display().to_compact_string();
+    pub fn load_file(
+        mut file: File,
+        name: CompactString,
+    ) -> Result<Rc<Self>, (std::io::Error, CompactString)> {
+        let mut string = String::new();
+        if let Err(err) = file.read_to_string(&mut string) {
+            return Err((err, name));
+        }
+        let contents = string.to_compact_string().into();
         Ok(Rc::new(Self { name, contents }))
     }
 }

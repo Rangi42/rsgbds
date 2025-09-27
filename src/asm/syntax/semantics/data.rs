@@ -1,4 +1,4 @@
-use std::{fmt::Display, fs::File, io::Read};
+use std::{fmt::Display, io::Read, path::Path};
 
 use compact_str::CompactString;
 use either::Either;
@@ -256,14 +256,14 @@ impl parse_ctx!() {
         }
 
         let report_io_err =
-            |err: std::io::Error, span: &Span, eof_msg: &str, eof_label: EofLabel| {
+            |err: std::io::Error, path: &Path, span: &Span, eof_msg: &str, eof_label: EofLabel| {
                 self.error(span, |error| {
                     use std::io::ErrorKind;
                     if err.kind() == ErrorKind::UnexpectedEof {
                         error.set_message(eof_msg);
                         error.add_label(diagnostics::error_label(span).with_message(eof_label));
                     } else {
-                        error.set_message(format!("failed to read \"{path}\""));
+                        error.set_message(format!("unable to read \"{}\"", path.display()));
                         error.add_label(diagnostics::error_label(span).with_message(err));
                     }
                 })
@@ -294,10 +294,14 @@ impl parse_ctx!() {
             }
         }
 
-        let mut file = match File::open(&path) {
-            Ok(file) => file,
-            Err(err) => {
-                report_io_err(err, &path_span, "", EofLabel::None);
+        let Some(res) = self.options.search_file(Path::new(&path)) else {
+            self.report_file_not_found_error(&path_span, &path);
+            return;
+        };
+        let mut file = match res {
+            Ok((file, _loaded_path)) => file,
+            Err((err, err_path)) => {
+                report_io_err(err, &err_path, &path_span, "", EofLabel::None);
                 return;
             }
         };
@@ -319,6 +323,7 @@ impl parse_ctx!() {
                     if let Err(err) = file.read_exact(&mut data) {
                         report_io_err(
                             err,
+                            Path::new(&path),
                             &span,
                             "specified start offset is greater than length of `incbin` file",
                             EofLabel::Start(value as usize),
@@ -348,6 +353,7 @@ impl parse_ctx!() {
         if let Err(err) = res {
             report_io_err(
                 err,
+                Path::new(&path),
                 &path_span,
                 "specified length is greater than end of `incbin` file",
                 EofLabel::Length(start, length.unwrap_or_default()),

@@ -1,4 +1,8 @@
-use std::{cell::Cell, path::PathBuf};
+use std::{
+    cell::Cell,
+    fs::File,
+    path::{Path, PathBuf},
+};
 
 use rustc_hash::FxBuildHasher;
 use sysexits::ExitCode;
@@ -97,7 +101,7 @@ fn main() -> ExitCode {
 
     sections.warn_if_unclosed_load_block(&nb_errors_left, &options);
     sections.check_section_sizes(&nb_errors_left, &options);
-    warn_if_opt_stack_not_empty(&nb_errors_left, &options);
+    options.warn_if_opt_stack_not_empty(&nb_errors_left);
     charmaps.warn_if_stack_not_empty(&nb_errors_left, &options);
     sections.warn_if_stack_not_empty(&nb_errors_left, &options);
     sections.reject_active_union(&Span::TopLevel, &nb_errors_left, &options);
@@ -128,22 +132,42 @@ fn main() -> ExitCode {
     ExitCode::Ok
 }
 
-fn warn_if_opt_stack_not_empty(nb_errors_left: &Cell<usize>, options: &Options) {
-    if !options.runtime_opt_stack.is_empty() {
-        diagnostics::warn(
-            warning!("unmatched-directive"),
-            &sources::Span::TopLevel,
-            |warning| {
-                warning.set_message("`pusho` without corresponding `popo`");
-                if options.runtime_opt_stack.len() != 1 {
-                    warning.set_note(format!(
-                        "{} unclosed `pusho`s",
-                        options.runtime_opt_stack.len()
-                    ));
-                }
-            },
-            nb_errors_left,
-            options,
-        );
+impl Options {
+    fn search_file(
+        &self,
+        path: &Path,
+    ) -> Option<Result<(File, PathBuf), (std::io::Error, PathBuf)>> {
+        let mut loaded_path = path.to_owned();
+        let mut res = File::open(&loaded_path);
+
+        let mut inc_path = self.inc_paths.iter();
+        while matches!(&res, Err(err) if err.kind() == std::io::ErrorKind::NotFound) {
+            loaded_path = inc_path.next()?.join(path);
+            res = File::open(&loaded_path);
+        }
+        Some(match res {
+            Ok(file) => Ok((file, loaded_path)),
+            Err(err) => Err((err, loaded_path)),
+        })
+    }
+
+    fn warn_if_opt_stack_not_empty(&self, nb_errors_left: &Cell<usize>) {
+        if !self.runtime_opt_stack.is_empty() {
+            diagnostics::warn(
+                warning!("unmatched-directive"),
+                &sources::Span::TopLevel,
+                |warning| {
+                    warning.set_message("`pusho` without corresponding `popo`");
+                    if self.runtime_opt_stack.len() != 1 {
+                        warning.set_note(format!(
+                            "{} unclosed `pusho`s",
+                            self.runtime_opt_stack.len()
+                        ));
+                    }
+                },
+                nb_errors_left,
+                self,
+            );
+        }
     }
 }

@@ -1,6 +1,6 @@
-use std::{cell::Cell, path::Path};
+use std::{cell::Cell, fs::File, path::Path};
 
-use compact_str::CompactString;
+use compact_str::{CompactString, ToCompactString};
 
 use crate::{
     charmap::Charmaps,
@@ -27,13 +27,18 @@ pub fn parse_file(
     nb_errors_left: &Cell<usize>,
     options: &mut Options,
 ) {
-    let file = match Source::load_file(path) {
+    let name = path.display().to_compact_string();
+    let res = match File::open(path) {
+        Ok(file) => Source::load_file(file, name),
+        Err(err) => Err((err, name)),
+    };
+    let file = match res {
         Ok(file) => file,
-        Err(err) => {
+        Err((err, loaded_path)) => {
             diagnostics::error(
                 &Span::CommandLine,
                 |error| {
-                    error.set_message(format!("failed to open \"{}\"", path.display()));
+                    error.set_message(format!("failed to open \"{loaded_path}\""));
                     error.add_note(err);
                 },
                 nb_errors_left,
