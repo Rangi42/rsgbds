@@ -19,5 +19,5 @@ NUM
 MUL(2.0, 3.0)
 this
  is, {not} a\n syntax" error
-"unclosed
-"""EOF
+"unclosed"
+"""EOF"""

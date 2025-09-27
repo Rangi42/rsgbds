@@ -1,9 +1,22 @@
-error: Unterminated string
-    at raw-macro-args.asm(26)
-error: Unterminated string
-    at raw-macro-args.asm::printargs::REPT~1(3) <- raw-macro-args.asm::printargs(2) <- raw-macro-args.asm(26)
-error: Unterminated string
-    at raw-macro-args.asm(37)
-error: Unterminated string
-    at raw-macro-args.asm(38)
-Assembly aborted with 4 errors!
+error: unterminated string literal
+    ╭─[ test.asm:26:12 ]
+    │
+ 26 │     printargs "unclosed
+    │               ────┬────  
+    │                   ╰────── no closing quote before the end of the line
+────╯
+error: unterminated string literal
+    ╭─[ test.asm:37:11 ]
+    │
+ 37 │     printlit "unclosed
+    │              ────┬────  
+    │                  ╰────── no closing quote before the end of the line
+────╯
+error: unterminated string literal
+    ╭─[ test.asm:38:11 ]
+    │
+ 38 │     printlit """EOF
+    │              ───┬──  
+    │                 ╰──── no closing quote before the end of input
+────╯
+3 errors generated.
