@@ -1,4 +1,4 @@
-error: expression is not equal to $ff00
+error: base address is not equal to $ff00
    ╭─[ test.asm:8:9 ]
    │
  8 │     ld a, [$ff01 + c]
