@@ -44,7 +44,7 @@ pub struct Cli {
     #[arg(short = 'D', long, value_name = "definition")]
     defines: Vec<String>,
     /// Export all labels, even unreferenced and local ones
-    #[arg(short, long)]
+    #[arg(short = 'E', long)]
     export_all: bool,
     /// The four characters to use for character constants
     #[arg(short, long, value_name = "chars")]
