@@ -45,6 +45,8 @@ pub enum SymbolData {
 
     /// Placeholder left over after purging a symbol, to improve error messages.
     Deleted(Span),
+    /// Placeholder to support exporting a symbol before it's actually defined.
+    ExportPlaceholder(Span),
 }
 
 #[derive(Debug)]
@@ -269,14 +271,17 @@ impl Symbols {
         }
     }
 
-    fn try_define_symbol(
-        symbols: &mut SymMap,
+    fn try_define_symbol<'syms>(
+        symbols: &'syms mut SymMap,
         name: Identifier,
         definition: Span,
         kind: SymbolKind,
-        exported: bool,
+        mut exported: bool,
         redef: bool,
-    ) -> Result<(), (&mut SymbolData, Span)> {
+        identifiers: &Identifiers,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) -> Result<(), (&'syms mut SymbolData, Span)> {
         match symbols.entry(name) {
             Entry::Vacant(entry) => {
                 entry.insert(SymbolData::User {
@@ -291,6 +296,24 @@ impl Symbols {
                 match existing {
                     // If the entry is merely occupied by a placeholder, just override it.
                     SymbolData::Deleted(..) => {
+                        *existing = SymbolData::User {
+                            definition,
+                            kind,
+                            exported,
+                        };
+                        Ok(())
+                    }
+                    SymbolData::ExportPlaceholder(export_span) => {
+                        Self::export_user_symbol(
+                            export_span,
+                            &definition,
+                            &mut exported,
+                            &kind,
+                            name,
+                            identifiers,
+                            nb_errors_left,
+                            options,
+                        );
                         *existing = SymbolData::User {
                             definition,
                             kind,
@@ -335,6 +358,37 @@ impl Symbols {
         }
     }
 
+    fn export_user_symbol(
+        span: &Span,
+        definition: &Span,
+        exported: &mut bool,
+        kind: &SymbolKind,
+        name: Identifier,
+        identifiers: &Identifiers,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        match kind {
+            // TODO: a warning if exporting a symbol twice
+            SymbolKind::Label { .. } | SymbolKind::Numeric { .. } => *exported = true,
+            _ => diagnostics::error(
+                span,
+                |error| {
+                    error.set_message("cannot export non-numeric symbol");
+                    error.add_labels([
+                        diagnostics::error_label(span).with_message(format!(
+                            "cannot export `{}`",
+                            identifiers.resolve(name).unwrap()
+                        )),
+                        diagnostics::error_label(definition)
+                            .with_message(format!("defined here as {}", kind.name())),
+                    ]);
+                },
+                nb_errors_left,
+                options,
+            ),
+        }
+    }
     pub fn export(
         &mut self,
         name: Identifier,
@@ -345,11 +399,12 @@ impl Symbols {
     ) {
         match self.symbols.entry(name) {
             Entry::Vacant(entry) => {
-                diagnostics::error(
+                diagnostics::warn(
+                    warning!("export-undefined"),
                     &span,
-                    |error| {
-                        error.set_message("cannot export undefined symbol");
-                        error.add_label(diagnostics::error_label(&span).with_message(format!(
+                    |warning| {
+                        warning.set_message("exporting a symbol before it's defined");
+                        warning.add_label(diagnostics::warning_label(&span).with_message(format!(
                             "`{}` is not defined at this point",
                             identifiers.resolve(name).unwrap(),
                         )));
@@ -357,44 +412,24 @@ impl Symbols {
                     nb_errors_left,
                     options,
                 );
+                entry.insert(SymbolData::ExportPlaceholder(span));
             }
 
             Entry::Occupied(mut entry) => match entry.get_mut() {
-                SymbolData::Deleted(..) => {
-                    diagnostics::error(
-                        &span,
-                        |error| {
-                            error.set_message("cannot export deleted symbol");
-                            error.add_labels([
-                                diagnostics::error_label(&span).with_message(format!(
-                                    "`{}` is not defined at this point",
-                                    identifiers.resolve(name).unwrap(),
-                                )),
-                                diagnostics::note_label(&span).with_message("it was deleted here"),
-                            ]);
-                        },
-                        nb_errors_left,
-                        options,
-                    );
+                data @ SymbolData::Deleted(..) => {
+                    *data = SymbolData::ExportPlaceholder(span);
                 }
                 SymbolData::User {
                     exported,
-                    kind: SymbolKind::Label { .. } | SymbolKind::Numeric { .. },
-                    ..
-                } => *exported = true,
-                ref sym @ SymbolData::User { ref definition, .. } => diagnostics::error(
+                    kind,
+                    definition,
+                } => Self::export_user_symbol(
                     &span,
-                    |error| {
-                        error.set_message("cannot export non-numeric symbol");
-                        error.add_labels([
-                            diagnostics::error_label(&span).with_message(format!(
-                                "cannot export `{}`",
-                                identifiers.resolve(name).unwrap()
-                            )),
-                            diagnostics::error_label(definition)
-                                .with_message(format!("defined here as {}", sym.kind_name())),
-                        ]);
-                    },
+                    definition,
+                    exported,
+                    kind,
+                    name,
+                    identifiers,
                     nb_errors_left,
                     options,
                 ),
@@ -434,6 +469,9 @@ impl Symbols {
             payload,
             exported,
             redef,
+            identifiers,
+            nb_errors_left,
+            options,
         ) {
             diagnostics::error(
                 &definition,
@@ -727,6 +765,31 @@ impl Symbols {
         }
     }
 
+    pub fn reject_placeholders(
+        &self,
+        identifiers: &Identifiers,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        for (name, sym) in &self.symbols {
+            match sym {
+                SymbolData::ExportPlaceholder(span) => diagnostics::error(
+                    &span,
+                    |error| {
+                        error.set_message("cannot export undefined symbol");
+                        error.add_label(diagnostics::error_label(&span).with_message(format!(
+                            "`{}` is not defined before or after this point",
+                            identifiers.resolve(*name).unwrap(),
+                        )));
+                    },
+                    nb_errors_left,
+                    options,
+                ),
+                _ => {} // OK, not a placeholder.
+            }
+        }
+    }
+
     fn anon_label_ident(identifiers: &mut Identifiers, idx: u32) -> Identifier {
         let name = format_compact!("<anonymous label {idx}>");
         identifiers.get_or_intern(&name)
@@ -812,6 +875,22 @@ impl SymbolKind {
             (_, _) => false,
         }
     }
+
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Numeric { mutable, .. } => {
+                if *mutable {
+                    "variable"
+                } else {
+                    "constant"
+                }
+            }
+            Self::String(_) => "string symbol",
+            Self::Macro(_) => "macro",
+            Self::Label { .. } => "label",
+            Self::Function { .. } => "function",
+        }
+    }
 }
 
 impl SymbolData {
@@ -831,7 +910,7 @@ impl SymbolData {
     ) -> bool {
         match self {
             SymbolData::User { .. } | SymbolData::Builtin(..) => true,
-            SymbolData::Deleted(..) => false,
+            SymbolData::Deleted(..) | SymbolData::ExportPlaceholder(..) => false,
             SymbolData::Pc => active_sym_section.is_some(),
             SymbolData::Narg => macro_args.is_some(),
             SymbolData::Dot | SymbolData::DotDot => scope.is_some(),
@@ -840,23 +919,12 @@ impl SymbolData {
 
     pub fn kind_name(&self) -> &'static str {
         match self {
-            SymbolData::User { kind, .. } | SymbolData::Builtin(kind) => match kind {
-                SymbolKind::Numeric { mutable, .. } => {
-                    if *mutable {
-                        "variable"
-                    } else {
-                        "constant"
-                    }
-                }
-                SymbolKind::String(_) => "string symbol",
-                SymbolKind::Macro(_) => "macro",
-                SymbolKind::Label { .. } => "label",
-                SymbolKind::Function { .. } => "function",
-            },
+            SymbolData::User { kind, .. } | SymbolData::Builtin(kind) => kind.name(),
             SymbolData::Pc => "label",
             SymbolData::Narg => "constant",
             SymbolData::Dot | SymbolData::DotDot => "string symbol",
             SymbolData::Deleted(_) => "deleted",
+            Self::ExportPlaceholder(..) => "undefined",
         }
     }
 
@@ -885,6 +953,7 @@ impl SymbolData {
                 None => Err(SymbolError::DotDotOutsideMacro),
             }),
             Self::Deleted(..) => None,
+            Self::ExportPlaceholder(..) => None,
         }
     }
 
@@ -922,6 +991,7 @@ impl SymbolData {
             Self::Dot => None,
             Self::DotDot => None,
             Self::Deleted(..) => None,
+            Self::ExportPlaceholder(..) => None,
         }
     }
 
@@ -934,21 +1004,22 @@ impl SymbolData {
         sections: &Sections,
     ) -> Option<Result<(usize, usize), SymbolError<'static, 'static>>> {
         match self {
-            SymbolData::User { kind, .. } | SymbolData::Builtin(kind) => match kind {
+            Self::User { kind, .. } | Self::Builtin(kind) => match kind {
                 SymbolKind::Label { section_id, offset } => Some(Ok((*section_id, *offset))),
                 SymbolKind::Numeric { .. } => None,
                 SymbolKind::String(_) => None,
                 SymbolKind::Macro(_) => None,
                 SymbolKind::Function { .. } => None,
             },
-            SymbolData::Pc => match sections.active_section.as_ref() {
+            Self::Pc => match sections.active_section.as_ref() {
                 Some(active) => Some(Ok((active.sym_section.id, active.sym_section.offset))),
                 None => Some(Err(SymbolError::PcOutsideSect("bank"))),
             },
-            SymbolData::Narg => None,
-            SymbolData::Dot => None,
-            SymbolData::DotDot => None,
-            SymbolData::Deleted(_) => None,
+            Self::Narg => None,
+            Self::Dot => None,
+            Self::DotDot => None,
+            Self::Deleted(_) => None,
+            Self::ExportPlaceholder(..) => None,
         }
     }
 }
