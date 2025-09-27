@@ -1,8 +1,8 @@
 error: invalid argument to option 'Q'
-    ╭─[ test.asm:3:5 ]
+    ╭─[ test.asm:3:6 ]
     │
   3 │     OPT Q\1
-    │        ──┬─  
+    │         ─┬─  
     │          ╰─── fixed-point precision must be between 1 and 31, not 0
     │ 
  17 │     test .0 ; error
@@ -10,10 +10,10 @@ error: invalid argument to option 'Q'
     │       ╰─── macro called here
 ────╯
 error: invalid argument to option 'Q'
-    ╭─[ test.asm:3:5 ]
+    ╭─[ test.asm:3:6 ]
     │
   3 │     OPT Q\1
-    │        ──┬─  
+    │         ─┬─  
     │          ╰─── fixed-point precision must be between 1 and 31, not 32
     │ 
  18 │     test 32 ; error

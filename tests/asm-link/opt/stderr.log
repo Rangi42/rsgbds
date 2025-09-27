@@ -1,7 +1,8 @@
 [-Wdiv] warning: division of -2_147_483_648 by -1 yields itself
-    ╭─[ test.asm:12:10 ]
+    ╭─[ test.asm:13:10 ]
     │
- 12 │     println $8000_0000 / -1
+ 13 │     println $8000_0000 / -1
     │             ───────┬───────  
     │                    ╰───────── the sign of this quotient may be surprising
 ────╯
+1 error generated.

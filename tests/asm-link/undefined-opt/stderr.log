@@ -1,8 +1,8 @@
 error: unknown option 'x'
-   ╭─[ test.asm:1:4 ]
+   ╭─[ test.asm:1:5 ]
    │
  1 │ opt x ; there is no opt x
-   │    ─┬  
+   │     ┬  
    │     ╰── this option string is invalid
 ───╯
 1 error generated.

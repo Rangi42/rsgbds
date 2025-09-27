@@ -243,8 +243,15 @@ impl Context {
     ) {
         debug_assert!(
             span.bytes.is_empty(),
-            "Do not consume a char before calling `with_(active_)context_raw`: it may read from a different buffer!"
+            "Do not consume a char before calling `with_active_context_raw/with_raw_text`: it may read from a different buffer!"
         );
+        self.with_raw_text_partial(span, callback)
+    }
+    fn with_raw_text_partial<F: FnOnce(&Context, &str) -> usize>(
+        &mut self,
+        span: &mut NormalSpan,
+        callback: F,
+    ) {
         let text = self.remaining_text();
 
         let nb_bytes_consumed = callback(self, text);
@@ -1237,22 +1244,16 @@ impl Lexer {
         span: &mut NormalSpan,
         callback: F,
     ) {
-        debug_assert!(
-            span.bytes.is_empty(),
-            "Do not consume a char before calling `with_active_context_raw`"
-        );
-        let ctx = self.active_context().unwrap();
-        let text = ctx.remaining_text();
-
-        let nb_bytes_consumed = callback(ctx, text);
-        debug_assert!(
-            nb_bytes_consumed <= text.len(),
-            "Consumed {nb_bytes_consumed} bytes out of a {}-byte string!?",
-            text.len()
-        );
-
-        *span = ctx.new_span_len(0, nb_bytes_consumed);
-        ctx.cur_byte += nb_bytes_consumed;
+        self.active_context().unwrap().with_raw_text(span, callback)
+    }
+    fn with_active_context_raw_partial<F: FnOnce(&Context, &str) -> usize>(
+        &mut self,
+        span: &mut NormalSpan,
+        callback: F,
+    ) {
+        self.active_context()
+            .unwrap()
+            .with_raw_text_partial(span, callback)
     }
 }
 
@@ -2412,10 +2413,7 @@ impl Lexer {
         let mut string = CompactString::default();
         let depth = self.contexts.len();
 
-        let ctx = self
-            .active_context()
-            .expect("No active context to read string from");
-        ctx.with_raw_text(span, |ctx, text| {
+        self.with_active_context_raw(span, |ctx, text| {
             fn is_quote(&(_, ch): &(usize, char)) -> bool {
                 ch == '"'
             }
@@ -2757,28 +2755,24 @@ impl Lexer {
             options,
         };
 
-        let depth = self.contexts.len();
         let ctx = self
             .active_context()
             .expect("Cannot lex a raw string without a context active");
         let mut span = ctx.new_span();
+
+        let mut span_before_whitespace = None;
         let mut string = CompactString::default();
-        let mut last_char = None;
-
-        let mut starting_whitespace_len = 0;
-        let mut end_offset = usize::MAX; // Dummy value, it will always be written to in the closure.
-        let mut extra_expanded = None;
-        ctx.with_raw_text(&mut span, |ctx, text| {
-            let mut chars = text.char_indices().peekable();
-
-            let mut parens_depth = 0usize;
-            end_offset = chars.peek().map_or(text.len(), |(ofs, _ch)| *ofs);
-            while let Some((ofs, ch)) = chars.next() {
-                last_char = Some(ch);
-
-                let was_blank = match ch {
-                    '\'' => {
-                        let _len = Self::read_string_inner(
+        let mut parens_depth = 0usize;
+        let ends_with_comma = loop {
+            match self.peek(&mut params) {
+                Some('\'') => {
+                    let depth = self.contexts.len();
+                    let ctx = self.active_context().unwrap();
+                    let mut string_span = ctx.new_span();
+                    ctx.with_raw_text(&mut string_span, |ctx, text| {
+                        let mut chars = text.char_indices().peekable();
+                        chars.next(); // Opening quote.
+                        Self::read_string_inner(
                             &mut string,
                             false, // Not raw.
                             true,  // Passthrough.
@@ -2788,12 +2782,22 @@ impl Lexer {
                             depth,
                             text,
                             &mut params,
-                        );
-                        last_char = Some('\''); // The terminating single quote.
-                        false
+                        )
+                    });
+                    if Rc::ptr_eq(&string_span.node.src, &span.node.src) {
+                        debug_assert_eq!(span.bytes.end, string_span.bytes.start);
+                        span.bytes.end = string_span.bytes.end;
                     }
-                    '"' => {
-                        let _len = Self::read_string_inner(
+                    span_before_whitespace = None;
+                }
+                Some('"') => {
+                    let depth = self.contexts.len();
+                    let ctx = self.active_context().unwrap();
+                    let mut string_span = ctx.new_span();
+                    ctx.with_raw_text(&mut string_span, |ctx, text| {
+                        let mut chars = text.char_indices().peekable();
+                        chars.next(); // Opening quote.
+                        Self::read_string_inner(
                             &mut string,
                             false, // Not raw.
                             true,  // Passthrough.
@@ -2803,238 +2807,184 @@ impl Lexer {
                             depth,
                             text,
                             &mut params,
-                        );
-                        last_char = Some('"'); // The terminating quote.
-                        false
+                        )
+                    });
+                    if Rc::ptr_eq(&string_span.node.src, &span.node.src) {
+                        debug_assert_eq!(span.bytes.end, string_span.bytes.start);
+                        span.bytes.end = string_span.bytes.end;
                     }
-                    '#' => {
-                        string.push('#');
-                        if chars.next_if(|&(_ofs, ch)| ch == '"').is_some() {
-                            let _len = Self::read_string_inner(
-                                &mut string,
-                                true, // Raw.
-                                true, // Passthrough.
-                                '"',
-                                &mut chars,
-                                ctx,
-                                depth,
-                                text,
-                                &mut params,
-                            );
-                            last_char = Some('"'); // The terminating quote.
+                    span_before_whitespace = None;
+                }
+                Some('#') => {
+                    let depth = self.contexts.len();
+                    let ctx = self.active_context().unwrap();
+                    let mut string_span = ctx.new_span();
+                    ctx.with_raw_text(&mut string_span, |ctx, text| {
+                        let mut chars = text.char_indices().peekable();
+                        chars.next(); // Hash.
+                        if chars.next_if(|(_ofs, ch)| *ch == '"').is_none() {
+                            string.push('#');
+                            return '#'.len_utf8(); // Not a string, just the hash.
                         }
-                        false
-                    }
-
-                    chars!(newline) => return ofs,
-                    ';' => {
-                        Self::read_line_comment(&mut chars);
-                        return chars.peek().map_or(text.len(), |(ofs, _newline_char)| *ofs);
-                    }
-                    '/' => {
-                        if chars.next_if(|&(_ofs, ch)| ch == '*').is_some() {
-                            if let Err(err) = Self::read_block_comment(
-                                &mut chars,
-                                ctx,
-                                params.nb_errors_left,
-                                params.options,
-                            ) {
-                                let span = Span::Normal(ctx.new_span_len(ofs, "/*".len()));
-                                params.error(&span, |error| {
-                                    error.set_message(&err);
-                                    error.add_label(
-                                        diagnostics::error_label(&span)
-                                            .with_message(err.label_msg()),
-                                    )
-                                });
-                            }
-                        } else {
-                            string.push('/');
-                        }
-                        false
-                    }
-
-                    ',' if parens_depth == 0 => return ofs,
-
-                    '(' => {
-                        parens_depth += 1;
-                        string.push('(');
-                        false
-                    }
-                    ')' if parens_depth != 0 => {
-                        parens_depth -= 1;
-                        string.push(')');
-                        false
-                    }
-
-                    '\\' => {
-                        let backup = chars.clone();
-                        if let Some(res) = Self::read_macro_arg(
+                        Self::read_string_inner(
+                            &mut string,
+                            true, // Raw.
+                            true, // Passthrough.
+                            '"',
                             &mut chars,
+                            ctx,
+                            depth,
                             text,
-                            params.identifiers,
-                            params.symbols,
-                            &mut params.macro_args,
-                            params.unique_id,
-                            params.sections,
+                            &mut params,
+                        )
+                    });
+                    if Rc::ptr_eq(&string_span.node.src, &span.node.src) {
+                        debug_assert_eq!(span.bytes.end, string_span.bytes.start);
+                        span.bytes.end = string_span.bytes.end;
+                    }
+                    span_before_whitespace = None;
+                }
+
+                Some(chars!(newline)) | None => break false,
+                Some(';') => {
+                    // Intentionally not consuming the semicolon! We don't want it to be part of `span`.
+                    let ctx = self.active_context().unwrap();
+                    let mut command_span = ctx.new_span();
+                    ctx.with_raw_text(&mut command_span, |_ctx, text| {
+                        let mut chars = text.char_indices().peekable();
+                        Self::read_line_comment(&mut chars);
+                        chars.next().map_or(text.len(), |(ofs, _ch)| ofs)
+                    });
+                    break false;
+                }
+                Some('/') => {
+                    let ctx = self.active_context().unwrap();
+                    let mut comment_span = ctx.new_span();
+                    ctx.with_raw_text(&mut comment_span, |ctx, text| {
+                        let mut chars = text.char_indices().peekable();
+                        chars.next(); // The slash.
+                        let Some((_ofs, '*')) = chars.next() else {
+                            return 0; // Not a block comment.
+                        };
+
+                        if let Err(err) = Self::read_block_comment(
+                            &mut chars,
+                            ctx,
+                            params.nb_errors_left,
+                            params.options,
                         ) {
-                            match res {
-                                Ok((kind, source)) => {
-                                    let contents = source.contents.text();
-                                    // If the expansion contains a comma, we need to terminate the argument there.
-                                    let position =
-                                        contents.char_indices().find(|(_ofs, ch)| *ch == ',');
-                                    if let Some((comma_ofs, _comma)) = position {
-                                        let end_ofs =
-                                            chars.next().map_or(text.len(), |(ofs, _ch)| ofs);
+                            let span = Span::Normal(ctx.new_span_len(0, "/*".len()));
+                            params.error(&span, |error| {
+                                error.set_message(&err);
+                                error.add_label(
+                                    diagnostics::error_label(&span).with_message(err.label_msg()),
+                                );
+                            });
+                        }
+                        chars.next().map_or(text.len(), |(ofs, _ch)| ofs)
+                    });
+                    if comment_span.bytes.is_empty() {
+                        // We didn't read a block comment.
+                        self.consume(&mut span);
+                        string.push('/');
+                        span_before_whitespace = None;
+                    } else if span_before_whitespace.is_none() {
+                        // Trailing block comments are treated as whitespace for span tracking purposes.
+                        span_before_whitespace = Some(span.clone());
+                    }
+                }
 
-                                        if comma_ofs + ','.len_utf8() != contents.len() {
-                                            debug_assert!(comma_ofs < contents.len());
+                Some(',') if parens_depth == 0 => {
+                    let mut dummy_span = span.clone(); // TODO: maybe instead, a version of `consume` that doesn't take a span?
+                    self.consume(&mut dummy_span);
+                    break true;
+                }
 
-                                            extra_expanded = Some(NormalSpan {
-                                                node: FileNode {
-                                                    src: Rc::clone(source),
-                                                    kind,
-                                                    parent: Some(Rc::new(
-                                                        ctx.new_span_ofs(ofs..end_ofs),
-                                                    )),
-                                                },
-                                                bytes: comma_ofs..contents.len(),
-                                            });
-                                            debug_assert!(!extra_expanded
-                                                .as_ref()
-                                                .unwrap()
-                                                .bytes
-                                                .is_empty());
-                                        }
+                Some('(') => {
+                    self.consume(&mut span);
+                    string.push('(');
+                    span_before_whitespace = None;
+                    parens_depth += 1;
+                }
+                Some(')') if parens_depth != 0 => {
+                    self.consume(&mut span);
+                    string.push(')');
+                    span_before_whitespace = None;
+                    parens_depth -= 1;
+                }
 
-                                        string.push_str(&contents[..comma_ofs]); // Push the argument up to the comma.
-
-                                        last_char = Some(',');
-                                        return end_ofs; // Consume the entire expansion.
-                                    }
-
-                                    string.push_str(contents); // Push the entire arg, since it doesn't contain a comma.
-                                }
-                                Err(err) => {
-                                    let span = Span::Normal(ctx.new_span_len(ofs, '\\'.len_utf8()));
-                                    params.error(&span, |error| {
-                                        error.set_message(&err);
-                                        error.add_label(
-                                            diagnostics::error_label(&span)
-                                                .with_message(err.label_msg()),
-                                        );
-                                    });
-                                }
-                            }
+                Some('\\') => {
+                    self.with_active_context_raw_partial(&mut span, |ctx, text| {
+                        let mut chars = text.char_indices().peekable();
+                        chars.next(); // The backslash.
+                        let ch = chars.next();
+                        if let Some((_ofs, escapee @ (',' | '(' | ')'))) = ch {
+                            // This escape is only valid in raw contexts.
+                            string.push(escapee);
+                            2 // The backslash plus the escapee.
                         } else {
-                            chars = backup; // `read_macro_arg` may spuriously consume characters.
-                            let ch = chars.next();
-                            if let Some((_ofs, escapee @ (',' | '(' | ')'))) = ch {
-                                // This escape is only valid in raw contexts.
-                                string.push(escapee);
-                            } else if let Some(value) =
-                                Self::get_char_escape(ch, ofs, ctx, text, &mut chars, &params)
+                            if let Some(value) =
+                                Self::get_char_escape(ch, 0, ctx, text, &mut chars, &params)
                             {
                                 string.push(value);
                             }
+                            chars.next().map_or(text.len(), |(ofs, _ch)| ofs)
                         }
-                        false
-                    }
-                    '{' => {
-                        let res = Self::read_interpolation(
-                            &mut chars,
-                            text,
-                            ctx,
-                            &mut string,
-                            depth,
-                            &mut params,
-                        );
+                    });
+                    span_before_whitespace = None;
+                }
 
-                        // If the expansion contains a comma, we need to terminate the argument there.
-                        let position = string.char_indices().find(|(_ofs, ch)| *ch == ',');
-                        if let Some((comma_ofs, _comma)) = position {
-                            let end_ofs = chars.next().map_or(text.len(), |(ofs, _ch)| ofs);
-
-                            if comma_ofs + ','.len_utf8() != string.len() {
-                                debug_assert!(comma_ofs < string.len());
-
-                                let (kind, name) =
-                                    Self::interpolation_span_kind(res, params.identifiers);
-                                extra_expanded = Some(NormalSpan {
-                                    node: FileNode {
-                                        src: Rc::new(Source {
-                                            name: name.into(),
-                                            contents: string.clone().into(),
-                                        }),
-                                        kind,
-                                        parent: Some(Rc::new(ctx.new_span_ofs(ofs..end_ofs))),
-                                    },
-                                    bytes: comma_ofs..string.len(),
-                                });
-                                debug_assert!(!extra_expanded.as_ref().unwrap().bytes.is_empty());
-                            }
-
-                            string.truncate(comma_ofs);
-
-                            last_char = Some(',');
-                            return end_ofs; // Consume the entire expansion.
+                Some(ch @ chars!(whitespace)) => {
+                    if span.bytes.is_empty() {
+                        // Leading whitespace.
+                        self.consume(&mut span);
+                        span.make_empty();
+                    } else {
+                        if span_before_whitespace.is_none() {
+                            span_before_whitespace = Some(span.clone());
                         }
-
-                        false
-                    }
-
-                    _ => {
+                        self.consume(&mut span);
                         string.push(ch);
-                        matches!(ch, chars!(whitespace))
                     }
-                };
-                if !was_blank {
-                    end_offset = chars.peek().map_or(text.len(), |(ofs, _ch)| *ofs);
+                }
+                Some(ch) => {
+                    self.consume(&mut span);
+                    string.push(ch);
+                    span_before_whitespace = None;
                 }
             }
-            text.len()
-        });
-
-        // If there are remaining chars in an expansion, perform the expansion.
-        if let Some(span) = extra_expanded {
-            // If it fails, we'll miss some macro args. But we can't bubble the error up.
-            let _ = self.push_context(span, LoopInfo::default(), nb_errors_left, options);
-        }
+        };
 
         // Trim right whitespace.
         let trimmed_len = string.trim_end_matches(is_whitespace).len();
         string.truncate(trimmed_len);
-        // Trim left whitespace.
+        // Trim left whitespace. TODO: it can only have been added by expansions, maybe perform the check only there?
         let trimmed = string.trim_start_matches(is_whitespace);
         // SAFETY: `trimmed` is derived from `string`.
         drop(string.drain(..unsafe { trimmed.as_ptr().offset_from(string.as_ptr()) } as usize));
 
-        // Adjust the span to remove the whitespace.
-        span.bytes.end = span.bytes.start + end_offset;
-        span.bytes.start += starting_whitespace_len;
-        debug_assert!(span.bytes.start <= span.bytes.end, "span: {:?}", span.bytes);
+        if let Some(trimmed_span) = span_before_whitespace {
+            // The argument ended with some (literal) whitespace, “rewind” the span to before that.
+            span = trimmed_span;
+        }
 
-        // Returning COMMAs to the parser would mean that two consecutive commas
-        // (i.e. an empty argument) need to return two different tokens (string then comma)
-        // without consuming any chars.
-        // To avoid this, commas in raw mode end the current macro argument,
-        // but are not tokenized themselves.
-        if last_char == Some(',') {
-            let mut dummy_span = span.clone();
-            self.consume(&mut dummy_span);
-            let span = Span::Normal(span);
-            return Some((string, span));
+        // Returning COMMAs to the parser would mean that two consecutive commas (i.e. an empty argument)
+        // need to return two different tokens (string then comma) without consuming any chars.
+        // To avoid this, commas in raw mode end the current macro argument, but are not tokenized themselves.
+        if ends_with_comma {
+            return Some((string, Span::Normal(span)));
         }
 
         // The last argument may end in a trailing comma, newline, or EOF.
         // To allow trailing commas, what would be the last argument is not emitted if empty.
-        // To pass an empty last argument, use a second trailing comma.
+        // (To pass an empty last argument, use a second trailing comma.)
         if !string.is_empty() {
-            return Some((string, Span::Normal(span)));
+            debug_assert!(!span.bytes.is_empty());
+            Some((string, Span::Normal(span)))
+        } else {
+            // The span may not be empty, e.g. if it contained only whitespace.
+            None
         }
-
-        None
     }
 }
 

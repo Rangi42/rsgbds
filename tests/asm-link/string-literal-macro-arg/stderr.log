@@ -13,10 +13,10 @@ error: invalid character escape
     │      ╰── no character to escape
 ────╯
 error: unterminated string literal
-    ╭─[ test.asm:11:4 ]
+    ╭─[ test.asm:11:5 ]
     │
  11 │ mac "\
-    │    ─┬─  
-    │     ╰─── no closing quote before the end of the line
+    │     ─┬  
+    │      ╰── no closing quote before the end of the line
 ────╯
 3 errors generated.

@@ -1,8 +1,8 @@
 warning: 256 is too large a level for `-Wtruncation`; capping at the maximum of 2
-   ╭─[ test.asm:1:4 ]
+   ╭─[ test.asm:1:5 ]
    │
  1 │ opt Wtruncation=256
-   │    ────────┬───────  
+   │     ───────┬───────  
    │            ╰───────── invalid argument
 ───╯
 [-Wtruncation=1] warning: this expression's value is not 8-bit
