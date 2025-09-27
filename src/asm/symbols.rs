@@ -772,20 +772,19 @@ impl Symbols {
         options: &Options,
     ) {
         for (name, sym) in &self.symbols {
-            match sym {
-                SymbolData::ExportPlaceholder(span) => diagnostics::error(
-                    &span,
+            if let SymbolData::ExportPlaceholder(span) = sym {
+                diagnostics::error(
+                    span,
                     |error| {
                         error.set_message("cannot export undefined symbol");
-                        error.add_label(diagnostics::error_label(&span).with_message(format!(
-                            "`{}` is not defined before or after this point",
+                        error.add_label(diagnostics::error_label(span).with_message(format!(
+                            "`{}` is not defined at or after this point",
                             identifiers.resolve(*name).unwrap(),
                         )));
                     },
                     nb_errors_left,
                     options,
-                ),
-                _ => {} // OK, not a placeholder.
+                );
             }
         }
     }
