@@ -1,11 +1,60 @@
-error: Built-in symbol `_RS` cannot be purged
-    at rs-overwrite.asm(1)
-error: `_RS` already defined as built-in
-    at rs-overwrite.asm(4)
-error: `_RS` already defined as built-in
-    at rs-overwrite.asm(10)
-error: `_RS` already defined as built-in non-`EQU`
-    at rs-overwrite.asm(16)
-error: `_RS` already defined as built-in non-`EQUS`
-    at rs-overwrite.asm(19)
-Assembly aborted with 5 errors!
+error: cannot delete built-in symbol `_RS`
+   ╭─[ test.asm:1:7 ]
+   │
+ 1 │ PURGE _RS
+   │       ─┬─  
+   │        ╰─── cannot perform this deletion
+───╯
+error: A symbol called "_RS" already exists
+   ╭─[ <built-in>:1:1 ]
+   │
+ 1 │ 
+   │ │ 
+   │ ╰─ the name is defined here...
+   │
+   ├─[ test.asm:4:9 ]
+   │
+ 4 │ DEF _RS EQU 1
+   │         ─┬─  
+   │          ╰─── ...so it's not available for this definition
+───╯
+error: A symbol called "_RS" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:10:9 ]
+    │
+ 10 │ DEF _RS EQUS "3"
+    │         ──┬─  
+    │           ╰─── ...so it's not available for this definition
+────╯
+error: A symbol called "_RS" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:16:11 ]
+    │
+ 16 │ REDEF _RS EQU 5
+    │           ─┬─  
+    │            ╰─── ...so it's not available for this definition
+────╯
+error: A symbol called "_RS" already exists
+    ╭─[ <built-in>:1:1 ]
+    │
+  1 │ 
+    │ │ 
+    │ ╰─ the name is defined here...
+    │
+    ├─[ test.asm:19:11 ]
+    │
+ 19 │ REDEF _RS EQUS "6"
+    │           ──┬─  
+    │             ╰─── ...so it's not available for this definition
+────╯
+5 errors generated.

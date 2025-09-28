@@ -25,7 +25,7 @@ error: syntax error: unexpected (
     │
  21 │     \1 (\2) == 42  ; if the `if` is not taken, this is not expanded!
     │        ┬  
-    │        ╰── expected "identifier", "local identifier", ":", "+", "-", "adc", "add", ...89 others
+    │        ╰── expected "identifier", "scoped identifier", "local identifier", ":", "+", "-", "adc", ...90 others
     │ 
  31 │     mac2 ; this prints "args:" *and* "forty-two!" since it doesn't create an `elif`
     │     ──┬─  
