@@ -2567,6 +2567,8 @@ impl Lexer {
                 }
                 chars!(newline) => {
                     if !multiline {
+                        // Unterminated string, but that will be reported at expansion time
+                        // (if it is expanded at all).
                         end_ofs = ofs;
                         break;
                     } else if ch == '\r' {
@@ -2651,13 +2653,7 @@ impl Lexer {
                     string.push('}');
                 }
 
-                ch => {
-                    if !passthrough || raw {
-                        string.push(ch)
-                    } else {
-                        push_char_passthrough(string, ch)
-                    }
-                }
+                ch => string.push(ch),
             }
         }
 
