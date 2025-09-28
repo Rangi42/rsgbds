@@ -204,21 +204,14 @@ struct LexerParams<'idents, 'sym, 'mac_args, 'uniq_id, 'sections, 'nb_err, 'opts
 }
 
 macro_rules! chars {
-    (whitespace) => {
-        ' ' | '\t'
-    };
-    (newline) => {
-        '\n' | '\r'
-    };
-    (line_cont) => {
-        chars!(whitespace) | chars!(newline) | ';'
-    };
-    (ident_start) => {
-        'a'..='z' | 'A'..='Z' | '_'
-    };
-    (ident) => {
-        chars!(ident_start) | '0'..='9' | '$' | '@' | '#'
-    }
+    (whitespace) => {' ' | '\t'};
+    (newline) => {'\n' | '\r'};
+    // Characters which, after a backslash, signify that it has to be a line continuation.
+    (line_cont) => {chars!(whitespace) | chars!(newline) | ';'};
+    (ident_start) => {'a'..='z' | 'A'..='Z' | '_'};
+    (ident) => {chars!(ident_start) | '0'..='9' | '$' | '@' | '#'};
+    // Characters that yield themselves when escaped.
+    (self_escape) => {'\\' | '"' | '\'' | '{' | '}'};
 }
 pub fn is_whitespace(ch: char) -> bool {
     matches!(ch, chars!(whitespace))
@@ -2515,20 +2508,23 @@ impl Lexer {
                 } else {
                     dest.reserve(contents.len()); // TODO(perf): is this helping?
                     for ch in contents.chars() {
-                        match ch {
-                            '\n' => dest.push_str("\\n"),
-                            '\r' => dest.push_str("\\r"),
-                            '\t' => dest.push_str("\\t"),
-                            '\0' => dest.push_str("\\0"),
-                            '\\' | '"' | '\'' | '{' | '}' => {
-                                dest.push('\\');
-                                dest.push(ch);
-                            }
-                            _ => dest.push(ch),
-                        }
+                        push_char_passthrough(dest, ch);
                     }
                 }
             };
+            fn push_char_passthrough(string: &mut CompactString, ch: char) {
+                match ch {
+                    '\n' => string.push_str("\\n"),
+                    '\r' => string.push_str("\\r"),
+                    '\t' => string.push_str("\\t"),
+                    '\0' => string.push_str("\\0"),
+                    chars!(self_escape) => {
+                        string.push('\\');
+                        string.push(ch);
+                    }
+                    _ => string.push(ch),
+                }
+            }
 
             match ch {
                 ch if ch == delim_char => {
@@ -2641,7 +2637,13 @@ impl Lexer {
                     string.push('}');
                 }
 
-                ch => string.push(ch),
+                ch => {
+                    if !passthrough {
+                        string.push(ch)
+                    } else {
+                        push_char_passthrough(string, ch)
+                    }
+                }
             }
         }
 
@@ -2680,7 +2682,7 @@ impl Lexer {
         params: &LexerParams,
     ) -> Option<char> {
         match escaped {
-            Some((_ofs, ch @ ('\\' | '"' | '\'' | '{' | '}'))) => Some(ch),
+            Some((_ofs, ch @ chars!(self_escape))) => Some(ch),
             Some((_ofs, 'n')) => Some('\n'),
             Some((_ofs, 'r')) => Some('\r'),
             Some((_ofs, 't')) => Some('\t'),
