@@ -1507,12 +1507,20 @@ impl Lexer {
                         _ => break token!("^"),
                     }
                 }
+
+                // 1-, 2-, or 3-char tokens.
                 Some('=') => {
                     self.consume(&mut span);
                     match self.peek(&mut params) {
                         Some('=') => {
                             self.consume(&mut span);
-                            break token!("==");
+                            match self.peek(&mut params) {
+                                Some('=') => {
+                                    self.consume(&mut span);
+                                    break token!("===");
+                                }
+                                _ => break token!("=="),
+                            }
                         }
                         _ => break token!("="),
                     }
@@ -1522,7 +1530,13 @@ impl Lexer {
                     match self.peek(&mut params) {
                         Some('=') => {
                             self.consume(&mut span);
-                            break token!("!=");
+                            match self.peek(&mut params) {
+                                Some('=') => {
+                                    self.consume(&mut span);
+                                    break token!("!==");
+                                }
+                                _ => break token!("!="),
+                            }
                         }
                         _ => break token!("!"),
                     }

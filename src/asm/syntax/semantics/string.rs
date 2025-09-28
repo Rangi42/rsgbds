@@ -34,6 +34,26 @@ impl parse_ctx!() {
         Expr::number(value, span)
     }
 
+    pub fn string_equal(
+        &self,
+        (lhs, left_span): (CompactString, Span),
+        (rhs, right_span): (CompactString, Span),
+    ) -> Expr {
+        let span = left_span.merged_with(&right_span);
+        let value = if lhs == rhs { 1 } else { 0 };
+        Expr::number(value, span)
+    }
+
+    pub fn string_unequal(
+        &self,
+        (lhs, left_span): (CompactString, Span),
+        (rhs, right_span): (CompactString, Span),
+    ) -> Expr {
+        let span = left_span.merged_with(&right_span);
+        let value = if lhs != rhs { 1 } else { 0 };
+        Expr::number(value, span)
+    }
+
     pub fn strfind(
         &self,
         (lhs, _left_span): (CompactString, Span),

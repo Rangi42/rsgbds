@@ -118,6 +118,10 @@ define_tokens! {
         Lte,
         #[name = ">="]
         Gte,
+        #[name = "==="]
+        TripleEqual,
+        #[name = "!=="]
+        NotEquEqu,
 
         // Logical operators.
         #[name = "&&"]

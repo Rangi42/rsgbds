@@ -607,8 +607,10 @@ ExprAtomNoIdent: Expr = {
 	<l_span_idx:@L> "charcmp"   "(" <lhs:StringExpr> "," <rhs:StringExpr> ")" <r_span_idx:@R> => ctx.charcmp(lhs, rhs, l_span_idx, r_span_idx),
 	<l_span_idx:@L> "charsize"  "(" <expr:StringExpr> ")" <r_span_idx:@R> => ctx.charsize(expr, l_span_idx, r_span_idx),
 	<l_span_idx:@L> "charval"   "(" <string:StringExpr> ")" <r_span_idx:@R> => ctx.charval_single(string, l_span_idx, r_span_idx),
-	<l_span_idx:@L> "charval"   "(" <string:StringExpr> "," <pos:Expr> ")" <r_span_idx:@R> =>  ctx.charval(string, pos, l_span_idx, r_span_idx),
-	<l_span_idx:@L> "strbyte"   "(" <string:StringExpr> "," <pos:Expr> ")" <r_span_idx:@R> =>  ctx.strbyte(string, pos, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "charval"   "(" <string:StringExpr> "," <pos:Expr> ")" <r_span_idx:@R> => ctx.charval(string, pos, l_span_idx, r_span_idx),
+	<l_span_idx:@L> "strbyte"   "(" <string:StringExpr> "," <pos:Expr> ")" <r_span_idx:@R> => ctx.strbyte(string, pos, l_span_idx, r_span_idx),
+	<lhs:StringExpr> "===" <rhs:StringExpr> => ctx.string_equal(lhs, rhs),
+	<lhs:StringExpr> "!==" <rhs:StringExpr> => ctx.string_unequal(lhs, rhs),
 };
 
 StringExpr = StringExprConcat<StringExprAtom>;
@@ -710,6 +712,8 @@ extern {
 		"**" => TokenPayload::DblAsterisk,
 		"==" => TokenPayload::DblEqual,
 		"!=" => TokenPayload::NotEqu,
+		"===" => TokenPayload::TripleEqual,
+		"!==" => TokenPayload::NotEquEqu,
 		"<" => TokenPayload::Lt,
 		">" => TokenPayload::Gt,
 		"<=" => TokenPayload::Lte,
