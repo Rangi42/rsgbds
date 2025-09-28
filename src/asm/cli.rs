@@ -61,7 +61,7 @@ pub struct Cli {
     output: Option<PathBuf>,
     /// Include this file before starting to read the input
     #[arg(short = 'P', long, value_name = "path")]
-    preinclude: Option<PathBuf>,
+    preinclude: Vec<PathBuf>,
     /// Use this as the default byte for `ds`
     #[arg(short, long, value_name = "byte")]
     pad_value: Option<String>,
@@ -86,7 +86,7 @@ pub struct Cli {
 }
 
 impl Cli {
-    pub fn finish(self) -> Result<(Options, PathBuf, Vec<String>), ()> {
+    pub fn finish(self) -> Result<(Options, Vec<PathBuf>, PathBuf, Vec<String>), ()> {
         crate::common::cli::apply_color_choice(self.color);
         let mut fail = false;
 
@@ -146,13 +146,13 @@ impl Cli {
                     inc_paths: self.inc_paths,
                     dependfile: self.dependfile,
                     output: self.output,
-                    preinclude: self.preinclude,
                     inhibit_warnings: self.inhibit_warnings,
                     backtrace_depth: self.backtrace_depth,
                     max_errors: self.max_errors,
                     runtime_opts,
                     runtime_opt_stack: vec![],
                 },
+                self.preinclude,
                 self.input,
                 self.defines,
             ))

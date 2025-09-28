@@ -1,6 +1,21 @@
-warning: pre-included file [-Wuser]
-    at preinclude-1.inc(1) <- preinclude-2.inc(0) <- preinclude.asm(0)
-warning: another pre-included file [-Wuser]
-    at preinclude-2.inc(1) <- preinclude.asm(0)
-warning: main file [-Wuser]
-    at preinclude.asm(1)
+[-Wuser] warning: pre-included file
+   ╭─[ preinclude-1.inc:1:1 ]
+   │
+ 1 │ warn "pre-included file"
+   │ ──┬─  
+   │   ╰─── triggered here
+───╯
+[-Wuser] warning: another pre-included file
+   ╭─[ preinclude-2.inc:1:1 ]
+   │
+ 1 │ warn "another pre-included file"
+   │ ──┬─  
+   │   ╰─── triggered here
+───╯
+[-Wuser] warning: main file
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ warn "main file"
+   │ ──┬─  
+   │   ╰─── triggered here
+───╯

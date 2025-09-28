@@ -43,7 +43,6 @@ pub struct Options {
     dependfile: Option<PathBuf>,
     // TODO: `MG`, `MP`, `MT`, `MQ`
     output: Option<PathBuf>,
-    preinclude: Option<PathBuf>,
     inhibit_warnings: bool,
     backtrace_depth: usize,
     max_errors: usize,
@@ -65,7 +64,7 @@ pub struct RuntimeOptions {
 }
 
 fn main() -> ExitCode {
-    let Ok((mut options, main_path, defines)) =
+    let Ok((mut options, preinclude_paths, main_path, defines)) =
         crate::common::cli::setup_and_parse_args().and_then(Cli::finish)
     else {
         return ExitCode::Usage;
@@ -77,9 +76,9 @@ fn main() -> ExitCode {
     let mut symbols = Symbols::new(&mut identifiers, defines, &nb_errors_left, &options);
     let mut charmaps = Charmaps::new(&mut identifiers);
 
-    if let Some(preinclude_path) = &options.preinclude {
+    for preinclude_path in &preinclude_paths {
         syntax::parse_file(
-            &preinclude_path.clone(),
+            preinclude_path,
             &mut identifiers,
             &mut sections,
             &mut charmaps,
