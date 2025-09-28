@@ -181,11 +181,14 @@ fn register_symbols<'sym>(symbols: &'sym Symbols, sections: &Sections) -> SymReg
             .flat_map(|expr| expr.expr.ops().filter_map(|op| op.get_symbol()))
             .flat_map(|ident| match symbols.symbols.get(&ident) {
                 None => Some((ident, None)),
+                // Treat placeholders the same way as if the symbol wasn't defined at all.
+                Some(sym) if !sym.exists(None, None, None) => Some((ident, None)),
                 Some(SymbolData::User {
                     definition: Span::Normal(span),
                     kind,
                     exported,
                 }) => Some((ident, Some((span, kind, *exported)))),
+                // Builtin symbol.
                 Some(_) => None,
             }),
     );
