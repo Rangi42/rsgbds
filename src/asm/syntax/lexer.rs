@@ -969,7 +969,6 @@ impl Lexer {
                             return Err(());
                         } else {
                             match res {
-                                Ok((_kind, text)) => name.push_str(text.contents.text()),
                                 Err(err) => {
                                     let span = Span::Normal(ctx.new_span_ofs(
                                         ofs..chars.peek().map_or(text.len(), |(ofs, _ch)| *ofs),
@@ -990,6 +989,33 @@ impl Lexer {
                                         params.options,
                                     );
                                     return Err(());
+                                }
+                                Ok((_kind, contents)) => {
+                                    name.push_str(contents.contents.text());
+
+                                    // Process any colons added by the macro arg.
+                                    let end_ofs_in_src =
+                                        chars.peek().map_or(text.len(), |(ofs, _ch)| *ofs);
+                                    let mut to_process = name.as_str();
+                                    while let Some((spec, rest)) = to_process.split_once(':') {
+                                        process_fmt_spec(
+                                            spec,
+                                            &mut fmt,
+                                            ctx,
+                                            || ctx.new_span_ofs(ofs..end_ofs_in_src),
+                                            end_ofs_in_src,
+                                            first_ofs,
+                                            params,
+                                        );
+                                        to_process = rest;
+                                    }
+                                    if to_process.as_ptr() != name.as_ptr() {
+                                        // SAFETY: `to_process` is derived from `name`.
+                                        let ofs_processed = unsafe {
+                                            to_process.as_ptr().offset_from(name.as_ptr())
+                                        };
+                                        drop(name.drain(..ofs_processed as usize));
+                                    }
                                 }
                             }
                         }
@@ -1015,47 +1041,40 @@ impl Lexer {
                             cur_depth + 1,
                             params,
                         )?;
+
+                        // Process any colons added by the interpolation.
+                        let end_ofs_in_src = chars.peek().map_or(text.len(), |(ofs, _ch)| *ofs);
+                        let mut to_process = name.as_str();
+                        while let Some((spec, rest)) = to_process.split_once(':') {
+                            process_fmt_spec(
+                                spec,
+                                &mut fmt,
+                                ctx,
+                                || ctx.new_span_ofs(ofs..end_ofs_in_src),
+                                end_ofs_in_src,
+                                first_ofs,
+                                params,
+                            );
+                            to_process = rest;
+                        }
+                        if to_process.as_ptr() != name.as_ptr() {
+                            // SAFETY: `to_process` is derived from `name`.
+                            let ofs_processed =
+                                unsafe { to_process.as_ptr().offset_from(name.as_ptr()) };
+                            drop(name.drain(..ofs_processed as usize));
+                        }
                     }
                 }
                 ':' => {
-                    if fmt.is_some() {
-                        let span = Span::Normal(ctx.new_span_len(ofs, ch.len_utf8()));
-                        diagnostics::error(
-                            &span,
-                            |error| {
-                                error.set_message("multiple ':' characters found in interpolation");
-                                error.add_label(
-                                    diagnostics::error_label(&span)
-                                        .with_message("this ':' is invalid"),
-                                );
-                            },
-                            params.nb_errors_left,
-                            params.options,
-                        );
-                    } else {
-                        match FormatSpec::parse(&name, params.options.runtime_opts.q_precision)
-                            .and_then(FormatSpec::require_full_parse)
-                        {
-                            Ok(spec) => fmt = Some(spec),
-                            Err(err) => {
-                                let span = Span::Normal(ctx.new_span_ofs(first_ofs.unwrap()..ofs));
-                                diagnostics::error(
-                                    &span,
-                                    |error| {
-                                        error.set_message(&err);
-                                        error.add_label(
-                                            diagnostics::error_label(&span).with_message(
-                                                "error parsing this format specification",
-                                            ),
-                                        );
-                                    },
-                                    params.nb_errors_left,
-                                    params.options,
-                                );
-                                // Still, continue parsing the interpolation.
-                            }
-                        }
-                    }
+                    process_fmt_spec(
+                        &name,
+                        &mut fmt,
+                        ctx,
+                        || ctx.new_span_len(ofs, ch.len_utf8()),
+                        ofs,
+                        first_ofs,
+                        params,
+                    );
                     name.clear();
                     first_ofs = Some(ofs);
                 }
@@ -1110,6 +1129,53 @@ impl Lexer {
 
                 // Accept any and all chars, since this could be a formatting specifier.
                 _ => name.push(ch),
+            }
+        }
+
+        fn process_fmt_spec(
+            string: &str,
+            fmt: &mut Option<FormatSpec>,
+            ctx: &Context,
+            colon_span: impl FnOnce() -> NormalSpan,
+            end_ofs: usize,
+            first_ofs: Option<usize>,
+            params: &mut LexerParams,
+        ) {
+            if fmt.is_some() {
+                let span = Span::Normal(colon_span());
+                diagnostics::error(
+                    &span,
+                    |error| {
+                        error.set_message("multiple ':' characters found in interpolation");
+                        error.add_label(
+                            diagnostics::error_label(&span).with_message("this ':' is invalid"),
+                        );
+                    },
+                    params.nb_errors_left,
+                    params.options,
+                );
+            } else {
+                match FormatSpec::parse(string, params.options.runtime_opts.q_precision)
+                    .and_then(FormatSpec::require_full_parse)
+                {
+                    Ok(spec) => *fmt = Some(spec),
+                    Err(err) => {
+                        let span = Span::Normal(ctx.new_span_ofs(first_ofs.unwrap()..end_ofs));
+                        diagnostics::error(
+                            &span,
+                            |error| {
+                                error.set_message(&err);
+                                error.add_label(
+                                    diagnostics::error_label(&span)
+                                        .with_message("error parsing this format specification"),
+                                );
+                            },
+                            params.nb_errors_left,
+                            params.options,
+                        );
+                        // Still, continue parsing the interpolation.
+                    }
+                }
             }
         }
 
