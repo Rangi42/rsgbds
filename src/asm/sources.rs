@@ -202,7 +202,13 @@ impl NormalSpan {
         }
 
         debug_assert_eq!(left.node.kind, right.node.kind);
-        debug_assert!(left.bytes.end <= right.bytes.start);
+        debug_assert!(
+            left.bytes.end <= right.bytes.start,
+            "Attempting to merge {:?} and {:?} in {}",
+            left.bytes,
+            right.bytes,
+            left.node.src.name,
+        );
         NormalSpan {
             node: left.node.clone(),
             bytes: left.bytes.start..right.bytes.end,

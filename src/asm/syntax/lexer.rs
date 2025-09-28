@@ -721,30 +721,17 @@ impl Lexer {
                 ctx.span.node.kind.ends_implicitly(),
                 "Tokens can only straddle implicitly-ending contexts"
             );
-            // The span is not pointing at the active buffer, so it should be pointing at its parent instead.
-            let Some(parent) = ctx.span.node.parent.as_ref() else {
-                panic!(
-                    "Span not pointing at the current top-level buffer ({}), but at {} instead",
-                    &ctx.span.node.src.name, &span.node.src.name,
-                );
-            };
-            debug_assert!(
-                Rc::ptr_eq(&span.node.src, &parent.node.src),
-                "Span is pointing neither at {} nor its parent {}, but at {}",
-                &ctx.span.node.src.name,
-                &parent.node.src.name,
-                &span.node.src.name,
-            );
-            // This modification is idempotent, so only do it at the beginning of the expansion, as a performance optimisation.
+            // Only perform a merge if at the beginning of the expansion.
+            // Otherwise, the merge has already been performed,
+            // which is redundant but also trips the ordering assertion.
             if ctx.cur_byte == ctx.span.bytes.start {
-                if !span.bytes.is_empty() {
-                    // Move the right edge of the span to encompass the entirety of the “trigger”.
-                    // Note that the parent will already have been advanced to start at the end of the trigger.
-                    debug_assert_eq!(span.bytes.end, parent.bytes.start);
-                    span.bytes.end = parent.bytes.end;
-                } else {
-                    // The span is empty, so move it to the beginning of the current buffer instead.
+                if span.bytes.is_empty() {
+                    // The span just happened to point to another context,
+                    // but it really belongs to the context its first char is read from.
                     *span = ctx.new_span_len(0, c.len_utf8());
+                } else {
+                    // Use the standard merging logic to find the lowest common ancestor.
+                    *span = span.merged_with(&ctx.new_span_len(0, c.len_utf8()));
                 }
             }
         }
