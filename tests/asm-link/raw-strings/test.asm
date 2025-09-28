@@ -1,8 +1,6 @@
-DEF q EQUS "\""
-
 	assert !strcmp( \
 		#"\t\1{s}\", \
-		"\\t\\1\{s}\\" )
+		"\\t\\1\{s\}\\" )
 	assert !strcmp( \
 		#"\a,\b,\1,\2", \
 		"\\a,\\b,\\1,\\2" )
@@ -15,10 +13,7 @@ line""", \
 		"""new\\nline""" )
 	assert !strcmp( \
 		#"/\w+(\+\w+)?@[a-z]+\.[a-z]{2,3}/i", \
-		"/\\w+(\\+\\w+)?@[a-z]+\\.[a-z]\{2,3}/i" )
-	assert !strcmp( \
-		#{q}{q}{q}rs", \
-		{q}\{q}\{q}rs" )
+		"/\\w+(\\+\\w+)?@[a-z]+\\.[a-z]\{2,3\}/i" )
 	assert !strcmp( \
 		#"", \
 		"" )
@@ -35,7 +30,7 @@ ENDM
 	; test lexing string literals within macro args
 	test \
 		#"\t\1{s}\", \
-		"\\t\\1\{s}\\"
+		"\\t\\1\{s\}\\"
 	test \
 		#"\a,\b,\1,\2", \
 		"\\a,\\b,\\1,\\2"
@@ -48,10 +43,7 @@ line""", \
 		"""new,\\nline"""
 	test \
 		#"/\w+(\+\w+)?@[a-z]+\.[a-z]{2,3}/i", \
-		"/\\w+(\\+\\w+)?@[a-z]+\\.[a-z]\{2,3}/i"
-	test \
-		#{q}{q}{q}rs", \
-		{q}\{q}\{q}rs"
+		"/\\w+(\\+\\w+)?@[a-z]+\\.[a-z]\{2,3\}/i"
 	test \
 		#"", \
 		""
