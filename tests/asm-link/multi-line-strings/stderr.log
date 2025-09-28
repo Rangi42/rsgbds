@@ -1,8 +1,8 @@
 error: unterminated string literal
-    ╭─[ test.asm:23:10 ]
+    ╭─[ test.asm:23:11 ]
     │
  23 │     printarg "
-    │             ─┬  
+    │              ┬  
     │              ╰── no closing quote before the end of the line
 ────╯
 [-Wuser] warning: check the line number

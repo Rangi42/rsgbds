@@ -1,22 +1,9 @@
-error: syntax error: unexpected +
-   ╭─[ concat:1:1 ]
-   │
- 1 │ ++ "hi world" ++
-   │ ┬  
-   │ ╰── expected nothing else on this line
-   │
-   ├─[ test.asm:2:11 ]
-   │
- 2 │ println ""{concat}""
-   │           ────┬───  
-   │               ╰───── interpolated here
-───╯
 error: syntax error: unexpected identifier
    ╭─[ greeting:1:1 ]
    │
  1 │ hello
    │ ──┬──  
-   │   ╰──── expected nothing else on this line
+   │   ╰──── expected ",", "+", "-", "*", "/", "%", "++", ...17 others
    │
    ├─[ test.asm:5:11 ]
    │
@@ -29,7 +16,7 @@ error: syntax error: unexpected string
    │
  1 │ "goodbye"
    │ ────┬────  
-   │     ╰────── expected nothing else on this line
+   │     ╰────── expected ",", "+", "-", "*", "/", "%", "++", ...17 others
    │
    ├─[ test.asm:8:11 ]
    │
@@ -37,4 +24,4 @@ error: syntax error: unexpected string
    │           ────┬───  
    │               ╰───── interpolated here
 ───╯
-3 errors generated.
+2 errors generated.

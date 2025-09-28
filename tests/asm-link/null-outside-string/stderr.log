@@ -10,7 +10,7 @@ error: syntax error: unexpected number
    │
  3 │     DEF foo\0qux EQU 42
    │             ┬  
-   │             ╰── expected "=", "+=", "-=", "*=", "/=", "%=", "&=", ...10 others
+   │             ╰── expected "(", "=", "+=", "-=", "*=", "/=", "%=", ...11 others
 ───╯
 error: unexpected character after line continuation
    ╭─[ test.asm:4:8 ]
@@ -24,7 +24,7 @@ error: syntax error: unexpected number
    │
  4 │     db foo\0qux
    │            ┬  
-   │            ╰── expected ",", "::", "+", "-", "*", "/", "%", ...16 others
+   │            ╰── expected ",", "::", "(", "+", "-", "*", "/", ...20 others
 ───╯
 error: unexpected character after line continuation
    ╭─[ test.asm:6:10 ]
@@ -38,7 +38,7 @@ error: syntax error: unexpected identifier
    │
  6 │     DEF spam\Xeggs EQU 69
    │              ──┬──  
-   │                ╰──── expected "=", "+=", "-=", "*=", "/=", "%=", "&=", ...10 others
+   │                ╰──── expected "(", "=", "+=", "-=", "*=", "/=", "%=", ...11 others
 ───╯
 error: unexpected character after line continuation
    ╭─[ test.asm:7:9 ]
@@ -52,6 +52,6 @@ error: syntax error: unexpected identifier
    │
  7 │     db spam\Xeggs
    │             ──┬──  
-   │               ╰──── expected ",", "::", "+", "-", "*", "/", "%", ...16 others
+   │               ╰──── expected ",", "::", "(", "+", "-", "*", "/", ...20 others
 ───╯
 8 errors generated.

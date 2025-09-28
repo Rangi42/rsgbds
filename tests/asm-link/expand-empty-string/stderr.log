@@ -3,7 +3,7 @@ error: syntax error: unexpected number
    │
  1 │ v 0
    │   ┬  
-   │   ╰── expected "identifier", "local identifier", ":", "+", "-", "adc", "add", ...89 others
+   │   ╰── expected "identifier", "scoped identifier", "local identifier", ":", "+", "-", "adc", ...90 others
    │
    ├─[ test.asm:4:1 ]
    │

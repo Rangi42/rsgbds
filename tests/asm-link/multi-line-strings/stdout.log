@@ -6,8 +6,8 @@ The multi-line string can contain:
 - ""double quotes""
 - even escaped """triple""" """quotes"""
 !
-arg <">
-arg (")
+arg <"">
+arg ("")
 arg <"""multi-line
 string argument""">
 arg ("""multi-line
