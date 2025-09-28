@@ -1,17 +1,96 @@
-error: syntax error, unexpected local label, expecting symbol
-    at label-macro-arg.asm::test_char(25) <- label-macro-arg.asm(38)
-    while expanding symbol `VAR_DEF`
-error: syntax error, unexpected local label, expecting symbol
-    at label-macro-arg.asm::test_char(26) <- label-macro-arg.asm(38)
-error: Interpolated symbol `sizeof_.something` does not exist
-    at label-macro-arg.asm::test_char(29) <- label-macro-arg.asm(38)
-error: syntax error, unexpected label, expecting symbol
-    at label-macro-arg.asm::test_char(25) <- label-macro-arg.asm(39)
-    while expanding symbol `VAR_DEF`
-error: syntax error, unexpected label, expecting symbol
-    at label-macro-arg.asm::test_char(26) <- label-macro-arg.asm(39)
-error: Invalid format spec "sizeof_"
-    at label-macro-arg.asm::test_char(29) <- label-macro-arg.asm(39)
-error: Interpolated symbol `something` does not exist
-    at label-macro-arg.asm::test_char(29) <- label-macro-arg.asm(39)
-Assembly aborted with 7 errors!
+error: syntax error: unexpected scoped identifier
+    ╭─[ VAR_DEF:1:5 ]
+    │
+  1 │ DEF sizeof_.something = 0
+    │     ────────┬────────  
+    │             ╰────────── expected "identifier"
+    │
+    ├─[ test.asm:25:1 ]
+    │
+ 25 │ {VAR_DEF}
+    │ ────┬────  
+    │     ╰────── interpolated here
+    │ 
+ 38 │     test_char .
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+error: syntax error: unexpected scoped identifier
+    ╭─[ test.asm:26:5 ]
+    │
+ 26 │ DEF sizeof_\1something = 1
+    │     ─────────┬────────  
+    │              ╰────────── expected "identifier"
+    │ 
+ 38 │     test_char .
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+error: the symbol `sizeof_.something` doesn't exist
+    ╭─[ test.asm:29:58 ]
+    │
+ 29 │ DEF VAR_PRINT equs "println \"sizeof_\1something equals {sizeof_\1something}\""
+    │                                                          ─────────┬────────  
+    │                                                                   ╰────────── this interpolation is invalid
+    │ 
+ 38 │     test_char .
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+error: syntax error: unexpected :
+    ╭─[ VAR_DEF:1:12 ]
+    │
+  1 │ DEF sizeof_:something = 0
+    │            ┬  
+    │            ╰── expected "(", "=", "+=", "-=", "*=", "/=", "%=", ...11 others
+    │
+    ├─[ test.asm:25:1 ]
+    │
+ 25 │ {VAR_DEF}
+    │ ────┬────  
+    │     ╰────── interpolated here
+    │ 
+ 39 │     test_char :
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+error: syntax error: unexpected :
+    ╭─[ <macro argument #1>:1:1 ]
+    │
+  1 │ :
+    │ ┬  
+    │ ╰── expected "(", "=", "+=", "-=", "*=", "/=", "%=", ...11 others
+    │
+    ├─[ test.asm:26:12 ]
+    │
+ 26 │ DEF sizeof_\1something = 1
+    │            ─┬  
+    │             ╰── expanded here
+    │ 
+ 39 │     test_char :
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+error: unexpected character 'i' after the print type
+    ╭─[ test.asm:29:58 ]
+    │
+ 29 │ DEF VAR_PRINT equs "println \"sizeof_\1something equals {sizeof_\1something}\""
+    │                                                          ────┬────  
+    │                                                              ╰────── error parsing this format specification
+    │ 
+ 39 │     test_char :
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+error: the symbol `something` doesn't exist
+    ╭─[ test.asm:29:58 ]
+    │
+ 29 │ DEF VAR_PRINT equs "println \"sizeof_\1something equals {sizeof_\1something}\""
+    │                                                          ─────────┬────────  
+    │                                                                   ╰────────── this interpolation is invalid
+    │ 
+ 39 │     test_char :
+    │     ────┬────  
+    │         ╰────── macro called here
+────╯
+7 errors generated.
