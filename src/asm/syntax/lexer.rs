@@ -2487,6 +2487,9 @@ impl Lexer {
 
         // If passthrough, make sure to add the string's opening quotes.
         if passthrough {
+            if raw {
+                string.push('#');
+            }
             string.push(delim_char);
         }
         let multiline = if delim_char != '"' {
@@ -2511,7 +2514,7 @@ impl Lexer {
         let mut end_ofs = text.len();
         while let Some((ofs, ch)) = chars.next() {
             let append_expansion = |dest: &mut CompactString, contents| {
-                if !passthrough {
+                if !passthrough || raw {
                     dest.push_str(contents);
                 } else {
                     dest.reserve(contents.len()); // TODO(perf): is this helping?
@@ -2646,7 +2649,7 @@ impl Lexer {
                 }
 
                 ch => {
-                    if !passthrough {
+                    if !passthrough || raw {
                         string.push(ch)
                     } else {
                         push_char_passthrough(string, ch)
