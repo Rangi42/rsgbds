@@ -192,13 +192,20 @@ impl parse_ctx!() {
         let span = self.nth_span(span_idx);
 
         match self.options.search_file(path.as_ref()) {
-            None => self.report_file_not_found_error(&path_span, path),
+            None => self
+                .options
+                .report_file_not_found_error(self.nb_errors_left, &path_span, path),
             Some(res) => match res
                 .map_err(|(err, err_path)| (err, err_path.display().to_compact_string()))
                 .and_then(|(file, loaded_path)| {
                     Source::load_file(file, loaded_path.display().to_compact_string())
                 }) {
-                Err((err, err_path)) => self.report_file_read_failure(&path_span, err_path, err),
+                Err((err, err_path)) => self.options.report_file_read_failure(
+                    self.nb_errors_left,
+                    &path_span,
+                    err_path,
+                    err,
+                ),
                 Ok(source) => push_file(self, source, Some(Rc::new(span.extract_normal()))),
             },
         }

@@ -1,5 +1,6 @@
 use std::{
     cell::Cell,
+    fmt::Display,
     fs::File,
     path::{Path, PathBuf},
 };
@@ -79,6 +80,7 @@ fn main() -> ExitCode {
     for preinclude_path in &preinclude_paths {
         syntax::parse_file(
             preinclude_path,
+            true,
             &mut identifiers,
             &mut sections,
             &mut charmaps,
@@ -90,6 +92,7 @@ fn main() -> ExitCode {
 
     syntax::parse_file(
         &main_path,
+        false,
         &mut identifiers,
         &mut sections,
         &mut charmaps,
@@ -148,6 +151,55 @@ impl Options {
             Ok(file) => Ok((file, loaded_path)),
             Err(err) => Err((err, loaded_path)),
         })
+    }
+    fn report_file_not_found_error(
+        &self,
+        nb_errors_left: &Cell<usize>,
+        span: &Span,
+        path: impl Display,
+    ) {
+        diagnostics::error(
+            span,
+            |error| {
+                error.set_message(format!("unable to find \"{path}\""));
+                if let Span::Normal(_) = &span {
+                    error.add_label(
+                        diagnostics::error_label(span).with_message("no such file or directory"),
+                    );
+                }
+                match self.inc_paths.as_slice() {
+                    [] => {}
+                    [only] => error.add_note(format!(
+                        "unable to find it in \"{}\" either",
+                        only.display(),
+                    )),
+                    list => error.add_note(format!(
+                        "unable to find it under any of the {} include paths either",
+                        list.len(),
+                    )),
+                }
+                // TODO: look for similarly-named files
+            },
+            nb_errors_left,
+            self,
+        );
+    }
+    fn report_file_read_failure(
+        &self,
+        nb_errors_left: &Cell<usize>,
+        span: &Span,
+        path: impl Display,
+        err: std::io::Error,
+    ) {
+        diagnostics::error(
+            span,
+            |error| {
+                error.set_message(format!("unable to read \"{path}\""));
+                error.add_label(diagnostics::error_label(span).with_message(err));
+            },
+            nb_errors_left,
+            self,
+        );
     }
 
     fn warn_if_opt_stack_not_empty(&self, nb_errors_left: &Cell<usize>) {

@@ -20,6 +20,7 @@ use tokens::tok;
 
 pub fn parse_file(
     path: &Path,
+    with_search_path: bool,
     identifiers: &mut Identifiers,
     sections: &mut Sections,
     charmaps: &mut Charmaps,
@@ -27,13 +28,27 @@ pub fn parse_file(
     nb_errors_left: &Cell<usize>,
     options: &mut Options,
 ) {
-    let name = path.display().to_compact_string();
-    let res = match File::open(path) {
-        Ok(file) => Source::load_file(file, name),
-        Err(err) => Err((err, name)),
+    let res = if with_search_path {
+        options.search_file(path)
+    } else {
+        let pathbuf = path.to_owned();
+        match File::open(path) {
+            Ok(file) => Some(Ok((file, pathbuf))),
+            Err(err) => Some(Err((err, pathbuf))), // Pass `NotFound` as-is, so that it's not reported as a *search* error.
+        }
     };
-    let file = match res {
-        Ok(file) => file,
+    let res = match res {
+        None => {
+            options.report_file_not_found_error(nb_errors_left, &Span::CommandLine, path.display());
+            return;
+        }
+        Some(Ok((file, loaded_path))) => {
+            Source::load_file(file, loaded_path.display().to_compact_string())
+        }
+        Some(Err((err, err_path))) => Err((err, err_path.display().to_compact_string())),
+    };
+    let src = match res {
+        Ok(src) => src,
         Err((err, loaded_path)) => {
             diagnostics::error(
                 &Span::CommandLine,
@@ -64,7 +79,7 @@ pub fn parse_file(
     if let Err(()) =
         parse_ctx
             .lexer
-            .push_file(file, None, parse_ctx.nb_errors_left, parse_ctx.options)
+            .push_file(src, None, parse_ctx.nb_errors_left, parse_ctx.options)
     {
         return;
     }

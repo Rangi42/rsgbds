@@ -295,7 +295,8 @@ impl parse_ctx!() {
         }
 
         let Some(res) = self.options.search_file(Path::new(&path)) else {
-            self.report_file_not_found_error(&path_span, &path);
+            self.options
+                .report_file_not_found_error(self.nb_errors_left, &path_span, &path);
             return;
         };
         let mut file = match res {
