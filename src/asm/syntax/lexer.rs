@@ -236,19 +236,16 @@ impl Context {
     ) {
         debug_assert!(
             span.bytes.is_empty(),
-            "Do not consume a char before calling `with_active_context_raw/with_raw_text`: it may read from a different buffer!",
+            "Do not consume a char before calling `with_active_context_raw/with_raw_text`: spans may point to different buffers!",
         );
-        debug_assert_eq!(
-            span.bytes.start, self.cur_byte,
-            "Create the span with `ctx.new_span()",
-        );
-        self.with_raw_text_partial(span, callback)
-    }
-    fn with_raw_text_partial<F: FnOnce(&Context, &str) -> usize>(
-        &mut self,
-        span: &mut NormalSpan,
-        callback: F,
-    ) {
+        if Rc::ptr_eq(&span.node.src, &self.span.node.src) {
+            debug_assert_eq!(
+                span.bytes.start, self.cur_byte,
+                "Create the span with `ctx.new_span()`",
+            );
+        } else {
+            *span = self.new_span();
+        }
         let text = self.remaining_text();
 
         let nb_bytes_consumed = callback(self, text);
@@ -1238,21 +1235,13 @@ impl Lexer {
         Err(LineContinuationErr::Eof)
     }
 
+    #[track_caller]
     fn with_active_context_raw<F: FnOnce(&Context, &str) -> usize>(
         &mut self,
         span: &mut NormalSpan,
         callback: F,
     ) {
         self.active_context().unwrap().with_raw_text(span, callback)
-    }
-    fn with_active_context_raw_partial<F: FnOnce(&Context, &str) -> usize>(
-        &mut self,
-        span: &mut NormalSpan,
-        callback: F,
-    ) {
-        self.active_context()
-            .unwrap()
-            .with_raw_text_partial(span, callback)
     }
 }
 
@@ -2953,7 +2942,9 @@ impl Lexer {
                 }
 
                 Some('\\') => {
-                    self.with_active_context_raw_partial(&mut span, |ctx, text| {
+                    let ctx = self.active_context().unwrap();
+                    let mut escape_span = ctx.new_span();
+                    ctx.with_raw_text(&mut escape_span, |ctx, text| {
                         let mut chars = text.char_indices().peekable();
                         chars.next(); // The backslash.
                         let ch = chars.next();
@@ -2970,6 +2961,7 @@ impl Lexer {
                             chars.next().map_or(text.len(), |(ofs, _ch)| ofs)
                         }
                     });
+                    span = span.merged_with(&escape_span);
                     span_before_whitespace = None;
                 }
 

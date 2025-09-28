@@ -150,7 +150,11 @@ impl Span {
         let (Self::Normal(lhs), Self::Normal(rhs)) = (self, &other) else {
             panic!("Only normal spans can be merged, not {self:?} and {other:?}");
         };
-
+        Self::Normal(lhs.merged_with(rhs))
+    }
+}
+impl NormalSpan {
+    pub fn merged_with(&self, other: &Self) -> Self {
         fn parent_of(span: &NormalSpan) -> &NormalSpan {
             debug_assert!(
                 span.node.kind.ends_implicitly(),
@@ -170,15 +174,15 @@ impl Span {
         impl FusedIterator for ParentIter<'_> {}
 
         // TODO(perf): store the depth directly in the span?
-        let left_depth = ParentIter(Some(lhs)).count();
-        let right_depth = ParentIter(Some(rhs)).count();
+        let left_depth = ParentIter(Some(self)).count();
+        let right_depth = ParentIter(Some(other)).count();
         // Start looking for the topmost common level.
         // In principle, the spans could be pointing at the same source but different locations within it;
         // in practice, callers should just not attempt to merge such tokens.
         //
         // This logic is meant for e.g. one token at top level, and the other inside of an expansion.
-        let mut left = lhs;
-        let mut right = rhs;
+        let mut left = self;
+        let mut right = other;
         match left_depth.cmp(&right_depth) {
             Ordering::Equal => {}
             Ordering::Less => {
@@ -199,10 +203,10 @@ impl Span {
 
         debug_assert_eq!(left.node.kind, right.node.kind);
         debug_assert!(left.bytes.end <= right.bytes.start);
-        Self::Normal(NormalSpan {
+        NormalSpan {
             node: left.node.clone(),
             bytes: left.bytes.start..right.bytes.end,
-        })
+        }
     }
 }
 
