@@ -236,7 +236,11 @@ impl Context {
     ) {
         debug_assert!(
             span.bytes.is_empty(),
-            "Do not consume a char before calling `with_active_context_raw/with_raw_text`: it may read from a different buffer!"
+            "Do not consume a char before calling `with_active_context_raw/with_raw_text`: it may read from a different buffer!",
+        );
+        debug_assert_eq!(
+            span.bytes.start, self.cur_byte,
+            "Create the span with `ctx.new_span()",
         );
         self.with_raw_text_partial(span, callback)
     }
@@ -251,11 +255,12 @@ impl Context {
         debug_assert!(
             nb_bytes_consumed <= text.len(),
             "Consumed {nb_bytes_consumed} bytes out of a {}-byte string!?",
-            text.len()
+            text.len(),
         );
 
-        *span = self.new_span_len(0, nb_bytes_consumed);
+        debug_assert_eq!(span.bytes.end, self.cur_byte);
         self.cur_byte += nb_bytes_consumed;
+        span.bytes.end = self.cur_byte;
     }
     fn skimming_lines<F: FnMut(&str, usize, usize, &Context) -> Option<usize>>(
         &mut self,
@@ -2407,7 +2412,10 @@ impl Lexer {
         let mut string = CompactString::default();
         let depth = self.contexts.len();
 
-        self.with_active_context_raw(span, |ctx, text| {
+        let ctx = self.active_context().unwrap();
+        debug_assert!(span.bytes.is_empty());
+        *span = ctx.new_span();
+        ctx.with_raw_text(span, |ctx, text| {
             fn is_quote(&(_, ch): &(usize, char)) -> bool {
                 ch == '"'
             }
