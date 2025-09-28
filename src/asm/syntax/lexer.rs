@@ -2899,9 +2899,20 @@ impl Lexer {
                         self.consume(&mut span);
                         string.push('/');
                         span_before_whitespace = None;
-                    } else if span_before_whitespace.is_none() {
-                        // Trailing block comments are treated as whitespace for span tracking purposes.
-                        span_before_whitespace = Some(span.clone());
+                    } else if span.bytes.is_empty() {
+                        // Leading block comments are treated as whitespace for span tracking purposes.
+                        span = comment_span;
+                        span.make_empty();
+                    } else {
+                        // Non-leading block comment.
+                        if span_before_whitespace.is_none() {
+                            // Trailing block comments are treated as whitespace for span tracking purposes.
+                            span_before_whitespace = Some(span.clone());
+                        }
+                        if Rc::ptr_eq(&span.node.src, &comment_span.node.src) {
+                            debug_assert_eq!(span.bytes.end, comment_span.bytes.start);
+                            span.bytes.end = comment_span.bytes.end;
+                        }
                     }
                 }
 
