@@ -1,16 +1,29 @@
-
+error: unable to find "nonexistent1.inc"
+   ╭─[ test.asm:6:9 ]
+   │
+ 6 │ INCLUDE "nonexistent1.inc"
+   │         ─────────┬────────  
+   │                  ╰────────── no such file or directory
+───╯
 [-Wuser] warning: still going!
    ╭─[ test.asm:7:1 ]
    │
  7 │ WARN "still going!"
-   │ ──┬─
+   │ ──┬─  
    │   ╰─── triggered here
+───╯
+error: unable to find "nonexistent2.inc"
+   ╭─[ test.asm:8:9 ]
+   │
+ 8 │ INCLUDE "nonexistent2.inc"
+   │         ─────────┬────────  
+   │                  ╰────────── no such file or directory
 ───╯
 [-Wuser] warning: and going!
    ╭─[ test.asm:9:1 ]
    │
  9 │ WARN "and going!"
-   │ ──┬─
+   │ ──┬─  
    │   ╰─── triggered here
 ───╯
 2 errors generated.

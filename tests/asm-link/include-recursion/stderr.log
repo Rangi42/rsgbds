@@ -1,2 +1,70 @@
-FATAL: Recursion limit (64) exceeded
-    at include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1) <- include-recursion.asm(1)
+error: maximum recursion depth exceeded
+   ╭─[ test.asm:1:1 ]
+   │
+ 1 │ INCLUDE "test.asm"
+   │ ───┬───  
+   │    ╰───── depth is 64 contexts here, cannot enter a new one
+   │
+   ├─[ test.asm:1:1 ]
+   │
+ 1 │ INCLUDE "test.asm"
+   │ ───┬───  
+   │    ╰───── file included from here
+   │
+   ├─[ test.asm:1:1 ]
+   │
+ 1 │ INCLUDE "test.asm"
+   │ ───┬───  
+   │    ╰───── file included from here
+   │
+   ├─[ test.asm:1:1 ]
+   │
+ 1 │ INCLUDE "test.asm"
+   │ ───┬───  
+   │    ╰───── file included from here
+   │
+   ├─[ test.asm:1:1 ]
+   │
+ 1 │ INCLUDE "test.asm"
+   │ ───┬───  
+   │    ╰───── file included from here
+   │
+   ├─[ test.asm:1:1 ]
+   │
+ 1 │ INCLUDE "test.asm"
+   │ ───┬───  
+   │    ╰───── file included from here
+   │
+   ├─[ test.asm:1:1 ]
+   │
+ 1 │ INCLUDE "test.asm"
+   │ ───┬───  
+   │    ╰───── file included from here
+   │
+   ├─[ test.asm:1:1 ]
+   │
+ 1 │ INCLUDE "test.asm"
+   │ ───┬───  
+   │    ╰───── file included from here
+   │
+   ├─[ test.asm:1:1 ]
+   │
+ 1 │ INCLUDE "test.asm"
+   │ ───┬───  
+   │    ╰───── file included from here
+   │
+   ├─[ test.asm:1:1 ]
+   │
+ 1 │ INCLUDE "test.asm"
+   │ ───┬───  
+   │    ╰───── file included from here
+   │
+   ├─[ test.asm:1:1 ]
+   │
+ 1 │ INCLUDE "test.asm"
+   │ ───┬───  
+   │    ╰───── file included from here
+   │ 
+   │ Note: ... 54 more levels of nesting omitted
+───╯
+1 error generated.

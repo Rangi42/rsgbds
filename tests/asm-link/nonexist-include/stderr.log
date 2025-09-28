@@ -1,3 +1,8 @@
-error: Error opening `INCLUDE` file "nonexist-include.inc": No such file or directory
-    at nonexist-include.asm(1)
-Assembly aborted with 1 error!
+error: unable to find "nonexist-include.inc"
+   ╭─[ test.asm:1:9 ]
+   │
+ 1 │ INCLUDE "nonexist-include.inc"
+   │         ───────────┬──────────  
+   │                    ╰──────────── no such file or directory
+───╯
+1 error generated.

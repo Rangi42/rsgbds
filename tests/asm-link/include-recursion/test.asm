@@ -1,1 +1,1 @@
-INCLUDE "include-recursion.asm"
+INCLUDE "test.asm"
