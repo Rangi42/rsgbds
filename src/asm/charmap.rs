@@ -304,6 +304,12 @@ impl Charmap {
                         string.insert(0, *ch); // FIXME: not great to be constantly copying characters...
                     }
                 }
+                let (first_ch, _node_idx) = self
+                    .root_node
+                    .iter()
+                    .find(|(_ch, node_idx)| **node_idx == target_idx)
+                    .unwrap();
+                string.insert(0, *first_ch);
 
                 match res.as_mut() {
                     None => res = Some((string, None)),

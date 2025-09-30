@@ -1,5 +1,23 @@
-error: REVCHAR: Multiple character mappings to values
-    at revchar.asm::test(13) <- revchar.asm(22)
-error: REVCHAR: No character mapping to values
-    at revchar.asm::test(13) <- revchar.asm(23)
-Assembly aborted with 2 errors!
+error: reverse string mapping found more than one result
+    ╭─[ test.asm:13:19 ]
+    │
+ 13 │     redef found equs revchar(\#)
+    │                      ─────┬─────  
+    │                           ╰─────── "c" matches in charmap `main`, but so does "d"
+    │ 
+ 23 │ test "c", 3 ; multiple
+    │ ──┬─  
+    │   ╰─── macro called here
+────╯
+error: reverse string mapping failed
+    ╭─[ test.asm:13:19 ]
+    │
+ 13 │     redef found equs revchar(\#)
+    │                      ─────┬─────  
+    │                           ╰─────── no mapping found in charmap `main` for these values
+    │ 
+ 24 │ test "", 4 ; none
+    │ ──┬─  
+    │   ╰─── macro called here
+────╯
+2 errors generated.
