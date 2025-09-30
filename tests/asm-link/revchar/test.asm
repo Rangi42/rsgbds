@@ -10,7 +10,8 @@ charmap "zed", $1234, $5678, $9abc, $def0
 macro test
 	redef expected equs \1
 	shift
-	assert !strcmp(revchar(\#), "{expected}")
+	assert !strcmp(revchar(\#), "{expected}"), \
+		STRFMT("revchar(\#) = \"%s\" != \"{expected}\"", revchar(\#))
 endm
 
 test "a", 1
