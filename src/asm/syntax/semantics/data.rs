@@ -308,8 +308,8 @@ impl parse_ctx!() {
         };
 
         let mut data = vec![];
-        let start = start_expr.and_then(|expr| match self.try_const_eval(&expr) {
-            Ok((value, span)) => {
+        let start = match start_expr.map(|expr| self.try_const_eval(&expr)) {
+            Some(Ok((value, span))) => {
                 if value < 0 {
                     self.error(&span, |error| {
                         error.set_message("negative start offset given to `incbin`");
@@ -329,17 +329,19 @@ impl parse_ctx!() {
                             "specified start offset is greater than length of `incbin` file",
                             EofLabel::Start(value as usize),
                         );
+                        return;
                     }
                     Some(value)
                 } else {
                     Some(0)
                 }
             }
-            Err(err) => {
+            Some(Err(err)) => {
                 self.report_expr_error(err);
                 None
             }
-        });
+            None => None,
+        };
 
         let res = match length {
             Some(length) => {
