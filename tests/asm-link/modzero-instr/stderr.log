@@ -1,2 +1,8 @@
-FATAL: Modulo by zero
-    at modzero-instr.asm(2)
+error: division by zero
+   ╭─[ test.asm:2:13 ]
+   │
+ 2 │     ld  a, 1 % 0
+   │                ┬  
+   │                ╰── this is equal to zero
+───╯
+1 error generated.
