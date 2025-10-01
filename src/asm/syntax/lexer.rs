@@ -944,6 +944,14 @@ impl Lexer {
         while let Some((ofs, ch)) =
             chars.next_if(|&(_ofs, ch)| !matches!(ch, chars!(newline) | '"'))
         {
+            fn consume_rest_of_interpolation(chars: &mut Peekable<CharIndices>) {
+                for (_ofs, ch) in chars {
+                    if ch == '}' {
+                        break;
+                    }
+                }
+            }
+
             match ch {
                 '\\' => {
                     let mut macro_chars = chars.clone();
@@ -966,6 +974,7 @@ impl Lexer {
                                 params.nb_errors_left,
                                 params.options,
                             );
+                            consume_rest_of_interpolation(chars);
                             return Err(());
                         } else {
                             match res {
@@ -988,6 +997,7 @@ impl Lexer {
                                         params.nb_errors_left,
                                         params.options,
                                     );
+                                    consume_rest_of_interpolation(chars);
                                     return Err(());
                                 }
                                 Ok((_kind, contents)) => {
@@ -1030,17 +1040,20 @@ impl Lexer {
                             params.nb_errors_left,
                             params.options,
                         );
+                        consume_rest_of_interpolation(chars);
                         return Err(());
                     } else {
-                        // TODO: consume the rest of the interpolation even if `Err`
-                        Self::read_interpolation(
+                        if let Err(()) = Self::read_interpolation(
                             chars,
                             text,
                             ctx,
                             &mut name,
                             cur_depth + 1,
                             params,
-                        )?;
+                        ) {
+                            consume_rest_of_interpolation(chars);
+                            return Err(());
+                        }
 
                         // Process any colons added by the interpolation.
                         let end_ofs_in_src = chars.peek().map_or(text.len(), |(ofs, _ch)| *ofs);
