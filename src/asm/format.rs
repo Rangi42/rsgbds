@@ -70,8 +70,6 @@ pub enum FormatError {
         flag_name: &'static str,
         sym_kind: &'static str,
     },
-    /// a sign is only applicable to signed or fixed-point formatting
-    SignOnUnsigned,
     /// a {flag_name} can only be used with fixed-point formatting
     FractionalFlag { flag_name: &'static str },
     /// fixed-point width cannot be more than 255
@@ -128,7 +126,12 @@ impl FormatSpec {
             Some('f') => Ok(FormatKind::FixedPoint),
 
             Some('s') => {
-                if pad_with_zeros {
+                if force_sign.is_some() {
+                    Err(FormatError::IncompatibleFlag {
+                        flag_name: "sign character",
+                        sym_kind: "string symbol",
+                    })
+                } else if pad_with_zeros {
                     Err(FormatError::IncompatibleFlag {
                         flag_name: "zero-padding flag",
                         sym_kind: "string symbol",
@@ -178,9 +181,6 @@ impl FormatSpec {
         }
 
         if !matches!(kind, FormatKind::FixedPoint) {
-            if !matches!(kind, FormatKind::Signed) && force_sign.is_some() {
-                return Err(FormatError::SignOnUnsigned);
-            }
             if frac.is_some() {
                 return Err(FormatError::FractionalFlag {
                     flag_name: "fixed-point width",
@@ -349,14 +349,10 @@ impl Display for NumberFormatter {
             debug_assert_eq!(self.force_sign, None);
             debug_assert_ne!(prefix, "\0");
             (false, prefix, self.number)
-        } else if matches!(self.kind, FormatKind::Signed) {
-            if (self.number as i32) < 0 {
-                (true, "", (self.number as i32).wrapping_neg() as u32)
-            } else if let Some(prefix) = self.force_sign {
-                (false, prefix, self.number)
-            } else {
-                (false, "", self.number)
-            }
+        } else if matches!(self.kind, FormatKind::Signed) && (self.number as i32) < 0 {
+            (true, "", (self.number as i32).wrapping_neg() as u32)
+        } else if let Some(prefix) = self.force_sign {
+            (false, prefix, self.number)
         } else {
             (false, "", self.number)
         };
