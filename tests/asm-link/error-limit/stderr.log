@@ -1,5 +1,17 @@
-error: `x` already defined
-    at error-limit.asm(2)
-    and also:
-    at error-limit.asm(1)
-Assembly aborted after the maximum of 1 error! (configure with '-X/--max-errors')
+error: A symbol called "x" already exists
+   ╭─[ test.asm:2:7 ]
+   │
+ 1 │ def x equ 1
+   │       ─┬─  
+   │        ╰─── the name is defined here...
+ 2 │ def x equ 2
+   │       ─┬─  
+   │        ╰─── ...so it's not available for this definition
+   │ 
+   │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+───╯
+warning: Reached 1 error, any subsequent will not be printed
+  │ 
+  │ Help: this limit can be configured using the `--max-errors` option
+──╯
+1 error generated.

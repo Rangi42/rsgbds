@@ -6,4 +6,7 @@ error: `@` is not constant
    │         ╰── this symbol's value is not known at this point
 ───╯
 warning: Reached 1 error, any subsequent will not be printed
+  │ 
+  │ Help: this limit can be configured using the `--max-errors` option
+──╯
 1 error generated.

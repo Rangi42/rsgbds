@@ -50,6 +50,7 @@ fn decrement_error_count(nb_errors_left: &Cell<usize>, options: &Options) {
                 options.max_errors,
                 S::from(options.max_errors),
             ))
+            .with_help("this limit can be configured using the `--max-errors` option")
             .finish()
             .eprint(())
             .expect("Failed to print diagnostic");
