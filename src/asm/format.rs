@@ -15,7 +15,7 @@ pub struct FormatSpec {
 }
 #[derive(Debug, Clone, Copy, displaydoc::Display)]
 pub enum FormatKind {
-    /// default
+    /// string or number
     Default,
     /// signed number
     Signed,
