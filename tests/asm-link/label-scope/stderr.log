@@ -1,13 +1,43 @@
-error: Undefined symbol `@`
-    at label-scope.asm(3)
-error: Undefined symbol `.`
-    at label-scope.asm(3)
-error: Undefined symbol `..`
-    at label-scope.asm(3)
-error: Built-in symbol `@` cannot be purged
-    at label-scope.asm(12)
-error: Built-in symbol `.` cannot be purged
-    at label-scope.asm(12)
-error: Built-in symbol `..` cannot be purged
-    at label-scope.asm(12)
-Assembly aborted with 6 errors!
+error: cannot delete built-in symbol `@`
+   ╭─[ test.asm:3:7 ]
+   │
+ 3 │ PURGE @, ., ..
+   │       ┬  
+   │       ╰── cannot perform this deletion
+───╯
+error: cannot delete built-in symbol `.`
+   ╭─[ test.asm:3:10 ]
+   │
+ 3 │ PURGE @, ., ..
+   │          ┬  
+   │          ╰── cannot perform this deletion
+───╯
+error: cannot delete built-in symbol `..`
+   ╭─[ test.asm:3:13 ]
+   │
+ 3 │ PURGE @, ., ..
+   │             ─┬  
+   │              ╰── cannot perform this deletion
+───╯
+error: cannot delete built-in symbol `@`
+    ╭─[ test.asm:12:7 ]
+    │
+ 12 │ PURGE @, ., ..
+    │       ┬  
+    │       ╰── cannot perform this deletion
+────╯
+error: cannot delete built-in symbol `.`
+    ╭─[ test.asm:12:10 ]
+    │
+ 12 │ PURGE @, ., ..
+    │          ┬  
+    │          ╰── cannot perform this deletion
+────╯
+error: cannot delete built-in symbol `..`
+    ╭─[ test.asm:12:13 ]
+    │
+ 12 │ PURGE @, ., ..
+    │             ─┬  
+    │              ╰── cannot perform this deletion
+────╯
+6 errors generated.
