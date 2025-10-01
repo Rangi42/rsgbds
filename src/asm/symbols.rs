@@ -547,6 +547,7 @@ impl Symbols {
     ) {
         if !identifiers.resolve(name).unwrap().contains('.') {
             self.global_scope = Some(name);
+            self.local_scope = None;
         } else {
             self.local_scope = Some(name);
         }
