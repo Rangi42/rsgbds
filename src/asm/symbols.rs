@@ -484,7 +484,8 @@ impl Symbols {
                         diagnostics::note_label(existing.def_span()).with_message(format!(
                             "the name is {} here...",
                             if existing.exists(
-                                self.global_scope.as_ref(),
+                                self.global_scope,
+                                self.local_scope,
                                 active_section,
                                 macro_args
                             ) {
@@ -903,7 +904,8 @@ impl SymbolData {
 
     pub fn exists(
         &self,
-        scope: Option<&Identifier>,
+        global_scope: Option<Identifier>,
+        local_scope: Option<Identifier>,
         active_sym_section: Option<&ActiveSection>,
         macro_args: Option<&MacroArgs>,
     ) -> bool {
@@ -912,7 +914,8 @@ impl SymbolData {
             SymbolData::Deleted(..) | SymbolData::ExportPlaceholder(..) => false,
             SymbolData::Pc => active_sym_section.is_some(),
             SymbolData::Narg => macro_args.is_some(),
-            SymbolData::Dot | SymbolData::DotDot => scope.is_some(),
+            SymbolData::Dot => global_scope.is_some(),
+            Self::DotDot => local_scope.is_some(),
         }
     }
 

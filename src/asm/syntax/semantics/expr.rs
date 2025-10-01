@@ -183,7 +183,8 @@ impl parse_ctx!() {
             let value = match self.symbols.find(&name) {
                 Some(sym)
                     if sym.exists(
-                        self.symbols.global_scope.as_ref(),
+                        self.symbols.global_scope,
+                        self.symbols.local_scope,
                         self.sections
                             .active_section
                             .as_ref()
