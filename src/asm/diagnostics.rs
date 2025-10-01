@@ -13,6 +13,7 @@ use crate::{
 
 const ERROR_COLOR: Color = Color::Red;
 pub const ERROR_KIND: ReportKind = ReportKind::Custom("error", ERROR_COLOR);
+pub const SYNTAX_ERROR_KIND: ReportKind = ReportKind::Custom("syntax error", ERROR_COLOR);
 
 const WARNING_COLOR: Color = Color::Yellow;
 pub const WARNING_KIND: ReportKind = ReportKind::Custom("warning", WARNING_COLOR);
