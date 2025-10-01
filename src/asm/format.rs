@@ -328,16 +328,30 @@ impl Display for NumberFormatter {
         let digits = match self.kind {
             FormatKind::String => unreachable!(),
             FormatKind::FixedPoint => {
+                use std::io::Write;
+                let mut buf = [0u8; 10 + 1 + 255 + 3]; // 1-.255qPP
+                let mut remaining = buf.as_mut_slice();
+                let (number, is_nonnegative) = if self.number as i32 >= 0 {
+                    (self.number, true)
+                } else {
+                    ((self.number as i32).wrapping_neg() as u32, false)
+                };
                 write!(
-                    f,
+                    remaining,
                     "{:.*}",
                     self.frac,
-                    self.number as i32 as f64 / (1u32 << self.precision) as f64,
-                )?;
+                    number as i32 as f64 / (1u32 << self.precision) as f64,
+                )
+                .unwrap();
                 if self.exact_prefix.is_some() {
-                    write!(f, "q{}", self.precision)?;
+                    write!(remaining, "q{}", self.precision).unwrap();
                 }
-                return Ok(());
+                let unused_len = remaining.len();
+                return f.pad_integral(
+                    is_nonnegative,
+                    "",
+                    std::str::from_utf8(&buf[..buf.len() - unused_len]).unwrap(),
+                );
             }
             FormatKind::Signed | FormatKind::Unsigned => &LOWERCASE_DIGITS[..10],
             FormatKind::Binary => &LOWERCASE_DIGITS[..2],
