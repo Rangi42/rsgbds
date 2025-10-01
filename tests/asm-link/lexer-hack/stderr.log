@@ -1,11 +1,39 @@
 error: `Label1` is not a macro
-    at lexer-hack.asm(22)
-error: `mac` already defined
-    at lexer-hack.asm(24)
-    and also:
-    at lexer-hack.asm(1)
-error: Undefined macro `undef`
-    at lexer-hack.asm(27)
-error: Undefined macro `undef`
-    at lexer-hack.asm(28)
-Assembly aborted with 4 errors!
+    ╭─[ test.asm:22:2 ]
+    │
+ 18 │     Label1: ld c, 3
+    │     ───┬──  
+    │        ╰──── a symbol by this name was defined here
+    │ 
+ 22 │     Label1 args
+    │     ───┬──  
+    │        ╰──── Macro call here
+────╯
+error: A symbol called "mac" already exists
+    ╭─[ test.asm:24:1 ]
+    │
+  1 │ MACRO mac
+    │       ─┬─  
+    │        ╰─── the name is defined here...
+    │ 
+ 24 │ mac: ld e, 5
+    │ ─┬─  
+    │  ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: macro `undef` does not exist
+    ╭─[ test.asm:27:2 ]
+    │
+ 27 │     undef :
+    │     ──┬──  
+    │       ╰──── attempting to call the macro here
+────╯
+error: macro `undef` does not exist
+    ╭─[ test.asm:28:1 ]
+    │
+ 28 │ undef :
+    │ ──┬──  
+    │   ╰──── attempting to call the macro here
+────╯
+4 errors generated.
