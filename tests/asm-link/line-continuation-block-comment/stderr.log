@@ -10,14 +10,14 @@ error: syntax error: unexpected end of line
    │
  6 │ println 6 \ / ; comment
    │             ┬  
-   │             ╰── expected "number", "identifier", "local identifier", "anonymous label reference", "(", "+", "-", ...37 others
+   │             ╰── expected "number", "string", "character literal", "identifier", "scoped identifier", "local identifier", "anonymous label reference", ...49 others
 ───╯
 error: syntax error: unexpected number
    ╭─[ test.asm:7:1 ]
    │
  7 │ 2
    │ ┬  
-   │ ╰── expected "identifier", "local identifier", ":", "+", "-", "adc", "add", ...89 others
+   │ ╰── expected "identifier", "scoped identifier", "local identifier", ":", "+", "-", "adc", ...90 others
 ───╯
 error: unexpected character after line continuation
     ╭─[ test.asm:12:12 ]
