@@ -1,3 +1,9 @@
-error: Expected constant expression: PC is not constant at assembly time
-    at max-errors.asm(3)
-Assembly aborted after the maximum of 1 error! (configure with '-X/--max-errors')
+error: `@` is not constant
+   ╭─[ test.asm:3:9 ]
+   │
+ 3 │ println @ ; causes an error before println occurs
+   │         ┬  
+   │         ╰── this symbol's value is not known at this point
+───╯
+warning: Reached 1 error, any subsequent will not be printed
+1 error generated.

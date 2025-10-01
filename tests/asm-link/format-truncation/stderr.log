@@ -1,5 +1,15 @@
-error: Fractional width 260 too long, limiting to 255
-    at format-truncation.asm(9)
-error: Fractional width 260 too long, limiting to 255
-    at format-truncation.asm(15)
-Assembly aborted with 2 errors!
+error: fixed-point width cannot be more than 255
+   ╭─[ test.asm:9:11 ]
+   │
+ 9 │ println "{0280.260f:fix}"
+   │           ────┬────  
+   │               ╰────── error parsing this format specification
+───╯
+error: fixed-point width cannot be more than 255
+    ╭─[ test.asm:15:12 ]
+    │
+ 15 │ println "<{0280.260f:fix}>"
+    │            ────┬────  
+    │                ╰────── error parsing this format specification
+────╯
+2 errors generated.

@@ -1,2 +1,11 @@
-warning: 5 [-Wuser]
-    at if-macro.asm::m(5) <- if-macro.asm(10)
+[-Wuser] warning: 5
+    ╭─[ test.asm:5:3 ]
+    │
+  5 │        WARN "5"
+    │        ──┬─  
+    │          ╰─── triggered here
+    │ 
+ 10 │     m
+    │     ┬  
+    │     ╰── macro called here
+────╯

@@ -61,7 +61,7 @@ error: unexpected character 'x' after the print type
    │                 ─┬  
    │                  ╰── error parsing this format specification
 ───╯
-error: a sign is only applicable to signed or fixed-point formatting
+error: a sign character is incompatible with string symbol formatting
     ╭─[ test.asm:11:16 ]
     │
  11 │ println STRFMT("%+s", "hello")

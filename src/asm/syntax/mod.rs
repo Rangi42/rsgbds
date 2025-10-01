@@ -125,7 +125,7 @@ pub fn parse_file(
                         .is_some_and(|cond| cond.entered_block) =>
                 {
                     parse_ctx.push_line_token(token, &mut line_tokens);
-                    // HACK: if we were executing the previous block, we need to not lex the remainder of the block!
+                    // HACK: if we were executing the previous block, we need to not lex the remainder of the line!
                     //       This enables code like:
                     // ```
                     // if _NARG < 1

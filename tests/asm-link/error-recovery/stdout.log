@@ -1,8 +1,12 @@
 begin
-$2Astart 0
+$2A$1
+start 0
+
 finish 0
 start 1
+
 finish 1
 start 2
+
 finish 2
 end 3
