@@ -1,9 +1,31 @@
-error: Interpolated symbol `undef` does not exist
-    at interpolation.asm(18)
-error: Interpolated symbol `label` does not exist
-    at interpolation.asm(22)
-error: Interpolated symbol `foo` is not a numeric or string symbol
-    at interpolation.asm(29)
-error: Interpolated symbol `xor` is a reserved keyword; add a '#' prefix to use it as a raw symbol
-    at interpolation.asm(32)
-Assembly aborted with 4 errors!
+error: the symbol `undef` doesn't exist
+    ╭─[ test.asm:18:17 ]
+    │
+ 18 │ PRINTLN "undef {undef}"
+    │                 ──┬──  
+    │                   ╰──── this interpolation is invalid
+────╯
+error: the symbol `label` doesn't exist
+    ╭─[ test.asm:22:17 ]
+    │
+ 22 │ PRINTLN "label {label}"
+    │                 ──┬──  
+    │                   ╰──── this interpolation is invalid
+────╯
+error: a macro cannot be formatted as string or number
+    ╭─[ test.asm:29:15 ]
+    │
+ 29 │ PRINTLN "foo {foo}"
+    │               ─┬─  
+    │                ╰─── this interpolation is invalid
+────╯
+error: interpolated symbol is a reserved keyword
+    ╭─[ test.asm:32:15 ]
+    │
+ 32 │ PRINTLN "xor {xor}"
+    │               ─┬─  
+    │                ╰─── attempting to interpolate `xor` here
+    │ 
+    │ Help: add a `#` prefix to use the name as a symbol anyway
+────╯
+4 errors generated.

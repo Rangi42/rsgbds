@@ -6,4 +6,7 @@ error: maximum recursion depth exceeded
    │                                                                 ╰── depth is 64 contexts here, cannot enter a new one
 ───╯
 warning: Reached 1 error, any subsequent will not be printed
+  │ 
+  │ Help: this limit can be configured using the `--max-errors` option
+──╯
 1 error generated.

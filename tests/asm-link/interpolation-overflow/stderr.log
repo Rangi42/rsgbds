@@ -1,10 +1,28 @@
-error: Fractional width 99999999 too long, limiting to 255
-    at interpolation-overflow.asm(4)
-warning: Precision of fixed-point constant is too large [-Wlarge-constant]
-    at interpolation-overflow.asm(4)
-    while expanding symbol `x`
-error: `\1` cannot be used outside of a macro
-    at interpolation-overflow.asm(4)
-error: syntax error, unexpected number
-    at interpolation-overflow.asm(4)
-Assembly aborted with 3 errors!
+error: fixed-point width cannot be more than 255
+   ╭─[ test.asm:4:2 ]
+   │
+ 4 │ {.99999999f:x}\1
+   │  ─────┬────  
+   │       ╰────── error parsing this format specification
+───╯
+error: a macro argument was used outside of a macro
+   ╭─[ test.asm:4:15 ]
+   │
+ 4 │ {.99999999f:x}\1
+   │               ─┬  
+   │                ╰── cannot use a macro argument here
+───╯
+error: syntax error: unexpected number
+   ╭─[ x:1:1 ]
+   │
+ 1 │ $0
+   │ ─┬  
+   │  ╰── expected "identifier", "scoped identifier", "local identifier", ":", "+", "-", "adc", ...90 others
+   │
+   ├─[ test.asm:4:1 ]
+   │
+ 4 │ {.99999999f:x}\1
+   │ ───────┬──────  
+   │        ╰──────── interpolated here
+───╯
+3 errors generated.

@@ -7,13 +7,6 @@ error: interpolated symbol is a reserved keyword
    │ 
    │ Help: add a `#` prefix to use the name as a symbol anyway
 ───╯
-error: unexpected character '}'
-   ╭─[ test.asm:1:9 ]
-   │
- 1 │ def p = {{a}}
-   │         ──┬──  
-   │           ╰──── this character was not expected at this point
-───╯
 error: syntax error: unexpected end of line
    ╭─[ test.asm:1:7 ]
    │
@@ -46,11 +39,11 @@ error: interpolated symbol is a reserved keyword
    │ 
    │ Help: add a `#` prefix to use the name as a symbol anyway
 ───╯
-[-Wunescaped-brace] warning: unescaped closing brace
-   ╭─[ test.asm:3:14 ]
+error: empty character literal
+   ╭─[ test.asm:3:9 ]
    │
  3 │ def r = '{{c}}'
-   │              ┬  
-   │              ╰── this isn't part of an interpolation
+   │         ───┬───  
+   │            ╰───── this literal is empty
 ───╯
 6 errors generated.
