@@ -347,7 +347,7 @@ Instruction: Option<Instruction> = {
 		Some(Instruction::srl(operand, ctx.span_from_to(l_span_idx, r_span_idx)))
 	},
 	<l_span_idx:@L> "stop" <operand:Expr?> <r_span_idx:@R> => {
-		Some(Instruction::stop(operand, ctx.span_from_to(l_span_idx, r_span_idx)))
+		Some(Instruction::stop(operand, ctx.span_from_to_maybe_eq(l_span_idx, r_span_idx)))
 	},
 	<l_span_idx:@L> "sub" <operands:ArithInstrOperands> <r_span_idx:@R> => {
 		Some(Instruction::sub(operands, ctx.span_from_to(l_span_idx, r_span_idx)))
