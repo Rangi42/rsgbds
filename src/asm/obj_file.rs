@@ -127,7 +127,7 @@ fn register_file_nodes<'nodes>(
             let Some(parent) = span.node.parent.as_deref() else {
                 break;
             };
-            span = parent;
+            span = hard_span_of(parent);
         }
     };
 
@@ -315,7 +315,7 @@ impl WriteContext<'_, '_, '_, '_, '_, '_> {
                 }
                 _ => {
                     debug_assert!(node.kind.ends_implicitly());
-                    unreachable!("Registered non-hard node!?")
+                    unreachable!("Registered non-hard node!? (`{}`)", node.src.name)
                 }
             };
         }
