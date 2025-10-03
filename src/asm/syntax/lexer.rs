@@ -2843,6 +2843,23 @@ impl Lexer {
         let mut string = CompactString::default();
         let mut parens_depth = 0usize;
         let ends_with_comma = loop {
+            fn adjust_span_after_string(
+                span: &mut NormalSpan,
+                string_span: &NormalSpan,
+                ctx: &Context,
+            ) {
+                if Rc::ptr_eq(&string_span.node.src, &span.node.src) {
+                    debug_assert_eq!(span.bytes.end, string_span.bytes.start);
+                    span.bytes.end = string_span.bytes.end;
+                } else {
+                    debug_assert!(string_span.node.kind.ends_implicitly());
+                    debug_assert_eq!(ctx.span.bytes.start, 0);
+                    if string_span.bytes.start == 0 {
+                        // Since this modification isn't idempotent, only perform it at the start of the expansion.
+                        *span = span.merged_with(string_span);
+                    }
+                }
+            }
             match self.peek(&mut params) {
                 Some('\'') => {
                     let depth = self.contexts.len();
@@ -2863,10 +2880,7 @@ impl Lexer {
                             &mut params,
                         )
                     });
-                    if Rc::ptr_eq(&string_span.node.src, &span.node.src) {
-                        debug_assert_eq!(span.bytes.end, string_span.bytes.start);
-                        span.bytes.end = string_span.bytes.end;
-                    }
+                    adjust_span_after_string(&mut span, &string_span, ctx);
                     span_before_whitespace = None;
                 }
                 Some('"') => {
@@ -2888,10 +2902,7 @@ impl Lexer {
                             &mut params,
                         )
                     });
-                    if Rc::ptr_eq(&string_span.node.src, &span.node.src) {
-                        debug_assert_eq!(span.bytes.end, string_span.bytes.start);
-                        span.bytes.end = string_span.bytes.end;
-                    }
+                    adjust_span_after_string(&mut span, &string_span, ctx);
                     span_before_whitespace = None;
                 }
                 Some('#') => {
@@ -2917,10 +2928,7 @@ impl Lexer {
                             &mut params,
                         )
                     });
-                    if Rc::ptr_eq(&string_span.node.src, &span.node.src) {
-                        debug_assert_eq!(span.bytes.end, string_span.bytes.start);
-                        span.bytes.end = string_span.bytes.end;
-                    }
+                    adjust_span_after_string(&mut span, &string_span, ctx);
                     span_before_whitespace = None;
                 }
 
