@@ -202,13 +202,11 @@ impl NormalSpan {
         }
 
         debug_assert_eq!(left.node.kind, right.node.kind);
-        debug_assert!(
-            left.bytes.end <= right.bytes.start,
-            "Attempting to merge {:?} and {:?} in {}",
-            left.bytes,
-            right.bytes,
-            left.node.src.name,
-        );
+        // The spans may be overlapping, e.g. if both straddle the same expansion:
+        // ```
+        // def x equs "b c"
+        // a{x}d ; Both `ab` and `cd` span the interpolation.
+        // ```
         NormalSpan {
             node: left.node.clone(),
             bytes: left.bytes.start..right.bytes.end,

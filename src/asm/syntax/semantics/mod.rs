@@ -39,16 +39,7 @@ impl parse_ctx!() {
         span
     }
 
-    pub(super) fn span_from_to_maybe_eq(&self, left_idx: usize, right_idx: usize) -> Span {
-        if left_idx == right_idx {
-            self.line_spans[left_idx].clone()
-        } else {
-            self.span_from_to(left_idx, right_idx)
-        }
-    }
-
     pub(super) fn span_from_to(&self, left_idx: usize, right_idx: usize) -> Span {
-        debug_assert_ne!(left_idx, right_idx);
         self.line_spans[left_idx].merged_with(&self.line_spans[right_idx])
     }
 
