@@ -539,10 +539,10 @@ ExprFactor<Atom>: Expr = {
 	ExprUnary<Atom>
 };
 ExprUnary<Atom>: Expr = {
-	<span_idx:@L> "~" <expr:ExprExponent<ExprAtom>> => expr.unary_op(UnOp::Complement, ctx.nth_span(span_idx)),
-	<span_idx:@L> "+" <expr:ExprExponent<ExprAtom>> => expr.unary_op(UnOp::Identity,   ctx.nth_span(span_idx)),
-	<span_idx:@L> "-" <expr:ExprExponent<ExprAtom>> => expr.unary_op(UnOp::Negation,   ctx.nth_span(span_idx)),
-	<span_idx:@L> "!" <expr:ExprExponent<ExprAtom>> => expr.unary_op(UnOp::Not,        ctx.nth_span(span_idx)),
+	<span_idx:@L> "~" <expr:ExprUnary<ExprAtom>> => expr.unary_op(UnOp::Complement, ctx.nth_span(span_idx)),
+	<span_idx:@L> "+" <expr:ExprUnary<ExprAtom>> => expr.unary_op(UnOp::Identity,   ctx.nth_span(span_idx)),
+	<span_idx:@L> "-" <expr:ExprUnary<ExprAtom>> => expr.unary_op(UnOp::Negation,   ctx.nth_span(span_idx)),
+	<span_idx:@L> "!" <expr:ExprUnary<ExprAtom>> => expr.unary_op(UnOp::Not,        ctx.nth_span(span_idx)),
 	ExprExponent<Atom>
 };
 ExprExponent<Atom>: Expr = { // Note the reversed expression tokens, which make `**` right-associative.
