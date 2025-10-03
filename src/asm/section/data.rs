@@ -564,7 +564,7 @@ impl Sections {
                 ctx.patches.push(Patch {
                     kind: PatchKind::Byte,
                     rest: LinkTimeExpr {
-                        span: expr.overall_span(),
+                        span: expr.first_span(),
                         expr: expr.clone(),
                         offset,
                         pc: Some((ctx.symbol_section.id, ctx.symbol_section.offset)),
@@ -604,7 +604,7 @@ impl Sections {
                 ctx.patches.push(Patch {
                     kind: PatchKind::Word,
                     rest: LinkTimeExpr {
-                        span: expr.overall_span(),
+                        span: expr.first_span(),
                         expr: expr.clone(),
                         offset,
                         pc: Some((ctx.symbol_section.id, ctx.symbol_section.offset)),
@@ -639,7 +639,7 @@ impl Sections {
                 ctx.patches.push(Patch {
                     kind: PatchKind::Long,
                     rest: LinkTimeExpr {
-                        span: expr.overall_span(),
+                        span: expr.first_span(),
                         expr: expr.clone(),
                         offset,
                         pc: Some((ctx.symbol_section.id, ctx.symbol_section.offset)),

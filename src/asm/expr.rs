@@ -552,12 +552,8 @@ impl Expr {
         }
     }
 
-    pub fn overall_span(&self) -> Span {
-        match self.payload.as_slice() {
-            // Attempting to merge a span with itself would fail.
-            [op] => op.span.clone(),
-            ops => ops[0].span.merged_with(&ops.last().unwrap().span),
-        }
+    pub fn first_span(&self) -> Span {
+        self.payload[0].span.clone()
     }
 
     pub fn ops(&self) -> impl ExactSizeIterator<Item = &Op> {
