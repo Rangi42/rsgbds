@@ -1,3 +1,10 @@
+#![deny(
+    clippy::undocumented_unsafe_blocks,
+    unsafe_op_in_unsafe_fn,
+    unused_unsafe
+)]
+#![debugger_visualizer(gdb_script_file = "../../maintainer/gdb_pretty_printers.py")]
+
 use std::{
     cell::Cell,
     fmt::Display,

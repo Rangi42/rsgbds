@@ -1071,8 +1071,8 @@ impl Lexer {
                             to_process = rest;
                         }
                         if to_process.as_ptr() != name.as_ptr() {
-                            // SAFETY: `to_process` is derived from `name`.
                             let ofs_processed =
+                                // SAFETY: `to_process` is derived from `name`.
                                 unsafe { to_process.as_ptr().offset_from(name.as_ptr()) };
                             drop(name.drain(..ofs_processed as usize));
                         }
