@@ -1,8 +1,8 @@
 use std::cell::Cell;
 
-use crate::{diagnostics, sources::Span, Options};
+use crate::{diagnostics, section::SectionKind, sources::Span, Options};
 
-use super::{Contents, Sections, UnionEntry};
+use super::{ActiveSection, Contents, Sections, UnionEntry};
 
 impl Sections {
     pub fn enter_union(
@@ -62,10 +62,13 @@ impl Sections {
                 debug_assert!(!active.is_load_block_active());
                 debug_assert_eq!(active.data_section.offset, active.sym_section.offset);
 
-                debug_assert_eq!(*len, active.data_section.offset);
+                if !matches!(data_sect.attrs.kind, SectionKind::Union) && active.unions.is_empty() {
+                    debug_assert_eq!(*len, active.data_section.offset);
+                }
                 active.unions.push(UnionEntry {
                     offset_at_entry: active.data_section.offset,
                     span: keyword_span,
+                    overall_size: 0,
                 });
             }
         }
@@ -117,6 +120,7 @@ impl Sections {
             return;
         };
 
+        union.record_size_of_block(&active.data_section, &active.sym_section);
         active.data_section.offset = union.offset_at_entry;
         active.sym_section.offset = union.offset_at_entry;
     }
@@ -151,7 +155,11 @@ impl Sections {
             );
             return;
         };
-        if active.unions.pop().is_none() {
+        if let Some(mut union) = active.unions.pop() {
+            union.record_size_of_block(&active.data_section, &active.sym_section);
+            active.data_section.offset = union.offset_at_entry + union.overall_size;
+            active.sym_section.offset = union.offset_at_entry + union.overall_size;
+        } else {
             diagnostics::error(
                 keyword_span,
                 |error| {
@@ -164,9 +172,14 @@ impl Sections {
                 nb_errors_left,
                 options,
             );
-        } else {
-            // In case the last block wasn't the largest.
-            active.data_section.offset = self.sections[active.data_section.id].bytes.len();
         }
+    }
+}
+
+impl UnionEntry {
+    fn record_size_of_block(&mut self, data_section: &ActiveSection, sym_section: &ActiveSection) {
+        debug_assert_eq!(data_section.offset, sym_section.offset);
+        let this_block_size = data_section.offset - self.offset_at_entry;
+        self.overall_size = std::cmp::max(self.overall_size, this_block_size);
     }
 }

@@ -38,6 +38,7 @@ pub struct ActiveSections {
 #[derive(Debug)]
 struct UnionEntry {
     offset_at_entry: usize,
+    overall_size: usize,
     span: Span,
 }
 
