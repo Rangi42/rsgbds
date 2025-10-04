@@ -40,9 +40,9 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
         .arg(obj_file.path())
         .arg("-Weverything");
 
-    let flags_file_path = asm_path.with_file_name("flags.txt");
+    let flags_file_path = asm_path.with_file_name("rgbasm.flags");
     if flags_file_path.exists() {
-        cmd = cmd.arg("@flags.txt");
+        cmd = cmd.arg("@rgbasm.flags");
     }
 
     let result = cmd.assert().with_assert(
@@ -81,7 +81,7 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
     if bin_file_path.exists() {
         let bin_file = NamedTempFile::new().context("Unable to create temp bin file")?;
 
-        Command::new(RGBLINK_PATH)
+        let mut cmd = Command::new(RGBLINK_PATH)
             .current_dir(
                 asm_path
                     .parent()
@@ -95,7 +95,12 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
             .arg(bin_file.path())
             .arg("-x")
             //.arg("-Weverything") TODO
-            .assert()
+            ;
+        let flags_file_path = asm_path.with_file_name("rgblink.flags");
+        if flags_file_path.exists() {
+            cmd = cmd.arg("@rgblink.flags");
+        }
+        cmd.assert()
             .success()
             .stdout_eq([].as_slice())
             .stderr_eq([].as_slice());
