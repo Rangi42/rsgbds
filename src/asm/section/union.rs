@@ -2,7 +2,7 @@ use std::cell::Cell;
 
 use crate::{diagnostics, section::SectionKind, sources::Span, Options};
 
-use super::{ActiveSection, Contents, Sections, UnionEntry};
+use super::{ActiveSection, Contents, SectionMap, Sections, UnionEntry};
 
 impl Sections {
     pub fn enter_union(
@@ -120,7 +120,7 @@ impl Sections {
             return;
         };
 
-        union.record_size_of_block(&active.data_section, &active.sym_section);
+        union.record_size_of_block(&active.data_section, &active.sym_section, &self.sections);
         active.data_section.offset = union.offset_at_entry;
         active.sym_section.offset = union.offset_at_entry;
     }
@@ -156,9 +156,13 @@ impl Sections {
             return;
         };
         if let Some(mut union) = active.unions.pop() {
-            union.record_size_of_block(&active.data_section, &active.sym_section);
+            union.record_size_of_block(&active.data_section, &active.sym_section, &self.sections);
             active.data_section.offset = union.offset_at_entry + union.overall_size;
             active.sym_section.offset = union.offset_at_entry + union.overall_size;
+            let data_sect = &self.sections[active.data_section.id];
+            if !matches!(data_sect.attrs.kind, SectionKind::Union) && active.unions.is_empty() {
+                debug_assert_eq!(data_sect.bytes.len(), active.data_section.offset);
+            }
         } else {
             diagnostics::error(
                 keyword_span,
@@ -177,8 +181,18 @@ impl Sections {
 }
 
 impl UnionEntry {
-    fn record_size_of_block(&mut self, data_section: &ActiveSection, sym_section: &ActiveSection) {
+    fn record_size_of_block(
+        &mut self,
+        data_section: &ActiveSection,
+        sym_section: &ActiveSection,
+        sections: &SectionMap,
+    ) {
+        debug_assert_eq!(
+            data_section.id, sym_section.id,
+            "`union` used in `load` block!!"
+        );
         debug_assert_eq!(data_section.offset, sym_section.offset);
+        debug_assert!(data_section.offset <= sections[data_section.id].bytes.len()); // The length should have been kept track of.
         let this_block_size = data_section.offset - self.offset_at_entry;
         self.overall_size = std::cmp::max(self.overall_size, this_block_size);
     }

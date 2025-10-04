@@ -20,11 +20,12 @@ mod union;
 
 #[derive(Debug)]
 pub struct Sections {
-    pub sections: IndexMap<CompactString, Section, FxBuildHasher>,
+    pub sections: SectionMap,
     pub active_section: Option<ActiveSections>,
     section_stack: Vec<SectionStackEntry>,
     pub assertions: Vec<Assertion>,
 }
+pub type SectionMap = IndexMap<CompactString, Section, FxBuildHasher>;
 pub type SectionId = usize; // Index into the `IndexMap`.
 #[derive(Debug)]
 pub struct ActiveSections {
