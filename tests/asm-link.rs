@@ -6,7 +6,7 @@ use tempfile::NamedTempFile;
 datatest_stable::harness! {
     { test = rgbasm_rgblink, root = "tests/asm-link", pattern = r"/test\.asm$" },
     // Intentionally testing opening a file that doesn't exist.
-    { test = rgbasm_notexist, root = "tests/asm-link", pattern = r"notexist/stderr\.log$" },
+    { test = rgbasm_notexist, root = "tests/asm-link", pattern = r"notexist/rgbasm\.err$" },
     // TODO: `version.asm`, other special tests in `test.sh`
 }
 
@@ -55,23 +55,23 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
             .normalize_paths(false),
     );
 
-    let err_file_path = asm_path.with_file_name("stderr.log");
+    let err_file_path = asm_path.with_file_name("rgbasm.err");
     let result = if err_file_path.exists() {
         // Note that the presence of a stderr log does not indicate failure is expected;
         // possibly the log contains only warnings.
         result.stderr_eq(
             Data::try_read_from(err_file_path.as_std_path(), None)
-                .context("Error reading errput")?,
+                .context("Error reading rgbasm errput")?,
         )
     } else {
         result.success().stderr_eq([].as_slice())
     };
 
-    let out_file_path = asm_path.with_file_name("stdout.log");
+    let out_file_path = asm_path.with_file_name("rgbasm.out");
     if out_file_path.exists() {
         result.stdout_eq(
             Data::try_read_from(out_file_path.as_std_path(), None)
-                .context("Error reading output")?,
+                .context("Error reading rgbasm output")?,
         );
     } else {
         result.stdout_eq([].as_slice());
@@ -94,32 +94,47 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
             .arg("-o")
             .arg(bin_file.path())
             .arg("-x")
-            //.arg("-Weverything") TODO
-            ;
+            .arg("-Weverything");
+
         let flags_file_path = asm_path.with_file_name("rgblink.flags");
         if flags_file_path.exists() {
             cmd = cmd.arg("@rgblink.flags");
         }
-        cmd.assert()
-            .success()
-            .stdout_eq([].as_slice())
-            .stderr_eq([].as_slice());
+
+        let result = cmd.assert().success();
+        let err_file_path = asm_path.with_file_name("rgblink.err");
+        let result = if err_file_path.exists() {
+            // Note that the presence of a stderr log does not indicate failure is expected;
+            // possibly the log contains only warnings.
+            result.stderr_eq(
+                Data::try_read_from(err_file_path.as_std_path(), None)
+                    .context("Error reading rgblink errput")?,
+            )
+        } else {
+            result.success().stderr_eq([].as_slice())
+        };
+
+        let out_file_path = asm_path.with_file_name("rgblink.out");
+        if out_file_path.exists() {
+            result.stdout_eq(
+                Data::try_read_from(out_file_path.as_std_path(), None)
+                    .context("Error reading rgblink output")?,
+            );
+        } else {
+            result.stdout_eq([].as_slice());
+        }
 
         let generated = std::fs::read(bin_file).context("Unable to read temp bin file")?;
         let reference = Data::try_read_from(bin_file_path.as_std_path(), Some(DataFormat::Binary))
             .context("Error reading binary")?;
-        if Assert::new()
+        Assert::new()
             .action_env(ACTION_ENV_VAR_NAME)
             .try_eq(None, Data::binary(generated.as_slice()), reference.clone())
-            .is_err()
-        {
-            return Err(BinDiff {
+            .map_err(|_err| BinDiff {
                 expected: reference.to_bytes().unwrap(),
                 actual: generated,
                 path: bin_file_path,
-            }
-            .into());
-        }
+            })?
     }
 
     Ok(())
