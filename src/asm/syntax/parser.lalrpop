@@ -624,7 +624,8 @@ StringExprAtom: (CompactString, Span) = {
 	StringExprAtomNoIdent
 };
 StringExprAtomNoIdent: (CompactString, Span) = {
-	<span_idx:@L> <string:"string"> => (string, ctx.nth_span(span_idx)),
+	// FIXME: should be able to become `nth_span` when strings-as-nums are removed
+	<span_idx:@L> <string:"string"> => (string, ctx.line_spans[span_idx].clone()),
 	// TODO: readfile
 	<l_span_idx:@L> "strslice" "(" <string:StringExpr> "," <start:Expr> <end:("," <Expr>)?> ")" <r_span_idx:@R> => {
 		ctx.strslice(string, start, end, l_span_idx, r_span_idx)
