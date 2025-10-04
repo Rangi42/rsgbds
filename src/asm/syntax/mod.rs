@@ -92,6 +92,7 @@ pub fn parse_file(
             // such an incremental approach is required.
             // (That, or `RefCell`ing all the things, but that sucks majorly.)
             line_tokens.clear();
+            parse_ctx.line_spans.clear();
 
             // There are two kinds of lines: regular lines, and lines with a “raw” portion.
             // The latter is macro invocations and `opt` directives;
