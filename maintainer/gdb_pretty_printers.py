@@ -31,12 +31,14 @@ class ArrayVecPrinter(gdb.ValuePrinter):
         return "array"
 
 
+ARIADNE_SOURCE_REGEX = re.compile(r"^(ariadne::(\w+::)+)Source<.+>$")
+
+
 @final
 class CompactStringPrinter(gdb.ValuePrinter):
     "Print a compact_str::CompactString"
 
     def __init__(self, val: gdb.Value) -> None:
-        super().__init__()
         repr = val["__0"]
         last_byte = int(repr["__5"])
         if (
@@ -53,6 +55,21 @@ class CompactStringPrinter(gdb.ValuePrinter):
 
     def to_string(self):
         return self.__str
+
+    @staticmethod
+    def display_hint():
+        return "string"
+
+
+@final
+class AriadneSourcePrinter(gdb.ValuePrinter):
+    "Print an ariadne::source::Source"
+
+    def __init__(self, val: gdb.Value) -> None:
+        self.__text = val["text"]
+
+    def to_string(self):
+        return self.__text
 
     @staticmethod
     def display_hint():
@@ -132,6 +149,8 @@ def rgbds_lookup(val: gdb.Value):
         return ArrayVecPrinter(val)
     if lookup_tag == "compact_str::CompactString":
         return CompactStringPrinter(val)
+    if ARIADNE_SOURCE_REGEX.match(lookup_tag):
+        return AriadneSourcePrinter(val)
     if lookup_tag == "rgbgfx::color_set::ColorSet":
         return ColorGroupPrinter(val)
     if lookup_tag == "plumers::color::Rgb16":
