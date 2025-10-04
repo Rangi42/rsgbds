@@ -133,7 +133,7 @@ impl parse_ctx!() {
     pub fn emit_words(&mut self, words: Vec<Either<Expr, (CompactString, Span)>>, span_idx: usize) {
         if words.is_empty() {
             self.warn_if_used_in_rom("dw", 2, &self.line_spans[span_idx]);
-            self.allocate_space(Either::Left(Either::Right(1)), span_idx);
+            self.allocate_space(Either::Left(Either::Right(2)), span_idx);
         } else {
             let keyword_span = &self.line_spans[span_idx];
 
@@ -166,7 +166,7 @@ impl parse_ctx!() {
     pub fn emit_longs(&mut self, longs: Vec<Either<Expr, (CompactString, Span)>>, span_idx: usize) {
         if longs.is_empty() {
             self.warn_if_used_in_rom("dl", 4, &self.line_spans[span_idx]);
-            self.allocate_space(Either::Left(Either::Right(1)), span_idx);
+            self.allocate_space(Either::Left(Either::Right(4)), span_idx);
         } else {
             let keyword_span = &self.line_spans[span_idx];
 
