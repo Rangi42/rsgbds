@@ -473,7 +473,7 @@ impl Lexer {
                 break ctx;
             }
             debug_assert_eq!(
-                ctx.span.bytes.start, ctx.span.bytes.end,
+                ctx.cur_byte, ctx.span.bytes.end,
                 "Implicitly-ending context not empty when popping!?"
             );
         };
