@@ -47,6 +47,7 @@ struct UnionEntry {
 pub struct ActiveSection {
     pub id: SectionId,
     pub offset: usize,
+    sym_scopes: Vec<Option<Identifier>>, // TODO(perf): consider a `smallvec` instead
 }
 
 #[derive(Debug)]
@@ -122,8 +123,6 @@ pub enum AssertLevel {
 pub struct SectionStackEntry {
     pushs_span: Span,
     active_section: Option<ActiveSections>,
-    global_scope: Option<Identifier>,
-    local_scope: Option<Identifier>,
 }
 
 impl Sections {
@@ -159,7 +158,11 @@ impl Sections {
                         bytes,
                     })
                     .index();
-                ActiveSection { id, offset: 0 }
+                ActiveSection {
+                    id,
+                    offset: 0,
+                    sym_scopes: vec![],
+                }
             }
 
             Entry::Occupied(mut entry) => {
@@ -227,7 +230,12 @@ impl Sections {
                 }
 
                 let id = entry.index();
-                ActiveSection { id, offset }
+                // Reset the symbol scope, even when entering a fragment of an existing section.
+                ActiveSection {
+                    id,
+                    offset,
+                    sym_scopes: vec![],
+                }
             }
         }
     }
@@ -241,63 +249,7 @@ impl Sections {
     ) {
         self.reject_active_union(span, nb_errors_left, options);
 
-        if let Some(active) = self.active_section.as_mut() {
-            if active.is_load_block_active() {
-                diagnostics::warn(
-                    warning!("unterminated-load"),
-                    span,
-                    |error| {
-                        error.set_message("`load` block terminated by another `load`");
-                        error.add_label(
-                            diagnostics::warning_label(span)
-                                .with_message("no `endl` before this point"),
-                        );
-                    },
-                    nb_errors_left,
-                    options,
-                );
-            }
-
-            let section = &self.sections[new_active_section.id];
-            if section.attrs.mem_region.has_data() {
-                diagnostics::error(
-                    span,
-                    |error| {
-                        error.set_message("`load` blocks cannot designate a data section");
-                        error.add_label(diagnostics::error_label(span).with_message(format!(
-                            "this section is in {}",
-                            section.attrs.mem_region.name(),
-                        )));
-                    },
-                    nb_errors_left,
-                    options,
-                );
-            }
-
-            if active.is_section_active(new_active_section.id)
-                || Self::is_in_stack(&self.section_stack, new_active_section.id)
-            {
-                diagnostics::error(
-                    span,
-                    |error| {
-                        error.set_message("`load` cannot designate an active section");
-                        error.add_label(diagnostics::error_label(span).with_message(format!(
-                            "section \"{}\" is {} at this point",
-                            self.sections.keys()[new_active_section.id],
-                            if active.is_section_active(new_active_section.id) {
-                                "active"
-                            } else {
-                                "in the stack"
-                            },
-                        )));
-                    },
-                    nb_errors_left,
-                    options,
-                );
-            } else {
-                active.sym_section = new_active_section;
-            }
-        } else {
+        let Some(active) = self.active_section.as_mut() else {
             diagnostics::error(
                 span,
                 |error| {
@@ -309,7 +261,103 @@ impl Sections {
                 nb_errors_left,
                 options,
             );
+            return;
         };
+        if active.is_load_block_active() {
+            diagnostics::warn(
+                warning!("unterminated-load"),
+                span,
+                |error| {
+                    error.set_message("`load` block terminated by another `load`");
+                    error.add_label(
+                        diagnostics::warning_label(span)
+                            .with_message("no `endl` before this point"),
+                    );
+                },
+                nb_errors_left,
+                options,
+            );
+        }
+
+        let section = &self.sections[new_active_section.id];
+        if section.attrs.mem_region.has_data() {
+            diagnostics::error(
+                span,
+                |error| {
+                    error.set_message("`load` blocks cannot designate a data section");
+                    error.add_label(diagnostics::error_label(span).with_message(format!(
+                        "this section is in {}",
+                        section.attrs.mem_region.name(),
+                    )));
+                },
+                nb_errors_left,
+                options,
+            );
+        }
+
+        if active.is_section_active(new_active_section.id)
+            || Self::is_in_stack(&self.section_stack, new_active_section.id)
+        {
+            diagnostics::error(
+                span,
+                |error| {
+                    error.set_message("`load` cannot designate an active section");
+                    error.add_label(diagnostics::error_label(span).with_message(format!(
+                        "section \"{}\" is {} at this point",
+                        self.sections.keys()[new_active_section.id],
+                        if active.is_section_active(new_active_section.id) {
+                            "active"
+                        } else {
+                            "in the stack"
+                        },
+                    )));
+                },
+                nb_errors_left,
+                options,
+            );
+        } else {
+            let prev_sym_sect = std::mem::replace(&mut active.sym_section, new_active_section);
+            active.data_section.sym_scopes = prev_sym_sect.sym_scopes;
+        }
+    }
+
+    pub fn close_load_block(
+        &mut self,
+        span: &Span,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        let Some(active) = self.active_section.as_mut() else {
+            diagnostics::error(
+                span,
+                |error| {
+                    error.set_message("`endl` used outside of a section");
+                    error.add_label(
+                        diagnostics::error_label(span).with_message("this directive is invalid"),
+                    );
+                },
+                nb_errors_left,
+                options,
+            );
+            return;
+        };
+
+        if active.is_load_block_active() {
+            // End the `LOAD` block.
+            active.sym_section = active.data_section.clone();
+        } else {
+            diagnostics::error(
+                span,
+                |error| {
+                    error.set_message("`endl` used outside of a `load` block");
+                    error.add_label(
+                        diagnostics::error_label(span).with_message("this directive is invalid"),
+                    );
+                },
+                nb_errors_left,
+                options,
+            );
+        }
     }
 
     pub fn find(&self, section_id: usize) -> &Section {
@@ -456,18 +504,15 @@ impl Sections {
             .iter()
             .any(|entry| refs_section(&entry.active_section))
     }
-    pub fn push_active_section(&mut self, pushs_span: Span, symbols: &mut Symbols) {
+    pub fn push_active_section(&mut self, pushs_span: Span) {
         let entry = SectionStackEntry {
             pushs_span,
             active_section: self.active_section.take(),
-            global_scope: symbols.global_scope.take(),
-            local_scope: symbols.local_scope.take(),
         };
         self.section_stack.push(entry);
     }
     pub fn pop_active_section(
         &mut self,
-        symbols: &mut Symbols,
         span: &Span,
         nb_errors_left: &Cell<usize>,
         options: &Options,
@@ -496,8 +541,6 @@ impl Sections {
 
         let entry = self.section_stack.pop()?;
         self.active_section = entry.active_section;
-        symbols.global_scope = entry.global_scope;
-        symbols.local_scope = entry.local_scope;
         Some(())
     }
 
@@ -741,11 +784,24 @@ impl ActiveSections {
         self.data_section.offset += nb_bytes;
         self.sym_section.offset += nb_bytes;
     }
-}
 
-impl ActiveSection {
+    pub fn sym_scope(&self, index: usize) -> Option<Identifier> {
+        self.sym_section.sym_scopes.get(index).copied().flatten()
+    }
+
+    pub fn set_sym_scope(&mut self, name: Identifier, identifiers: &Identifiers) {
+        let name_str = identifiers.resolve(name).unwrap();
+        let depth = name_str
+            .as_bytes()
+            .iter()
+            .filter(|&&byte| byte == b'.')
+            .count();
+        self.sym_section.sym_scopes.resize(depth + 1, None);
+        self.sym_section.sym_scopes[depth] = Some(name);
+    }
+
     pub fn define_label(
-        &self,
+        &mut self,
         name: Identifier,
         symbols: &mut Symbols,
         identifiers: &Identifiers,
@@ -755,13 +811,15 @@ impl ActiveSection {
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
+        let sect_id = self.sym_section.id;
+        let offset = self.sym_section.offset;
         symbols.define_label(
             name,
             identifiers,
             definition,
-            (self.id, self.offset),
+            (sect_id, offset),
             exported,
-            Some(self),
+            self,
             macro_args,
             nb_errors_left,
             options,

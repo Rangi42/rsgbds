@@ -17,9 +17,9 @@ impl parse_ctx!() {
     pub fn define_label(&mut self, name: Option<Identifier>, def_span_id: usize, exported: bool) {
         let def_span = self.nth_span(def_span_id);
 
-        if let Some(active) = self.sections.active_section.as_ref() {
+        if let Some(active) = self.sections.active_section.as_mut() {
             if let Some(ident) = name {
-                active.sym_section.define_label(
+                active.define_label(
                     ident,
                     self.symbols,
                     self.identifiers,
@@ -44,8 +44,8 @@ impl parse_ctx!() {
     pub fn define_anon_label(&mut self, def_span_id: usize) {
         let def_span = self.nth_span(def_span_id);
 
-        if let Some(active) = self.sections.active_section.as_ref() {
-            active.sym_section.define_label(
+        if let Some(active) = self.sections.active_section.as_mut() {
+            active.define_label(
                 self.symbols.cur_anon_label(self.identifiers),
                 self.symbols,
                 self.identifiers,
@@ -72,7 +72,12 @@ impl parse_ctx!() {
         mut name: CompactString,
         span_idx: usize,
     ) -> Option<Identifier> {
-        if let Some(scope) = self.symbols.global_scope {
+        if let Some(scope) = self
+            .sections
+            .active_section
+            .as_ref()
+            .and_then(|active| active.sym_scope(0))
+        {
             let scope_name = self.identifiers.resolve(scope).unwrap();
             debug_assert!(!scope_name.contains('.'), "scope = {scope_name:?}");
             name.insert_str(0, scope_name);
@@ -112,11 +117,7 @@ impl parse_ctx!() {
             return Either::Left(Expr::symbol(name, span));
         };
 
-        if let Some(res) = sym.get_string(
-            self.symbols.global_scope,
-            self.symbols.local_scope,
-            self.identifiers,
-        ) {
+        if let Some(res) = sym.get_string(self.sections.active_section.as_ref(), self.identifiers) {
             let string = res.unwrap_or_else(|err| {
                 self.error(&span, |error| {
                     error.set_message(&err);
@@ -160,10 +161,7 @@ impl parse_ctx!() {
             span,
             string,
             redef,
-            self.sections
-                .active_section
-                .as_ref()
-                .map(|active| &active.sym_section),
+            self.sections.active_section.as_ref(),
             self.macro_args.last(),
             self.nb_errors_left,
             self.options,
@@ -191,10 +189,7 @@ impl parse_ctx!() {
                     mutable,
                     export.is_some(),
                     redef,
-                    self.sections
-                        .active_section
-                        .as_ref()
-                        .map(|active| &active.sym_section),
+                    self.sections.active_section.as_ref(),
                     self.macro_args.last(),
                     self.nb_errors_left,
                     self.options,
@@ -228,10 +223,7 @@ impl parse_ctx!() {
                     true, // Mutable.
                     export.is_some(),
                     redef,
-                    self.sections
-                        .active_section
-                        .as_ref()
-                        .map(|active| &active.sym_section),
+                    self.sections.active_section.as_ref(),
                     self.macro_args.last(),
                     self.nb_errors_left,
                     self.options,
@@ -269,10 +261,7 @@ impl parse_ctx!() {
                     false, // Not mutable.
                     export.is_some(),
                     redef,
-                    self.sections
-                        .active_section
-                        .as_ref()
-                        .map(|active| &active.sym_section),
+                    self.sections.active_section.as_ref(),
                     self.macro_args.last(),
                     self.nb_errors_left,
                     self.options,
@@ -355,10 +344,7 @@ impl parse_ctx!() {
             param_names,
             expr,
             redef,
-            self.sections
-                .active_section
-                .as_ref()
-                .map(|active| &active.sym_section),
+            self.sections.active_section.as_ref(),
             self.macro_args.last(),
             self.nb_errors_left,
             self.options,

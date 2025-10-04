@@ -603,11 +603,8 @@ impl parse_ctx!() {
             });
             return (Default::default(), span.clone());
         };
-        let Some(res) = symbol.get_string(
-            self.symbols.global_scope,
-            self.symbols.local_scope,
-            self.identifiers,
-        ) else {
+        let Some(res) = symbol.get_string(self.sections.active_section.as_ref(), self.identifiers)
+        else {
             self.error(span, |error| {
                 error.set_message(SymbolError::NotString(
                     self.identifiers.resolve(name).unwrap(),

@@ -217,37 +217,11 @@ impl parse_ctx!() {
         }
     }
 
-    pub fn end_load_block(&mut self, span_idx: usize) {
-        let span = &self.line_spans[span_idx];
-
-        if let Some(active) = self.sections.active_section.as_mut() {
-            if active.is_load_block_active() {
-                // End the `LOAD` block.
-                active.sym_section = active.data_section.clone();
-            } else {
-                self.error(span, |error| {
-                    error.set_message("`endl` used outside of a `load` block");
-                    error.add_label(
-                        diagnostics::error_label(span).with_message("this directive is invalid"),
-                    );
-                });
-            }
-        } else {
-            self.error(span, |error| {
-                error.set_message("`endl` used outside of a section");
-                error.add_label(
-                    diagnostics::error_label(span).with_message("this directive is invalid"),
-                );
-            });
-        }
-    }
-
     pub fn end_section(&mut self, span_idx: usize) {
         let span = &self.line_spans[span_idx];
 
         self.sections
             .end_section(span, self.nb_errors_left, self.options);
-        self.symbols.end_scope();
     }
 
     pub fn set_symbol_section(
@@ -266,8 +240,13 @@ impl parse_ctx!() {
         let span = &self.line_spans[span_idx];
         self.sections
             .open_load_block(new_active_section, span, self.nb_errors_left, self.options);
+    }
 
-        // TODO: save the symbol scope to be restored at `endl`, and reset it
+    pub fn end_load_block(&mut self, span_idx: usize) {
+        let span = &self.line_spans[span_idx];
+
+        self.sections
+            .close_load_block(span, self.nb_errors_left, self.options);
     }
 
     pub fn push_section(
@@ -276,8 +255,7 @@ impl parse_ctx!() {
         span_idx: usize,
     ) {
         let pushs_span = &self.line_spans[span_idx];
-        self.sections
-            .push_active_section(pushs_span.clone(), self.symbols);
+        self.sections.push_active_section(pushs_span.clone());
 
         if let Some((attrs, (name, span))) = opt {
             let active_section = self.sections.create_if_not_exists(
@@ -295,7 +273,6 @@ impl parse_ctx!() {
                 self.options,
             );
         }
-        self.symbols.end_scope();
     }
 
     pub fn pop_section(&mut self, span_idx: usize) {
@@ -303,7 +280,7 @@ impl parse_ctx!() {
 
         if self
             .sections
-            .pop_active_section(self.symbols, span, self.nb_errors_left, self.options)
+            .pop_active_section(span, self.nb_errors_left, self.options)
             .is_none()
         {
             self.error(span, |error| {
@@ -334,6 +311,5 @@ impl parse_ctx!() {
             self.nb_errors_left,
             self.options,
         );
-        self.symbols.end_scope();
     }
 }

@@ -129,13 +129,11 @@ impl parse_ctx!() {
 
     pub fn ident(&self, ident: Identifier, span_idx: usize) -> Expr {
         let span = self.line_spans[span_idx].clone();
-        if let Some(res) = self.symbols.find(&ident).and_then(|sym| {
-            sym.get_string(
-                self.symbols.global_scope,
-                self.symbols.local_scope,
-                self.identifiers,
-            )
-        }) {
+        if let Some(res) = self
+            .symbols
+            .find(&ident)
+            .and_then(|sym| sym.get_string(self.sections.active_section.as_ref(), self.identifiers))
+        {
             match res {
                 Ok(string) => self.str_to_num((string, span)),
                 Err(err) => {
@@ -183,12 +181,7 @@ impl parse_ctx!() {
             let value = match self.symbols.find(&name) {
                 Some(sym)
                     if sym.exists(
-                        self.symbols.global_scope,
-                        self.symbols.local_scope,
-                        self.sections
-                            .active_section
-                            .as_ref()
-                            .map(|active| &active.sym_section),
+                        self.sections.active_section.as_ref(),
                         self.macro_args.last(),
                     ) =>
                 {
@@ -212,11 +205,7 @@ impl parse_ctx!() {
         let span = self.span_from_to(l_span_idx, r_span_idx);
         if let Some(name) = ident {
             if let Some(res) = self.symbols.find(&name).and_then(|sym| {
-                sym.get_string(
-                    self.symbols.global_scope,
-                    self.symbols.local_scope,
-                    self.identifiers,
-                )
+                sym.get_string(self.sections.active_section.as_ref(), self.identifiers)
             }) {
                 match res {
                     Ok(name) => Expr::bank_of_section(name, span),

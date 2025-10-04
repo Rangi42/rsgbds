@@ -11,7 +11,7 @@ use crate::{
     expr::Expr,
     format::{FormatError, FormatSpec},
     macro_args::MacroArgs,
-    section::{ActiveSection, SectionId, Sections},
+    section::{ActiveSections, SectionId, Sections},
     sources::{NormalSpan, Span},
     Identifier, Identifiers, Options,
 };
@@ -22,8 +22,6 @@ type SymMap = FxHashMap<Identifier, SymbolData>;
 #[derive(Debug)]
 pub struct Symbols {
     pub symbols: SymMap,
-    pub global_scope: Option<Identifier>,
-    pub local_scope: Option<Identifier>,
     anon_label_idx: u32,
 }
 
@@ -76,8 +74,6 @@ impl Symbols {
     ) -> Self {
         let mut this = Self {
             symbols: FxHashMap::with_hasher(FxBuildHasher),
-            global_scope: None,
-            local_scope: None,
             anon_label_idx: 0,
         };
 
@@ -258,7 +254,7 @@ impl Symbols {
                 sym.kind_name(),
             )?;
             Ok(())
-        } else if let Some(res) = sym.get_string(self.global_scope, self.local_scope, identifiers) {
+        } else if let Some(res) = sym.get_string(sections.active_section.as_ref(), identifiers) {
             fmt.write_str(&res?, buf, sym.kind_name())?;
             Ok(())
         } else if let SymbolData::Deleted(span) = sym {
@@ -457,7 +453,7 @@ impl Symbols {
         payload: SymbolKind,
         exported: bool,
         redef: bool,
-        active_section: Option<&ActiveSection>,
+        active_sections: Option<&ActiveSections>,
         macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
@@ -483,12 +479,7 @@ impl Symbols {
                     error.add_labels([
                         diagnostics::note_label(existing.def_span()).with_message(format!(
                             "the name is {} here...",
-                            if existing.exists(
-                                self.global_scope,
-                                self.local_scope,
-                                active_section,
-                                macro_args
-                            ) {
+                            if existing.exists(active_sections, macro_args) {
                                 "defined"
                             } else {
                                 "reserved"
@@ -514,7 +505,7 @@ impl Symbols {
         definition: Span,
         string: CompactString,
         redef: bool,
-        active_section: Option<&ActiveSection>,
+        active_sections: Option<&ActiveSections>,
         macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
@@ -526,7 +517,7 @@ impl Symbols {
             SymbolKind::String(string),
             false, // Not exported.
             redef,
-            active_section,
+            active_sections,
             macro_args,
             nb_errors_left,
             options,
@@ -540,17 +531,12 @@ impl Symbols {
         definition: Span,
         (section_id, offset): (usize, usize),
         exported: bool,
-        active_section: Option<&ActiveSection>,
+        active_sections: &mut ActiveSections,
         macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
-        if !identifiers.resolve(name).unwrap().contains('.') {
-            self.global_scope = Some(name);
-            self.local_scope = None;
-        } else {
-            self.local_scope = Some(name);
-        }
+        active_sections.set_sym_scope(name, identifiers);
 
         self.define_symbol(
             name,
@@ -559,7 +545,7 @@ impl Symbols {
             SymbolKind::Label { section_id, offset },
             exported || options.export_all,
             false, // Not redefining.
-            active_section,
+            Some(active_sections),
             macro_args,
             nb_errors_left,
             options,
@@ -575,7 +561,7 @@ impl Symbols {
         mutable: bool,
         exported: bool,
         redef: bool,
-        active_section: Option<&ActiveSection>,
+        active_sections: Option<&ActiveSections>,
         macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
@@ -587,7 +573,7 @@ impl Symbols {
             SymbolKind::Numeric { value, mutable },
             exported,
             redef,
-            active_section,
+            active_sections,
             macro_args,
             nb_errors_left,
             options,
@@ -602,7 +588,7 @@ impl Symbols {
         param_names: Vec<Identifier>,
         expr: Expr,
         redef: bool,
-        active_section: Option<&ActiveSection>,
+        active_sections: Option<&ActiveSections>,
         macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
@@ -614,7 +600,7 @@ impl Symbols {
             SymbolKind::Function { param_names, expr },
             false, // Not exported.
             redef,
-            active_section,
+            active_sections,
             macro_args,
             nb_errors_left,
             options,
@@ -627,7 +613,7 @@ impl Symbols {
         identifiers: &Identifiers,
         definition: Span,
         body: NormalSpan,
-        active_section: Option<&ActiveSection>,
+        active_sections: Option<&ActiveSections>,
         macro_args: Option<&MacroArgs>,
         nb_errors_left: &Cell<usize>,
         options: &Options,
@@ -639,7 +625,7 @@ impl Symbols {
             SymbolKind::Macro(body),
             false, // Not exported.
             false, // Not redefining.
-            active_section,
+            active_sections,
             macro_args,
             nb_errors_left,
             options,
@@ -655,10 +641,6 @@ impl Symbols {
             unreachable!()
         };
         value
-    }
-
-    pub fn end_scope(&mut self) {
-        self.global_scope = None;
     }
 
     pub fn delete(
@@ -905,18 +887,20 @@ impl SymbolData {
 
     pub fn exists(
         &self,
-        global_scope: Option<Identifier>,
-        local_scope: Option<Identifier>,
-        active_sym_section: Option<&ActiveSection>,
+        active_sections: Option<&ActiveSections>,
         macro_args: Option<&MacroArgs>,
     ) -> bool {
         match self {
             SymbolData::User { .. } | SymbolData::Builtin(..) => true,
             SymbolData::Deleted(..) | SymbolData::ExportPlaceholder(..) => false,
-            SymbolData::Pc => active_sym_section.is_some(),
+            SymbolData::Pc => active_sections.is_some(),
             SymbolData::Narg => macro_args.is_some(),
-            SymbolData::Dot => global_scope.is_some(),
-            Self::DotDot => local_scope.is_some(),
+            SymbolData::Dot => active_sections
+                .and_then(|active| active.sym_scope(0))
+                .is_some(),
+            Self::DotDot => active_sections
+                .and_then(|active| active.sym_scope(1))
+                .is_some(),
         }
     }
 
@@ -933,8 +917,7 @@ impl SymbolData {
 
     pub fn get_string(
         &self,
-        global_scope: Option<Identifier>,
-        local_scope: Option<Identifier>,
+        active_sections: Option<&ActiveSections>,
         identifiers: &Identifiers,
     ) -> Option<Result<CompactString, SymbolError<'static, 'static>>> {
         match self {
@@ -947,14 +930,18 @@ impl SymbolData {
             },
             Self::Pc => None,
             Self::Narg => None,
-            Self::Dot => Some(match global_scope {
-                Some(ident) => Ok(identifiers.resolve(ident).unwrap().into()),
-                None => Err(SymbolError::DotOutsideMacro),
-            }),
-            Self::DotDot => Some(match local_scope {
-                Some(ident) => Ok(identifiers.resolve(ident).unwrap().into()),
-                None => Err(SymbolError::DotDotOutsideMacro),
-            }),
+            Self::Dot => Some(
+                match active_sections.and_then(|active| active.sym_scope(0)) {
+                    Some(ident) => Ok(identifiers.resolve(ident).unwrap().into()),
+                    None => Err(SymbolError::DotOutsideMacro),
+                },
+            ),
+            Self::DotDot => Some(
+                match active_sections.and_then(|active| active.sym_scope(1)) {
+                    Some(ident) => Ok(identifiers.resolve(ident).unwrap().into()),
+                    None => Err(SymbolError::DotDotOutsideMacro),
+                },
+            ),
             Self::Deleted(..) => None,
             Self::ExportPlaceholder(..) => None,
         }

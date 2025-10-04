@@ -242,11 +242,9 @@ impl parse_ctx!() {
             if with_equs_expansion && !self.lexer.last_ident_was_raw {
                 if let tok!("identifier"(ident)) = &token.payload {
                     if let Some(sym) = self.symbols.find(ident) {
-                        if let Some(res) = sym.get_string(
-                            self.symbols.global_scope,
-                            self.symbols.local_scope,
-                            self.identifiers,
-                        ) {
+                        if let Some(res) =
+                            sym.get_string(self.sections.active_section.as_ref(), self.identifiers)
+                        {
                             match res {
                                 Ok(string) => self.lexer.expand_equs_symbol(
                                     *ident,

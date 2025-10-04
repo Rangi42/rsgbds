@@ -74,10 +74,7 @@ impl parse_ctx!() {
             self.identifiers,
             def_span,
             body,
-            self.sections
-                .active_section
-                .as_ref()
-                .map(|active| &active.sym_section),
+            self.sections.active_section.as_ref(),
             self.macro_args.last(),
             self.nb_errors_left,
             self.options,
@@ -135,10 +132,7 @@ impl parse_ctx!() {
                 true,  // Mutable.
                 false, // Unexported.
                 false, // Not redefining.
-                self.sections
-                    .active_section
-                    .as_ref()
-                    .map(|active| &active.sym_section),
+                self.sections.active_section.as_ref(),
                 self.macro_args.last(),
                 self.nb_errors_left,
                 self.options,
@@ -316,10 +310,7 @@ impl parse_ctx!() {
                         true,  // Mutable.
                         false, // Unexported.
                         false, // Not redefining.
-                        self.sections
-                            .active_section
-                            .as_ref()
-                            .map(|active| &active.sym_section),
+                        self.sections.active_section.as_ref(),
                         self.macro_args.last(),
                         self.nb_errors_left,
                         self.options,
