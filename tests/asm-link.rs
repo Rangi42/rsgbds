@@ -64,7 +64,7 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
                 .context("Error reading rgbasm errput")?,
         )
     } else {
-        result.success().stderr_eq([].as_slice())
+        result.success().stderr_eq("")
     };
 
     let out_file_path = asm_path.with_file_name("rgbasm.out");
@@ -74,7 +74,7 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
                 .context("Error reading rgbasm output")?,
         );
     } else {
-        result.stdout_eq([].as_slice());
+        result.stdout_eq("");
     }
 
     let bin_file_path = asm_path.with_file_name("output.bin");
@@ -111,7 +111,7 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
                     .context("Error reading rgblink errput")?,
             )
         } else {
-            result.success().stderr_eq([].as_slice())
+            result.success().stderr_eq("")
         };
 
         let out_file_path = asm_path.with_file_name("rgblink.out");
@@ -121,7 +121,7 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
                     .context("Error reading rgblink output")?,
             );
         } else {
-            result.stdout_eq([].as_slice());
+            result.stdout_eq("");
         }
 
         let generated = std::fs::read(bin_file).context("Unable to read temp bin file")?;
