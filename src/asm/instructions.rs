@@ -407,14 +407,14 @@ impl Instruction {
     pub fn dec_r16(rhs: Reg16Arith, span: Span) -> Self {
         Self {
             span,
-            bytes: [(rhs as u8) << 4 | 0x03].into_iter().collect(),
+            bytes: [(rhs as u8) << 4 | 0x0B].into_iter().collect(),
             patch: None,
         }
     }
     pub fn inc_r16(rhs: Reg16Arith, span: Span) -> Self {
         Self {
             span,
-            bytes: [(rhs as u8) << 4 | 0x0B].into_iter().collect(),
+            bytes: [(rhs as u8) << 4 | 0x03].into_iter().collect(),
             patch: None,
         }
     }
