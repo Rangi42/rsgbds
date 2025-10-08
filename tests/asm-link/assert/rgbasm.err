@@ -1,0 +1,8 @@
+error: assertion failed
+   ╭─[ test.asm:9:15 ]
+   │
+ 9 │     assert WARN, 0, "Still can finish the film, though!"
+   │                  ┬  
+   │                  ╰── Still can finish the film, though!
+───╯
+1 error generated.

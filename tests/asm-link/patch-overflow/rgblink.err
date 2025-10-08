@@ -1,0 +1,4 @@
+warning: Value $4000 is not 8-bit [-Wtruncation]
+    at test.asm(2)
+warning: Value $14000 is not 16-bit [-Wtruncation]
+    at test.asm(3)

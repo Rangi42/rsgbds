@@ -1,0 +1,21 @@
+error: Undefined symbol `Foo`
+    at test.asm(18)
+error: Undefined symbol `Bar`
+    at test.asm(19)
+error: Undefined symbol `hNonExist`
+    at test.asm(16)
+error: Undefined symbol `NonExist`
+    at test.asm(14)
+error: Undefined symbol `Foo`
+    at test.asm(12)
+error: Undefined symbol `Foo`
+    at test.asm(10)
+error: Division by 0
+    at test.asm(10)
+error: Undefined symbol `Foo`
+    at test.asm(9)
+error: Undefined symbol `Bar`
+    at test.asm(9)
+error: Undefined symbol `Bar`
+    at test.asm(8)
+Linking failed with 10 errors

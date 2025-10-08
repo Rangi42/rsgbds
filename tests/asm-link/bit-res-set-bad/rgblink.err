@@ -1,0 +1,7 @@
+error: Value $ffffffff is not a bit index
+    at test.asm(3)
+error: Value $8 is not a bit index
+    at test.asm(4)
+error: Value $ff00 is not a bit index
+    at test.asm(5)
+Linking failed with 3 errors

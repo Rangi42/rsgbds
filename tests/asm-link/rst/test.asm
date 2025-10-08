@@ -12,8 +12,6 @@ SECTION "calls", ROM0[0]
 	rst rst30
 	rst rst38
 
-	rst rst2A
-
 
 MACRO defRST
 	SECTION "rst\1", ROM0[$\1]
@@ -27,5 +25,3 @@ ENDM
 	defRST 28
 	defRST 30
 	defRST 38
-
-	defRST 2A ; Define a nonsensical RST, because RGBASM cannot catch it

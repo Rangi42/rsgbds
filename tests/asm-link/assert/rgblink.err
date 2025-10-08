@@ -1,0 +1,7 @@
+warning: Worry about me, but not too much. [-Wassert]
+    at test.asm(5)
+error: Okay, this is getting serious!
+    at test.asm(6)
+FATAL: It all ends now.
+    at test.asm(7)
+Linking aborted with 2 errors

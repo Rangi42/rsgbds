@@ -1,0 +1,5 @@
+error: Undefined symbol `where`
+    at test.asm(2)
+error: Undefined symbol `nothing`
+    at test.asm(3)
+Linking failed with 2 errors
