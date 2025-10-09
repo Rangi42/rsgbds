@@ -1,0 +1,63 @@
+warning: Shifting left by large amount 32 [-Wshift-amount]
+    at test.asm::test(4)
+    <- test.asm(14)
+warning: Shifting left by large amount 9001 [-Wshift-amount]
+    at test.asm::test(4)
+    <- test.asm(15)
+warning: Shifting left by large amount 32 [-Wshift-amount]
+    at test.asm::test(4)
+    <- test.asm(17)
+warning: Shifting left by negative amount -9001 [-Wshift-amount]
+    at test.asm::test(4)
+    <- test.asm(18)
+warning: Shifting right negative value -1 [-Wshift]
+    at test.asm::test(4)
+    <- test.asm(20)
+warning: Shifting right negative value -1 [-Wshift]
+    at test.asm::test(4)
+    <- test.asm(21)
+warning: Shifting right by large amount 32 [-Wshift-amount]
+    at test.asm::test(4)
+    <- test.asm(21)
+warning: Shifting right negative value -1 [-Wshift]
+    at test.asm::test(4)
+    <- test.asm(22)
+warning: Shifting right by large amount 9001 [-Wshift-amount]
+    at test.asm::test(4)
+    <- test.asm(22)
+warning: Shifting right negative value -4 [-Wshift]
+    at test.asm::test(4)
+    <- test.asm(23)
+warning: Shifting right negative value -4 [-Wshift]
+    at test.asm::test(4)
+    <- test.asm(24)
+warning: Shifting right negative value -1 [-Wshift]
+    at test.asm::test(4)
+    <- test.asm(25)
+warning: Shifting right by negative amount -9001 [-Wshift-amount]
+    at test.asm::test(4)
+    <- test.asm(25)
+warning: Shifting left by negative amount -2 [-Wshift-amount]
+    at test.asm::test(4)
+    <- test.asm(27)
+warning: Shifting right by negative amount -2 [-Wshift-amount]
+    at test.asm::test(4)
+    <- test.asm(28)
+warning: Shifting right by negative amount -16 [-Wshift-amount]
+    at test.asm::test(4)
+    <- test.asm(31)
+warning: Shifting right by large amount 32 [-Wshift-amount]
+    at test.asm::test(4)
+    <- test.asm(32)
+warning: Shifting right by negative amount -32 [-Wshift-amount]
+    at test.asm::test(4)
+    <- test.asm(33)
+warning: Shifting right by large amount 32 [-Wshift-amount]
+    at test.asm::test(4)
+    <- test.asm(34)
+warning: Shifting right by negative amount -32 [-Wshift-amount]
+    at test.asm::test(4)
+    <- test.asm(35)
+warning: Shifting right negative value -559038737 [-Wshift]
+    at test.asm::test(4)
+    <- test.asm(37)

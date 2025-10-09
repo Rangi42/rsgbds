@@ -1,6 +1,6 @@
 ROM0
 	"ROM0"
-	"\\\"\'\n\r\t\0"
+	"\\\"\'\n\r\t"
 ROMX 1
 	"ROM1"
 ROMX 2
