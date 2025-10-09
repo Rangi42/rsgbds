@@ -1,0 +1,5 @@
+FATAL: Section "Same" is already defined
+    at b.asm(1)
+    and also:
+    at a.asm(1)
+Linking aborted with 1 error

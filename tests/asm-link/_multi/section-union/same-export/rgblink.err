@@ -1,0 +1,5 @@
+FATAL: `Same` is defined as a label, but also as another label
+    at a.asm(2)
+    and also:
+    at b.asm(2)
+Linking aborted with 1 error

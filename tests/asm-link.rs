@@ -1,6 +1,6 @@
 use std::{ffi::OsStr, path::Path};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use datatest_stable::Utf8Path;
 use snapbox::{cmd::Command, data::DataFormat, Assert, Data};
 use tempfile::NamedTempFile;
@@ -9,11 +9,13 @@ datatest_stable::harness! {
     { test = rgbasm_rgblink, root = "tests/asm-link", pattern = r"/test\.asm$" },
     // Intentionally testing opening a file that doesn't exist.
     { test = rgbasm_notexist, root = "tests/asm-link", pattern = r"notexist/rgbasm\.err$" },
+    { test = multi, root = "tests/asm-link/_multi", pattern = r"rgblink\.err" },
+    { test = consistency, root = "tests/asm-link/_consistency", pattern = r"rgblink.err" },
     // TODO: `version.asm`, other special tests in `test.sh`
 }
 
 const RGBASM_PATH: &str = env!("CARGO_BIN_EXE_rgbasm");
-const RGBLINK_PATH: &str = "../../../../rgbds/rgblink"; // TODO: use rsgblink when it's complete
+const RGBLINK_PATH: &str = "/home/issotm/rgbds/rgblink"; // TODO: use rsgblink when it's complete
 
 const ACTION_ENV_VAR_NAME: &str = "SNAPSHOTS_ASM_LINK";
 
@@ -30,12 +32,8 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
 
     let working_directory = asm_path.parent().unwrap();
 
-    let mut asm_cmd = command(
-        RGBASM_PATH,
-        working_directory,
-        asm_path.file_name().unwrap().as_ref(),
-        obj_file.path(),
-    )?;
+    let mut asm_cmd = command(RGBASM_PATH, working_directory, obj_file.path())?
+        .arg(asm_path.file_name().unwrap());
 
     let flags_file_path = asm_path.with_file_name("rgbasm.flags");
     if flags_file_path.exists() {
@@ -43,11 +41,11 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
     }
 
     let result = asm_cmd.assert().with_assert(
-        cmd_assert()
+        assert_cfg()
             // On its face, path normalisation is desirable;
             // however, it causes `snapbox` to replace ALL backslashes with slashes...
             // including in source code listings (e.g. macro args).
-            // `datatest-stable` passes relative path with forward slashes always, anyway.
+            // `datatest-stable` passes relative paths with forward slashes always, anyway.
             .normalize_paths(false),
     );
 
@@ -77,20 +75,16 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
     if bin_file_path.exists() {
         let bin_file = NamedTempFile::new().context("Unable to create temp bin file")?;
 
-        let mut cmd = command(
-            RGBLINK_PATH,
-            working_directory,
-            obj_file.path(),
-            bin_file.path(),
-        )?
-        .arg("-x");
+        let mut cmd = command(RGBLINK_PATH, working_directory, bin_file.path())?
+            .arg(obj_file.path())
+            .arg("--nopad");
 
         let flags_file_path = asm_path.with_file_name("rgblink.flags");
         if flags_file_path.exists() {
             cmd = cmd.arg("@rgblink.flags");
         }
 
-        let result = cmd.assert().with_assert(cmd_assert()).success(); // If failure is expected, remove `output.bin`.
+        let result = cmd.assert().with_assert(assert_cfg()).success(); // If failure is expected, remove `output.bin`.
         let err_file_path = asm_path.with_file_name("rgblink.err");
         let result = if err_file_path.exists() {
             // Note that the presence of a stderr log does not indicate failure is expected;
@@ -116,7 +110,7 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
         let generated = std::fs::read(bin_file).context("Unable to read temp bin file")?;
         let reference = Data::try_read_from(bin_file_path.as_std_path(), Some(DataFormat::Binary))
             .context("Error reading binary")?;
-        cmd_assert()
+        assert_cfg()
             .try_eq(None, Data::binary(generated.as_slice()), reference.clone())
             .map_err(|_err| BinDiff {
                 expected: reference.to_bytes().unwrap(),
@@ -127,19 +121,15 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
         let err_file_path = asm_path.with_file_name("rgblink.err");
         if err_file_path.exists() {
             let bin_file = NamedTempFile::new().context("Unable to create temp bin file")?;
-            command(
-                RGBLINK_PATH,
-                working_directory,
-                obj_file.path(),
-                bin_file.path(),
-            )?
-            .assert()
-            .with_assert(cmd_assert())
-            .stdout_eq("")
-            .stderr_eq(
-                Data::try_read_from(err_file_path.as_std_path(), Some(DataFormat::Text))
-                    .context("Unable to read default linker errput")?,
-            );
+            command(RGBLINK_PATH, working_directory, bin_file.path())?
+                .arg(obj_file.path())
+                .assert()
+                .with_assert(assert_cfg())
+                .stdout_eq("")
+                .stderr_eq(
+                    Data::try_read_from(err_file_path.as_std_path(), Some(DataFormat::Text))
+                        .context("Unable to read default linker errput")?,
+                );
         }
     }
 
@@ -149,20 +139,16 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
 
         if path.exists() {
             let bin_file = NamedTempFile::new().context("Unable to create temp bin file")?;
-            command(
-                RGBLINK_PATH,
-                working_directory,
-                obj_file.path(),
-                bin_file.path(),
-            )?
-            .arg(flag)
-            .assert()
-            .with_assert(cmd_assert())
-            .stdout_eq("")
-            .stderr_eq(
-                Data::try_read_from(path.as_std_path(), Some(DataFormat::Text))
-                    .context("Error reading expected errput")?,
-            );
+            command(RGBLINK_PATH, working_directory, bin_file.path())?
+                .arg(obj_file.path())
+                .arg(flag)
+                .assert()
+                .with_assert(assert_cfg())
+                .stdout_eq("")
+                .stderr_eq(
+                    Data::try_read_from(path.as_std_path(), Some(DataFormat::Text))
+                        .context("Error reading expected errput")?,
+                );
         }
     }
 
@@ -173,31 +159,155 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
         if Path::new(&file_name).extension() == Some(OsStr::new("link")) {
             let bin_file = NamedTempFile::new().context("Unable to create temp bin file")?;
             let err_file_path = Path::new(&entry.path()).with_extension("err");
-            command(
-                RGBLINK_PATH,
-                working_directory,
-                obj_file.path(),
-                bin_file.path(),
-            )?
-            .arg("--linkerscript")
-            .arg(file_name)
-            .assert()
-            .with_assert(cmd_assert())
-            .stdout_eq("")
-            .stderr_eq(
-                Data::try_read_from(&err_file_path, Some(DataFormat::Text))
-                    .context("Error reading linkerscript errput")?,
-            );
+            command(RGBLINK_PATH, working_directory, bin_file.path())?
+                .arg(obj_file.path())
+                .arg("--linkerscript")
+                .arg(file_name)
+                .assert()
+                .with_assert(assert_cfg())
+                .stdout_eq("")
+                .stderr_eq(
+                    Data::try_read_from(&err_file_path, Some(DataFormat::Text))
+                        .context("Error reading linkerscript errput")?,
+                );
         }
     }
 
     Ok(())
 }
 
+fn multi(err_path: &Utf8Path) -> datatest_stable::Result<()> {
+    let dir = err_path.parent().unwrap();
+
+    let obj_files = std::fs::read_dir(dir)
+        .context("Unable to scan directory")?
+        .filter_map(|entry| {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(err) => return Some(Err(err.into())),
+            };
+            let file_name = entry.file_name();
+            if Path::new(&file_name).extension() != Some(OsStr::new("asm")){
+                None
+            } else if file_name == OsStr::new("test.asm") {
+                Some(Err(anyhow!("`test.asm` is not allowed in `_multi` tests, as this'd overlap with regular tests")))
+            } else {
+                Some(NamedTempFile::new().context("Error creating temp obj file").and_then(|obj_file| {
+                    command(RGBASM_PATH, dir, obj_file.path())?
+                        .arg(&file_name)
+                        .assert()
+                        .with_assert(assert_cfg())
+                        .success()
+                        .stdout_eq("")
+                        .stderr_eq("");
+                    Ok(obj_file)
+                }))
+            }
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let bin_file = NamedTempFile::new().context("Error creating temp bin file")?;
+    let sym_file = NamedTempFile::new().context("Error creating temp sym file")?;
+    let map_file = NamedTempFile::new().context("Error creating temp map file")?;
+    command(RGBLINK_PATH, dir, bin_file.path())?
+        .args(obj_files.iter().map(|obj| obj.path()))
+        .arg("--map")
+        .arg(map_file.path())
+        .arg("--sym")
+        .arg(sym_file.path())
+        .arg("--nopad")
+        .assert()
+        .with_assert(assert_cfg())
+        .stdout_eq("")
+        .stderr_eq(
+            Data::try_read_from(err_path.as_std_path(), Some(DataFormat::Text))
+                .context("Error reading expected linker errput")?,
+        );
+
+    let mut path = err_path.with_file_name("out.bin");
+    let generated = std::fs::read(bin_file).context("Error reading generated bin file")?;
+    let reference = Data::try_read_from(path.as_std_path(), Some(DataFormat::Binary))
+        .context("Error reading expected bin data")?;
+    if assert_cfg()
+        .try_eq(None, Data::binary(generated.as_slice()), reference.clone())
+        .is_err()
+    {
+        return Err(BinDiff {
+            expected: reference.to_bytes().unwrap(),
+            actual: generated,
+            path,
+        }
+        .into());
+    }
+    for (extension, output) in [("sym", &sym_file), ("map", &map_file)] {
+        path.set_extension(extension);
+
+        if path.exists() {
+            let expected = Data::try_read_from(path.as_std_path(), Some(DataFormat::Text))
+                .context("Error reading expected data")?;
+            let actual =
+                std::fs::read_to_string(output.path()).context("Error reading generated file")?;
+            assert_cfg().eq(Data::text(actual), expected)
+        }
+    }
+
+    Ok(())
+}
+
+fn consistency(link_err_path: &Utf8Path) -> datatest_stable::Result<()> {
+    let dir = link_err_path.parent().unwrap();
+    let tmp1 = NamedTempFile::new().context("Error creating temp file")?;
+    let tmp2 = NamedTempFile::new().context("Error creating temp file")?;
+
+    command(RGBASM_PATH, dir, tmp1.path())?
+        .arg("one-two.asm")
+        .assert()
+        .with_assert(assert_cfg())
+        .success()
+        .stdout_eq("")
+        .stderr_eq("");
+    command(RGBASM_PATH, dir, tmp2.path())?
+        .arg("one-two.asm")
+        .arg("-DSECOND")
+        .assert()
+        .with_assert(assert_cfg())
+        .success()
+        .stdout_eq("")
+        .stderr_eq("");
+    command(RGBLINK_PATH, dir, "".as_ref())?
+        .args([tmp1.path(), tmp2.path()])
+        .assert()
+        .with_assert(assert_cfg())
+        .failure()
+        .stdout_eq("")
+        .stderr_eq(
+            Data::try_read_from(link_err_path.as_std_path(), Some(DataFormat::Text))
+                .context("Error reading expected linker errput")?,
+        );
+
+    let asm_err_path = link_err_path.with_file_name("rgbasm.err");
+    std::fs::write(tmp1.path(), "def SECOND equs \"1\"").context("Failed to write SECOND stub")?;
+    command(RGBASM_PATH, dir, "".as_ref())?
+        .args(["--preinclude", "one-two.asm", "--preinclude"])
+        .arg(tmp1.path()) // Define `SECOND` for the second pass.
+        .arg("one-two.asm")
+        .assert()
+        .with_assert(assert_cfg())
+        .failure()
+        .stdout_eq("")
+        .stderr_eq(
+            Data::try_read_from(asm_err_path.as_std_path(), Some(DataFormat::Text))
+                .context("Error reading expected assembler errput")?,
+        );
+
+    Ok(())
+}
+
+/* Utilities. */
+
 fn command(
     cmd_path: &str,
     cwd: &Utf8Path,
-    input_path: &Path,
     output_path: &Path,
 ) -> anyhow::Result<snapbox::cmd::Command> {
     Ok(Command::new(cmd_path)
@@ -206,12 +316,11 @@ fn command(
                 .context("Unable to canonicalise working directory")?,
         )
         .env("SOURCE_DATE_EPOCH", TIMESTAMP)
-        .arg(input_path)
         .arg("-o")
         .arg(output_path)
         .arg("-Weverything"))
 }
-fn cmd_assert() -> Assert {
+fn assert_cfg() -> Assert {
     Assert::new().action_env(ACTION_ENV_VAR_NAME)
 }
 

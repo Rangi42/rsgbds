@@ -1,0 +1,5 @@
+FATAL: Section "conflicting types" is defined with type `HRAM`, but also with type `WRAM0`
+    at one-two.asm(7)
+    and also:
+    at one-two.asm(7)
+Linking aborted with 1 error

@@ -1,0 +1,8 @@
+error: Undefined symbol `Label`
+    at a.asm(2)
+    4 symbols with that name are defined but not exported:
+    at a.asm(2)
+    at a.asm(1)
+    at a.asm(1)
+    ...and 1 more
+Linking failed with 1 error

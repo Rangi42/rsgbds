@@ -1,0 +1,5 @@
+FATAL: Section "conflicting address" is defined with address $beef, but also with address $babe
+    at one-two.asm(7)
+    and also:
+    at one-two.asm(7)
+Linking aborted with 1 error

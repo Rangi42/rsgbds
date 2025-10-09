@@ -1,0 +1,17 @@
+error: assert failure
+    at a.asm::REPT~4::REPT~3::REPT~2::REPT~1::m(10)
+    <- a.asm::REPT~4::REPT~3::REPT~2::REPT~1::REPT~1(15)
+    <- a.asm::REPT~4::REPT~3::REPT~2::REPT~1(14)
+    <- a.asm::REPT~4::REPT~3::REPT~2(13)
+    <- a.asm::REPT~4::REPT~3(6)
+    <- a.asm::REPT~4(4)
+    <- a.asm(2)
+error: assert failure
+    at a.asm::REPT~4::REPT~3::REPT~2::REPT~1::m(10)
+    <- a.asm::REPT~4::REPT~3::REPT~2::REPT~1::REPT~2(15)
+    <- a.asm::REPT~4::REPT~3::REPT~2::REPT~1(14)
+    <- a.asm::REPT~4::REPT~3::REPT~2(13)
+    <- a.asm::REPT~4::REPT~3(6)
+    <- a.asm::REPT~4(4)
+    <- a.asm(2)
+Linking failed with 2 errors

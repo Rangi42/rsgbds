@@ -1,0 +1,5 @@
+FATAL: Section "conflicting alignment" is defined with 8-byte alignment (offset 7), but also with 8-byte alignment (offset 6)
+    at one-two.asm(7)
+    and also:
+    at one-two.asm(7)
+Linking aborted with 1 error

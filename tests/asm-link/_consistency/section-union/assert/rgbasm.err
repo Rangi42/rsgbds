@@ -1,0 +1,3 @@
+error: Assertion failed: Force failing the build
+    at one-two.asm(30)
+Assembly aborted with 1 error!

@@ -1,0 +1,4 @@
+error: Section already declared with different bank 4
+    at one-two.asm(14)
+FATAL: Cannot create section "conflicting banks" (1 error)
+    at one-two.asm(14)

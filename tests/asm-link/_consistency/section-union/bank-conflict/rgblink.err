@@ -1,0 +1,5 @@
+FATAL: Section "conflicting banks" is defined with bank 4, but also with bank 1
+    at one-two.asm(5)
+    and also:
+    at one-two.asm(5)
+Linking aborted with 1 error
