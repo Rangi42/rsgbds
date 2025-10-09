@@ -1,11 +1,36 @@
-error: Symbol `ref` is referenced and thus cannot be purged
-    at purge-ref.asm(4)
-warning: Purging a label `OK` [-Wpurge]
-    at purge-ref.asm(7)
-error: Symbol `NotOK` is referenced and thus cannot be purged
-    at purge-ref.asm(11)
-error: Symbol `EvenLessOK` is referenced and thus cannot be purged
-    at purge-ref.asm(15)
-warning: Purging a label `Maybe` [-Wpurge]
-    at purge-ref.asm(23)
-Assembly aborted with 3 errors!
+error: cannot delete a symbol that doesn't exist
+   ╭─[ test.asm:4:8 ]
+   │
+ 4 │     PURGE ref
+   │           ─┬─  
+   │            ╰─── no symbol named `ref` exists at this point
+───╯
+error: labels cannot be deleted
+   ╭─[ test.asm:7:8 ]
+   │
+ 7 │     PURGE OK
+   │           ─┬  
+   │            ╰── attempting to delete `OK` here
+───╯
+error: labels cannot be deleted
+    ╭─[ test.asm:11:8 ]
+    │
+ 11 │     PURGE NotOK
+    │           ──┬──  
+    │             ╰──── attempting to delete `NotOK` here
+────╯
+error: labels cannot be deleted
+    ╭─[ test.asm:15:8 ]
+    │
+ 15 │     PURGE EvenLessOK
+    │           ─────┬────  
+    │                ╰────── attempting to delete `EvenLessOK` here
+────╯
+error: labels cannot be deleted
+    ╭─[ test.asm:23:8 ]
+    │
+ 23 │     PURGE Maybe
+    │           ──┬──  
+    │             ╰──── attempting to delete `Maybe` here
+────╯
+5 errors generated.

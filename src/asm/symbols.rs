@@ -476,6 +476,7 @@ impl Symbols {
                         "A symbol called \"{}\" already exists",
                         identifiers.resolve(name).unwrap()
                     ));
+                    // TODO: this only really makes sense for user-defined symbols; print a better error message for builtins
                     error.add_labels([
                         diagnostics::note_label(existing.def_span()).with_message(format!(
                             "the name is {} here...",
@@ -489,6 +490,7 @@ impl Symbols {
                             .with_message("...so it's not available for this definition"),
                     ]);
                     if matches!(existing, SymbolData::User { .. }) {
+                        // TODO: don't display this for labels
                         error.set_help("If this is intentional, consider using `PURGE` to delete the old definition first");
                     }
                 },
@@ -671,16 +673,15 @@ impl Symbols {
                 let sym = entry.get_mut();
                 match sym {
                     SymbolData::User { exported, kind, .. } => {
-                        if *exported {
-                            diagnostics::warn(
-                                warning!("purge=1"),
+                        if matches!(kind, SymbolKind::Label { .. }) {
+                            diagnostics::error(
                                 &deletion_span,
                                 |warning| {
-                                    warning.set_message("deleting an exported symbol");
+                                    warning.set_message("labels cannot be deleted");
                                     warning.add_label(
                                         diagnostics::warning_label(&deletion_span).with_message(
                                             format!(
-                                                "deleting `{}` here",
+                                                "attempting to delete `{}` here",
                                                 identifiers.resolve(name).unwrap(),
                                             ),
                                         ),
@@ -689,26 +690,27 @@ impl Symbols {
                                 nb_errors_left,
                                 options,
                             );
-                        } else if matches!(kind, SymbolKind::Label { .. }) {
-                            diagnostics::warn(
-                                warning!("purge=2"),
-                                &deletion_span,
-                                |warning| {
-                                    warning.set_message("deleting a label");
-                                    warning.add_label(
-                                        diagnostics::warning_label(&deletion_span).with_message(
-                                            format!(
-                                                "deleting `{}` here",
-                                                identifiers.resolve(name).unwrap(),
-                                            ),
-                                        ),
-                                    );
-                                },
-                                nb_errors_left,
-                                options,
-                            );
+                        } else {
+                            if *exported {
+                                diagnostics::warn(
+                                    warning!("purge"),
+                                    &deletion_span,
+                                    |warning| {
+                                        warning.set_message("deleting an exported symbol");
+                                        warning.add_label(
+                                            diagnostics::warning_label(&deletion_span)
+                                                .with_message(format!(
+                                                    "deleting `{}` here",
+                                                    identifiers.resolve(name).unwrap(),
+                                                )),
+                                        );
+                                    },
+                                    nb_errors_left,
+                                    options,
+                                );
+                            }
+                            *sym = SymbolData::Deleted(deletion_span);
                         }
-                        *sym = SymbolData::Deleted(deletion_span)
                     }
 
                     SymbolData::Deleted(span) => diagnostics::error(

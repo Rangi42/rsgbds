@@ -37,46 +37,38 @@ error: the symbol `argi` was deleted
     │            ──┬─  
     │              ╰─── this interpolation is invalid
 ────╯
-[-Wpurge=1] warning: deleting an exported symbol
+error: labels cannot be deleted
     ╭─[ test.asm:20:7 ]
     │
  20 │ PURGE Label
     │       ──┬──  
-    │         ╰──── deleting `Label` here
+    │         ╰──── attempting to delete `Label` here
 ────╯
-error: the symbol `Label` was deleted
+error: `Label` is not constant
     ╭─[ test.asm:21:9 ]
     │
- 20 │ PURGE Label
-    │       ──┬──  
-    │         ╰──── it has been deleted here
  21 │ DEF x = Label
     │         ──┬──  
-    │           ╰──── no symbol by this name exists at this point
+    │           ╰──── this symbol's value is not known at this point
 ────╯
-error: the symbol `Label` was deleted
-    ╭─[ test.asm:22:9 ]
-    │
- 20 │ PURGE Label
-    │       ──┬──  
-    │         ╰──── it has been deleted here
-    │ 
- 22 │ DEF x = BANK(Label)
-    │         ─────┬─────  
-    │              ╰─────── no symbol by this name exists at this point
-────╯
-[-Wpurge=1] warning: deleting an exported symbol
+error: labels cannot be deleted
     ╭─[ test.asm:25:7 ]
     │
  25 │ PURGE Label2
     │       ───┬──  
-    │          ╰──── deleting `Label2` here
+    │          ╰──── attempting to delete `Label2` here
 ────╯
-error: `Label2` does not belong to a section
-    ╭─[ test.asm:26:20 ]
+error: A symbol called "x" already exists
+    ╭─[ test.asm:26:7 ]
     │
+ 22 │ DEF x = BANK(Label)
+    │       ┬  
+    │       ╰── the name is defined here...
+    │ 
  26 │ DEF x EQUS SECTION(Label2)
-    │                    ───┬──  
-    │                       ╰──── deleted symbols do not belong to any section
+    │       ──┬─  
+    │         ╰─── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
-7 errors generated.
+8 errors generated.

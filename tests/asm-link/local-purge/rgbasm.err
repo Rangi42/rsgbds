@@ -1,5 +1,15 @@
-warning: Purging a label `.loc` [-Wpurge]
-    at local-purge.asm(7)
-error: Interpolated symbol `.loc` does not exist; it was purged
-    at local-purge.asm(8)
-Assembly aborted with 1 error!
+error: labels cannot be deleted
+   ╭─[ test.asm:7:8 ]
+   │
+ 7 │     PURGE .loc
+   │           ──┬─  
+   │             ╰─── attempting to delete `Glob.loc` here
+───╯
+error: the symbol `.loc` doesn't exist
+   ╭─[ test.asm:8:12 ]
+   │
+ 8 │     PRINTLN "{.loc}" ; This should fail because the label doesn't exist anymore
+   │               ──┬─  
+   │                 ╰─── this interpolation is invalid
+───╯
+2 errors generated.

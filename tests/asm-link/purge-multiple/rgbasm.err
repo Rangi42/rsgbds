@@ -1,7 +1,8 @@
-[-Wpurge=1] warning: deleting an exported symbol
+error: labels cannot be deleted
    ╭─[ test.asm:9:7 ]
    │
  9 │ PURGE u, v, w, x, y
    │       ┬  
-   │       ╰── deleting `u` here
+   │       ╰── attempting to delete `u` here
 ───╯
+1 error generated.

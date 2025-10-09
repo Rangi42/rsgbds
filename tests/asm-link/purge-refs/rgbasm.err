@@ -1,5 +1,15 @@
-error: Symbol `Floating` is referenced and thus cannot be purged
-    at purge-refs.asm(6)
-warning: Purging a label `Fixed` [-Wpurge]
-    at purge-refs.asm(13)
-Assembly aborted with 1 error!
+error: labels cannot be deleted
+   ╭─[ test.asm:6:8 ]
+   │
+ 6 │     PURGE Floating ; This used to cause a use-after-free
+   │           ────┬───  
+   │               ╰───── attempting to delete `Floating` here
+───╯
+error: labels cannot be deleted
+    ╭─[ test.asm:13:8 ]
+    │
+ 13 │     PURGE Fixed ; Can work, it's a constant
+    │           ──┬──  
+    │             ╰──── attempting to delete `Fixed` here
+────╯
+2 errors generated.

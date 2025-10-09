@@ -1,9 +1,55 @@
-warning: Purging a label `Label` [-Wpurge]
-    at purge.asm(5)
-error: Symbol `Referenced` is referenced and thus cannot be purged
-    at purge.asm(9)
-warning: Purging an exported symbol `Exported` [-Wpurge]
-    at purge.asm(12)
-error: Undefined symbol `Undefined`
-    at purge.asm(15)
-Assembly aborted with 2 errors!
+error: labels cannot be deleted
+   ╭─[ test.asm:5:8 ]
+   │
+ 5 │     PURGE Label
+   │           ──┬──  
+   │             ╰──── attempting to delete `Label` here
+───╯
+error: A symbol called "Label" already exists
+   ╭─[ test.asm:6:1 ]
+   │
+ 4 │ Label:
+   │ ──┬──  
+   │   ╰──── the name is defined here...
+   │ 
+ 6 │ Label:
+   │ ──┬──  
+   │   ╰──── ...so it's not available for this definition
+   │ 
+   │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+───╯
+error: cannot delete a symbol that doesn't exist
+   ╭─[ test.asm:9:8 ]
+   │
+ 9 │     PURGE Referenced ; Should fail
+   │           ─────┬────  
+   │                ╰────── no symbol named `Referenced` exists at this point
+───╯
+error: labels cannot be deleted
+    ╭─[ test.asm:12:8 ]
+    │
+ 12 │     PURGE Exported
+    │           ────┬───  
+    │               ╰───── attempting to delete `Exported` here
+────╯
+error: A symbol called "Exported" already exists
+    ╭─[ test.asm:13:1 ]
+    │
+ 11 │ Exported::
+    │ ────┬───  
+    │     ╰───── the name is defined here...
+    │ 
+ 13 │ Exported::
+    │ ────┬───  
+    │     ╰───── ...so it's not available for this definition
+    │ 
+    │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
+────╯
+error: cannot delete a symbol that doesn't exist
+    ╭─[ test.asm:15:8 ]
+    │
+ 15 │     PURGE Undefined
+    │           ────┬────  
+    │               ╰────── no symbol named `Undefined` exists at this point
+────╯
+6 errors generated.
