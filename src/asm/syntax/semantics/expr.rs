@@ -18,7 +18,7 @@ impl parse_ctx!() {
     ) -> Expr {
         let span = self.span_from_to(l_span_idx, r_span_idx);
 
-        let Some(symbol) = self.symbols.find(&ident) else {
+        let Some(symbol) = self.symbols.find_not_placeholder(&ident) else {
             self.error(&span, |error| {
                 error.set_message(format!(
                     "no function called `{}`",
@@ -131,7 +131,7 @@ impl parse_ctx!() {
         let span = self.line_spans[span_idx].clone();
         if let Some(res) = self
             .symbols
-            .find(&ident)
+            .find_not_placeholder(&ident)
             .and_then(|sym| sym.get_string(self.sections.active_section.as_ref(), self.identifiers))
         {
             match res {
@@ -204,7 +204,7 @@ impl parse_ctx!() {
     ) -> Expr {
         let span = self.span_from_to(l_span_idx, r_span_idx);
         if let Some(name) = ident {
-            if let Some(res) = self.symbols.find(&name).and_then(|sym| {
+            if let Some(res) = self.symbols.find_not_placeholder(&name).and_then(|sym| {
                 sym.get_string(self.sections.active_section.as_ref(), self.identifiers)
             }) {
                 match res {

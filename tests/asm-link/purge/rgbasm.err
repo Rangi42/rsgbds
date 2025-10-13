@@ -21,6 +21,9 @@ error: A symbol called "Label" already exists
 error: cannot delete a symbol that doesn't exist
    ╭─[ test.asm:9:8 ]
    │
+ 8 │     db Referenced
+   │        ─────┬────  
+   │             ╰────── the name has been referenced here previously
  9 │     PURGE Referenced ; Should fail
    │           ─────┬────  
    │                ╰────── no symbol named `Referenced` exists at this point

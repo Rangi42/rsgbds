@@ -395,7 +395,7 @@ impl parse_ctx!() {
         r_span_idx: usize,
     ) -> (CompactString, Span) {
         let opt = if let Some(ident) = name {
-            match self.symbols.find(&ident) {
+            match self.symbols.find_not_placeholder(&ident) {
                 None => {
                     self.error(span, |error| {
                         error.set_message(format!(

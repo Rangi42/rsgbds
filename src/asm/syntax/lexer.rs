@@ -852,7 +852,10 @@ impl Lexer {
                             // This is possible if `first_char` is '#'.
                             return Some(Err(MacroArgError::EmptyBracketed));
                         }
-                        match identifiers.get(name).and_then(|ident| symbols.find(&ident)) {
+                        match identifiers
+                            .get(name)
+                            .and_then(|ident| symbols.find_not_placeholder(&ident))
+                        {
                             None => return Some(Err(SymbolError::NotFound(name).into())),
                             Some(SymbolData::Deleted(span)) => {
                                 return Some(Err(SymbolError::Deleted(name, span).into()))

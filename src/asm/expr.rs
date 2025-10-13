@@ -57,11 +57,16 @@ pub struct Error {
 }
 
 #[derive(Debug)]
-pub enum ExprWarning {
+pub enum ExprWarning<'a> {
     ShiftByNeg(bool, i32),
     ShiftByTooMuch(bool, i32),
     LeftShiftNeg(i32),
     MinDivM1,
+    LinkTimeYetMutated {
+        name: &'a str,
+        def_span: &'a Span,
+        ref_span: &'a Span,
+    },
 }
 
 #[derive(Debug)]
@@ -280,10 +285,13 @@ impl Expr {
             let res = match &op.kind {
                 &OpKind::Number(value) => Ok((value, op.span.clone())),
                 &OpKind::Symbol(name) => match symbols.find(&name) {
-                    None | Some(SymbolData::ExportPlaceholder(..)) => Err(Error {
-                        span: op.span.clone(),
-                        kind: ErrKind::SymNotFound(name),
-                    }),
+                    None
+                    | Some(SymbolData::ExportPlaceholder(..) | SymbolData::RefPlaceholder(..)) => {
+                        Err(Error {
+                            span: op.span.clone(),
+                            kind: ErrKind::SymNotFound(name),
+                        })
+                    }
                     Some(SymbolData::Deleted(span)) => Err(Error {
                         span: op.span.clone(),
                         kind: ErrKind::SymDeleted(name, span.clone()),
@@ -311,7 +319,7 @@ impl Expr {
                         }),
                     },
                 },
-                &OpKind::BankOfSym(name) => match symbols.find(&name) {
+                &OpKind::BankOfSym(name) => match symbols.find_not_placeholder(&name) {
                     None => Err(Error {
                         span: op.span.clone(),
                         kind: ErrKind::SymNotFound(name),
@@ -505,45 +513,42 @@ impl Expr {
         match self.try_const_eval(symbols, macro_args, sections, warn) {
             Ok((value, span)) => Ok(Either::Left((value, span))),
             Err(Error { kind, .. }) if kind.can_be_deferred_to_linker() => {
+                let mut process_op = |op: &Op| {
+                    match &op.kind {
+                        // Eagerly evaluate symbols that can be.
+                        OpKind::Symbol(name) => {
+                            match symbols.find_and_ref(*name, || op.span.clone()) {
+                                SymbolData::Deleted(..)
+                                | SymbolData::ExportPlaceholder(..)
+                                | SymbolData::RefPlaceholder(..) => Ok(OpKind::Symbol(*name)),
+                                sym => match sym.get_number(macro_args, sections) {
+                                    None => Err(ErrKind::NonNumericSym(
+                                        *name,
+                                        sym.kind_name(),
+                                        sym.def_span().clone(),
+                                    )),
+                                    Some(Err(err)) => Err(ErrKind::SymError(err)),
+                                    Some(Ok(Some(value))) => Ok(OpKind::Number(value)),
+                                    Some(Ok(None)) => Ok(OpKind::Symbol(*name)),
+                                },
+                            }
+                        }
+                        kind => Ok(kind.clone()),
+                    }
+                };
                 Ok(Either::Right(Self {
                     payload: self
                         .payload
-                        .iter()
-                        .map(|op| {
-                            Ok(Op {
+                        .iter() // TODO(prrf): maybe this could be a consuming iterator instead?
+                        .map(|op| match process_op(op) {
+                            Ok(kind) => Ok(Op {
                                 span: op.span.clone(),
-                                kind: match &op.kind {
-                                    // Eagerly evaluate symbols that can be.
-                                    OpKind::Symbol(name) => match symbols.find(name) {
-                                        None
-                                        | Some(
-                                            SymbolData::Deleted(..)
-                                            | SymbolData::ExportPlaceholder(..),
-                                        ) => OpKind::Symbol(*name),
-                                        Some(sym) => match sym.get_number(macro_args, sections) {
-                                            None => {
-                                                return Err(Error {
-                                                    span: op.span.clone(),
-                                                    kind: ErrKind::NonNumericSym(
-                                                        *name,
-                                                        sym.kind_name(),
-                                                        sym.def_span().clone(),
-                                                    ),
-                                                })
-                                            }
-                                            Some(Err(err)) => {
-                                                return Err(Error {
-                                                    span: op.span.clone(),
-                                                    kind: ErrKind::SymError(err),
-                                                })
-                                            }
-                                            Some(Ok(Some(value))) => OpKind::Number(value),
-                                            Some(Ok(None)) => OpKind::Symbol(*name),
-                                        },
-                                    },
-                                    kind => kind.clone(),
-                                },
-                            })
+                                kind,
+                            }),
+                            Err(kind) => Err(Error {
+                                span: op.span.clone(),
+                                kind,
+                            }),
                         })
                         .collect::<Result<_, _>>()?,
                 }))
@@ -974,6 +979,22 @@ impl Error {
     pub fn can_be_deferred_to_linker(&self) -> bool {
         self.kind.can_be_deferred_to_linker()
     }
+
+    pub fn report_non_numeric_ref(
+        span: &Span,
+        name: Identifier,
+        kind_name: &'static str,
+        ref_span: &Span,
+        identifiers: &Identifiers,
+        nb_errors_left: &Cell<usize>,
+        options: &Options,
+    ) {
+        let error = Error {
+            span: span.clone(),
+            kind: ErrKind::NonNumericSym(name, kind_name, ref_span.clone()),
+        }
+        .report(identifiers, nb_errors_left, options);
+    }
 }
 impl ErrKind {
     fn can_be_deferred_to_linker(&self) -> bool {
@@ -1167,7 +1188,7 @@ impl ErrKind {
         }
     }
 }
-impl ExprWarning {
+impl ExprWarning<'_> {
     pub fn report(&self, span: &Span, nb_errors_left: &Cell<usize>, options: &Options) {
         match self {
             Self::ShiftByNeg(dir_right, shift_amount) => diagnostics::warn(
@@ -1232,6 +1253,25 @@ impl ExprWarning {
                         diagnostics::warning_label(span)
                             .with_message("the sign of this quotient may be surprising"),
                     );
+                },
+                nb_errors_left,
+                options,
+            ),
+            Self::LinkTimeYetMutated {
+                name,
+                def_span,
+                ref_span,
+            } => diagnostics::warn(
+                warning!("mutating-referenced"),
+                span,
+                |warning| {
+                    warning.set_message("changing the value of a referenced symbol");
+                    warning.add_labels([
+                        diagnostics::warning_label(span)
+                            .with_message(format!("modifying {name} here")),
+                        diagnostics::note_label(def_span).with_message("created here"),
+                        diagnostics::note_label(ref_span).with_message("initially created here"),
+                    ]);
                 },
                 nb_errors_left,
                 options,

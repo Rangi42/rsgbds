@@ -591,7 +591,7 @@ impl parse_ctx!() {
 impl parse_ctx!() {
     pub fn string_symbol(&self, name: Identifier, span_idx: usize) -> (CompactString, Span) {
         let span = &self.line_spans[span_idx]; // If this span is the last one in the line, it could be used by enclosing scopes, so don't take it.
-        let Some(symbol) = self.symbols.find(&name) else {
+        let Some(symbol) = self.symbols.find_not_placeholder(&name) else {
             self.error(span, |error| {
                 error.set_message(SymbolError::NotFound(
                     self.identifiers.resolve(name).unwrap(),

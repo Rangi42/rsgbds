@@ -25,12 +25,13 @@ pub struct Symbols {
     anon_label_idx: u32,
 }
 
+// When adding new undefined-like variants, remember to list them in `find_not_placeholder`.
 #[derive(Debug)]
 pub enum SymbolData {
     User {
         definition: Span,
         kind: SymbolKind,
-        exported: bool,
+        exported: bool, // TODO: make this a member of `Numeric` and `Label` instead
     },
 
     /// Built-in symbols, but that don't have special behaviour.
@@ -45,6 +46,8 @@ pub enum SymbolData {
     Deleted(Span),
     /// Placeholder to support exporting a symbol before it's actually defined.
     ExportPlaceholder(Span),
+    /// Placeholder created when a symbol will be needed by the linker.
+    RefPlaceholder(Span),
 }
 
 #[derive(Debug)]
@@ -52,6 +55,7 @@ pub enum SymbolKind {
     Numeric {
         value: i32,
         mutable: bool,
+        ref_span: Option<Span>,
     },
     String(CompactString),
     Macro(NormalSpan),
@@ -83,7 +87,13 @@ impl Symbols {
             debug_assert!(res.is_none());
             name_sym
         };
-        let numeric = |value, mutable| SymbolData::Builtin(SymbolKind::Numeric { value, mutable });
+        let numeric = |value, mutable| {
+            SymbolData::Builtin(SymbolKind::Numeric {
+                value,
+                mutable,
+                ref_span: None,
+            })
+        };
         let string = |string| SymbolData::Builtin(SymbolKind::String(string));
 
         let pc_sym = def_builtin("@", SymbolData::Pc);
@@ -217,12 +227,25 @@ impl Symbols {
     pub fn find(&self, name: &Identifier) -> Option<&SymbolData> {
         self.symbols.get(name)
     }
+    /// Use this when not explicitly matching all variants of the returned value,
+    /// and the placeholders should be treated as if the symbol wasn't defined.
+    pub fn find_not_placeholder(&self, name: &Identifier) -> Option<&SymbolData> {
+        match self.find(name) {
+            None | Some(SymbolData::ExportPlaceholder(..) | SymbolData::RefPlaceholder(..)) => None,
+            Some(sym) => Some(sym),
+        }
+    }
+    pub fn find_and_ref(&mut self, name: Identifier, span: impl FnOnce() -> Span) -> &SymbolData {
+        self.symbols
+            .entry(name)
+            .or_insert_with(|| SymbolData::RefPlaceholder(span()))
+    }
 
     pub fn find_macro(
         &self,
         name: &Identifier,
     ) -> Result<Result<&NormalSpan, &SymbolData>, Option<&Span>> {
-        match self.find(name) {
+        match self.find_not_placeholder(name) {
             Some(SymbolData::User {
                 kind: SymbolKind::Macro(slice),
                 ..
@@ -244,7 +267,7 @@ impl Symbols {
         sections: &Sections,
     ) -> Result<(), SymbolError<'name, 'sym>> {
         let sym = name
-            .and_then(|name| self.find(&name))
+            .and_then(|name| self.find_not_placeholder(&name))
             .ok_or(SymbolError::NotFound(name_str))?;
 
         if let Some(value) = sym.get_number(macro_args, sections) {
@@ -288,6 +311,37 @@ impl Symbols {
                 Ok(())
             }
             Entry::Occupied(entry) => {
+                let mutate_symbol = |kind: SymbolKind,
+                                     def_span: &Span,
+                                     ref_span: &Option<Span>,
+                                     value: &mut i32,
+                                     name: Identifier|
+                 -> Result<(), ()> {
+                    match kind {
+                        SymbolKind::Numeric {
+                            value: new_value,
+                            mutable: true,
+                            ..
+                        } => {
+                            if let Some(ref_span) = ref_span {
+                                crate::expr::ExprWarning::LinkTimeYetMutated {
+                                    name: identifiers.resolve(name).unwrap(),
+                                    def_span,
+                                    ref_span,
+                                }
+                                .report(
+                                    &definition,
+                                    nb_errors_left,
+                                    options,
+                                );
+                            }
+                            *value = new_value;
+                            Ok(())
+                        }
+                        _ => Err(()),
+                    }
+                };
+
                 let existing = entry.into_mut();
                 match existing {
                     // If the entry is merely occupied by a placeholder, just override it.
@@ -317,11 +371,79 @@ impl Symbols {
                         };
                         Ok(())
                     }
+                    SymbolData::RefPlaceholder(span) => {
+                        match kind {
+                            SymbolKind::Numeric {
+                                value,
+                                mutable,
+                                ref_span: _,
+                            } => {
+                                *existing = SymbolData::User {
+                                    definition,
+                                    kind: SymbolKind::Numeric {
+                                        value,
+                                        mutable,
+                                        ref_span: Some(std::mem::replace(span, Span::CommandLine)),
+                                    },
+                                    exported,
+                                }
+                            }
+                            SymbolKind::Label { .. } => {
+                                *existing = SymbolData::User {
+                                    definition,
+                                    kind,
+                                    exported,
+                                }
+                            }
+                            SymbolKind::String(..)
+                            | SymbolKind::Macro(..)
+                            | SymbolKind::Function { .. } => {
+                                crate::expr::Error::report_non_numeric_ref(
+                                    span,
+                                    name,
+                                    kind.name(),
+                                    &definition,
+                                    identifiers,
+                                    nb_errors_left,
+                                    options,
+                                );
+                                *existing = SymbolData::User {
+                                    definition,
+                                    kind,
+                                    exported,
+                                };
+                            }
+                        }
+                        Ok(())
+                    }
                     SymbolData::User {
                         definition: cur_definition,
                         kind: cur_kind,
                         exported: cur_exported,
                     } if redef && kind.is_same_kind(cur_kind) => {
+                        if let (
+                            SymbolKind::Numeric {
+                                ref_span: cur_ref_span,
+                                ..
+                            },
+                            SymbolKind::Numeric { ref_span, .. },
+                        ) = (&cur_kind, &kind)
+                        {
+                            debug_assert!(ref_span.is_none());
+                            if let Some(ref_span) = cur_ref_span.as_ref() {
+                                crate::expr::ExprWarning::LinkTimeYetMutated {
+                                    name: identifiers.resolve(name).unwrap(),
+                                    def_span: cur_definition,
+                                    ref_span,
+                                }
+                                .report(
+                                    &definition,
+                                    nb_errors_left,
+                                    options,
+                                );
+                            }
+                        }
+
                         *cur_definition = definition;
                         *cur_kind = kind;
                         *cur_exported |= exported;
@@ -332,22 +454,18 @@ impl Symbols {
                             SymbolKind::Numeric {
                                 value,
                                 mutable: true,
+                                ref_span,
                             },
+                        definition: def_span,
                         ..
-                    }
-                    | SymbolData::Builtin(SymbolKind::Numeric {
+                    } => mutate_symbol(kind, def_span, &ref_span, value, name)
+                        .map_err(|()| (existing, definition)),
+                    SymbolData::Builtin(SymbolKind::Numeric {
                         value,
                         mutable: true,
-                    }) => match kind {
-                        SymbolKind::Numeric {
-                            value: new_value,
-                            mutable: true,
-                        } => {
-                            *value = new_value;
-                            Ok(())
-                        }
-                        _ => Err((existing, definition)),
-                    },
+                        ref_span,
+                    }) => mutate_symbol(kind, &Span::Builtin, &ref_span, value, name)
+                        .map_err(|()| (existing, definition)),
                     _ => Err((existing, definition)),
                 }
             }
@@ -572,7 +690,11 @@ impl Symbols {
             name,
             identifiers,
             definition,
-            SymbolKind::Numeric { value, mutable },
+            SymbolKind::Numeric {
+                value,
+                mutable,
+                ref_span: None,
+            },
             exported,
             redef,
             active_sections,
@@ -638,6 +760,7 @@ impl Symbols {
         let Some(SymbolData::Builtin(SymbolKind::Numeric {
             value,
             mutable: true,
+            ref_span: None,
         })) = self.symbols.get_mut(&Self::rs_ident())
         else {
             unreachable!()
@@ -653,8 +776,8 @@ impl Symbols {
         nb_errors_left: &Cell<usize>,
         options: &Options,
     ) {
-        match self.symbols.entry(name) {
-            Entry::Vacant(_) => diagnostics::error(
+        let report_nonexistent_sym = |ref_span| {
+            diagnostics::error(
                 &deletion_span,
                 |error| {
                     error.set_message("cannot delete a symbol that doesn't exist");
@@ -664,14 +787,26 @@ impl Symbols {
                             identifiers.resolve(name).unwrap(),
                         ),
                     ));
+                    if let Some(span) = ref_span {
+                        error.add_label(
+                            diagnostics::note_label(span)
+                                .with_message("the name has been referenced here previously"),
+                        );
+                    }
                 },
                 nb_errors_left,
                 options,
-            ),
+            )
+        };
+        match self.symbols.entry(name) {
+            Entry::Vacant(_) => report_nonexistent_sym(None),
 
             Entry::Occupied(mut entry) => {
                 let sym = entry.get_mut();
                 match sym {
+                    SymbolData::ExportPlaceholder(span) | SymbolData::RefPlaceholder(span) => {
+                        report_nonexistent_sym(Some(span))
+                    }
                     SymbolData::User { exported, kind, .. } => {
                         if matches!(kind, SymbolKind::Label { .. }) {
                             diagnostics::error(
@@ -679,7 +814,7 @@ impl Symbols {
                                 |warning| {
                                     warning.set_message("labels cannot be deleted");
                                     warning.add_label(
-                                        diagnostics::warning_label(&deletion_span).with_message(
+                                        diagnostics::error_label(&deletion_span).with_message(
                                             format!(
                                                 "attempting to delete `{}` here",
                                                 identifiers.resolve(name).unwrap(),
@@ -731,7 +866,11 @@ impl Symbols {
                         options,
                     ),
 
-                    _ => diagnostics::error(
+                    SymbolData::Builtin(..)
+                    | SymbolData::Dot
+                    | SymbolData::DotDot
+                    | SymbolData::Narg
+                    | SymbolData::Pc => diagnostics::error(
                         &deletion_span,
                         |error| {
                             error.set_message(format!(
@@ -882,7 +1021,9 @@ impl SymbolData {
     pub fn def_span(&self) -> &Span {
         match self {
             Self::User { definition, .. } => definition,
-            Self::Deleted(span) | Self::ExportPlaceholder(span) => span,
+            Self::Deleted(span) | Self::ExportPlaceholder(span) | Self::RefPlaceholder(span) => {
+                span
+            }
             _ => &Span::Builtin,
         }
     }
@@ -893,11 +1034,11 @@ impl SymbolData {
         macro_args: Option<&MacroArgs>,
     ) -> bool {
         match self {
-            SymbolData::User { .. } | SymbolData::Builtin(..) => true,
-            SymbolData::Deleted(..) | SymbolData::ExportPlaceholder(..) => false,
-            SymbolData::Pc => active_sections.is_some(),
-            SymbolData::Narg => macro_args.is_some(),
-            SymbolData::Dot => active_sections
+            Self::User { .. } | Self::Builtin(..) => true,
+            Self::Deleted(..) | Self::ExportPlaceholder(..) | Self::RefPlaceholder(..) => false,
+            Self::Pc => active_sections.is_some(),
+            Self::Narg => macro_args.is_some(),
+            Self::Dot => active_sections
                 .and_then(|active| active.sym_scope(0))
                 .is_some(),
             Self::DotDot => active_sections
@@ -908,12 +1049,12 @@ impl SymbolData {
 
     pub fn kind_name(&self) -> &'static str {
         match self {
-            SymbolData::User { kind, .. } | SymbolData::Builtin(kind) => kind.name(),
-            SymbolData::Pc => "label",
-            SymbolData::Narg => "constant",
-            SymbolData::Dot | SymbolData::DotDot => "string symbol",
-            SymbolData::Deleted(_) => "deleted",
-            Self::ExportPlaceholder(..) => "undefined",
+            Self::User { kind, .. } | Self::Builtin(kind) => kind.name(),
+            Self::Pc => "label",
+            Self::Narg => "constant",
+            Self::Dot | Self::DotDot => "string symbol",
+            Self::Deleted(_) => "deleted",
+            Self::ExportPlaceholder(..) | Self::RefPlaceholder(..) => "undefined",
         }
     }
 
@@ -944,8 +1085,7 @@ impl SymbolData {
                     None => Err(SymbolError::DotDotOutsideMacro),
                 },
             ),
-            Self::Deleted(..) => None,
-            Self::ExportPlaceholder(..) => None,
+            Self::Deleted(..) | Self::ExportPlaceholder(..) | Self::RefPlaceholder(..) => None,
         }
     }
 
@@ -980,10 +1120,8 @@ impl SymbolData {
                 Some(args) => Ok(Some(args.max_valid() as i32)),
                 None => Err(SymbolError::NargOutsideMacro),
             }),
-            Self::Dot => None,
-            Self::DotDot => None,
-            Self::Deleted(..) => None,
-            Self::ExportPlaceholder(..) => None,
+            Self::Dot | Self::DotDot => None,
+            Self::Deleted(..) | Self::ExportPlaceholder(..) | Self::RefPlaceholder(..) => None,
         }
     }
 
@@ -1010,8 +1148,7 @@ impl SymbolData {
             Self::Narg => None,
             Self::Dot => None,
             Self::DotDot => None,
-            Self::Deleted(_) => None,
-            Self::ExportPlaceholder(..) => None,
+            Self::Deleted(..) | Self::ExportPlaceholder(..) | Self::RefPlaceholder(..) => None,
         }
     }
 }

@@ -1,6 +1,9 @@
 error: cannot delete a symbol that doesn't exist
    ╭─[ test.asm:4:8 ]
    │
+ 3 │     dw ref
+   │        ─┬─  
+   │         ╰─── the name has been referenced here previously
  4 │     PURGE ref
    │           ─┬─  
    │            ╰─── no symbol named `ref` exists at this point
