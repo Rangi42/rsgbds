@@ -19,12 +19,12 @@ error: syntax error: unexpected anonymous label reference
    │            ─┬  
    │             ╰── expected "identifier", "scoped identifier", "local identifier", "redef", or "def"
 ───╯
-[-Wpurge=2] warning: deleting a label
+error: labels cannot be deleted
     ╭─[ test.asm:10:8 ]
     │
  10 │     PURGE :-
     │           ─┬  
-    │            ╰── deleting `<anonymous label 0>` here
+    │            ╰── attempting to delete `<anonymous label 0>` here
 ────╯
 error: syntax error: unexpected ::
     ╭─[ test.asm:22:1 ]
@@ -33,4 +33,4 @@ error: syntax error: unexpected ::
     │ ─┬  
     │  ╰── expected "identifier", "scoped identifier", "local identifier", ":", "+", "-", "adc", ...90 others
 ────╯
-4 errors generated.
+5 errors generated.

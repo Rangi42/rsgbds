@@ -23,8 +23,8 @@ error: A symbol called "s" already exists
     ╭─[ test.asm:44:5 ]
     │
  39 │ DEF s EQUS "x"
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ──┬─  
+    │         ╰─── the name is defined here...
     │ 
  44 │ for s, 10
     │     ┬  
@@ -46,8 +46,8 @@ error: A symbol called "s" already exists
     ╭─[ test.asm:44:1 ]
     │
  39 │ DEF s EQUS "x"
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ──┬─  
+    │         ╰─── the name is defined here...
     │ 
  44 │ for s, 10
     │ ─┬─  
@@ -69,8 +69,8 @@ error: A symbol called "s" already exists
     ╭─[ test.asm:44:1 ]
     │
  39 │ DEF s EQUS "x"
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ──┬─  
+    │         ╰─── the name is defined here...
     │ 
  44 │ for s, 10
     │ ─┬─  
@@ -92,8 +92,8 @@ error: A symbol called "s" already exists
     ╭─[ test.asm:44:1 ]
     │
  39 │ DEF s EQUS "x"
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ──┬─  
+    │         ╰─── the name is defined here...
     │ 
  44 │ for s, 10
     │ ─┬─  
@@ -115,8 +115,8 @@ error: A symbol called "s" already exists
     ╭─[ test.asm:44:1 ]
     │
  39 │ DEF s EQUS "x"
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ──┬─  
+    │         ╰─── the name is defined here...
     │ 
  44 │ for s, 10
     │ ─┬─  
@@ -138,8 +138,8 @@ error: A symbol called "s" already exists
     ╭─[ test.asm:44:1 ]
     │
  39 │ DEF s EQUS "x"
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ──┬─  
+    │         ╰─── the name is defined here...
     │ 
  44 │ for s, 10
     │ ─┬─  
@@ -161,8 +161,8 @@ error: A symbol called "s" already exists
     ╭─[ test.asm:44:1 ]
     │
  39 │ DEF s EQUS "x"
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ──┬─  
+    │         ╰─── the name is defined here...
     │ 
  44 │ for s, 10
     │ ─┬─  
@@ -184,8 +184,8 @@ error: A symbol called "s" already exists
     ╭─[ test.asm:44:1 ]
     │
  39 │ DEF s EQUS "x"
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ──┬─  
+    │         ╰─── the name is defined here...
     │ 
  44 │ for s, 10
     │ ─┬─  
@@ -207,8 +207,8 @@ error: A symbol called "s" already exists
     ╭─[ test.asm:44:1 ]
     │
  39 │ DEF s EQUS "x"
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ──┬─  
+    │         ╰─── the name is defined here...
     │ 
  44 │ for s, 10
     │ ─┬─  
@@ -230,8 +230,8 @@ error: A symbol called "s" already exists
     ╭─[ test.asm:44:1 ]
     │
  39 │ DEF s EQUS "x"
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ──┬─  
+    │         ╰─── the name is defined here...
     │ 
  44 │ for s, 10
     │ ─┬─  
@@ -253,8 +253,8 @@ error: A symbol called "s" already exists
     ╭─[ test.asm:44:1 ]
     │
  39 │ DEF s EQUS "x"
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ──┬─  
+    │         ╰─── the name is defined here...
     │ 
  44 │ for s, 10
     │ ─┬─  
@@ -270,8 +270,8 @@ error: A symbol called "v" already exists
     │  ╰─── ...so it's not available for this definition
     │ 
  52 │ def v equ 42
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ─┬─  
+    │        ╰─── the name is defined here...
     │ 
     │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
@@ -283,8 +283,8 @@ error: A symbol called "v" already exists
     │  ╰─── ...so it's not available for this definition
     │ 
  52 │ def v equ 42
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ─┬─  
+    │        ╰─── the name is defined here...
     │ 
     │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
@@ -296,8 +296,8 @@ error: A symbol called "v" already exists
     │  ╰─── ...so it's not available for this definition
     │ 
  52 │ def v equ 42
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ─┬─  
+    │        ╰─── the name is defined here...
     │ 
     │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
@@ -309,8 +309,8 @@ error: A symbol called "v" already exists
     │  ╰─── ...so it's not available for this definition
     │ 
  52 │ def v equ 42
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ─┬─  
+    │        ╰─── the name is defined here...
     │ 
     │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
@@ -322,8 +322,8 @@ error: A symbol called "v" already exists
     │  ╰─── ...so it's not available for this definition
     │ 
  52 │ def v equ 42
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ─┬─  
+    │        ╰─── the name is defined here...
     │ 
     │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
@@ -335,8 +335,8 @@ error: A symbol called "v" already exists
     │  ╰─── ...so it's not available for this definition
     │ 
  52 │ def v equ 42
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ─┬─  
+    │        ╰─── the name is defined here...
     │ 
     │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
@@ -348,8 +348,8 @@ error: A symbol called "v" already exists
     │  ╰─── ...so it's not available for this definition
     │ 
  52 │ def v equ 42
-    │ ─┬─  
-    │  ╰─── the name is defined here...
+    │       ─┬─  
+    │        ╰─── the name is defined here...
     │ 
     │ Help: If this is intentional, consider using `PURGE` to delete the old definition first
 ────╯
