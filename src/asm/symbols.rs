@@ -458,13 +458,13 @@ impl Symbols {
                             },
                         definition: def_span,
                         ..
-                    } => mutate_symbol(kind, def_span, &ref_span, value, name)
+                    } => mutate_symbol(kind, def_span, ref_span, value, name)
                         .map_err(|()| (existing, definition)),
                     SymbolData::Builtin(SymbolKind::Numeric {
                         value,
                         mutable: true,
                         ref_span,
-                    }) => mutate_symbol(kind, &Span::Builtin, &ref_span, value, name)
+                    }) => mutate_symbol(kind, &Span::Builtin, ref_span, value, name)
                         .map_err(|()| (existing, definition)),
                     _ => Err((existing, definition)),
                 }

@@ -157,8 +157,9 @@ pub fn parse_file(
                     let mut enable_equs_expansion = true;
                     loop {
                         match &token.payload {
-                            tok!("purge") | tok!("def") | tok!("redef") => enable_equs_expansion = false,
+                            tok!("purge") | tok!("for") | tok!("def") | tok!("redef") => enable_equs_expansion = false,
                             tok!(")") // The closing parens of a `def()`...
+                            | tok!(",") // ...the comma of a `for`...
                             | tok!("equ") // ...or a symbol definition keyword.
                             | tok!("equs")
                             | tok!("rb")
