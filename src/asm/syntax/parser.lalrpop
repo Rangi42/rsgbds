@@ -578,8 +578,10 @@ ExprAtomNoIdent: Expr = {
 	<l_span_idx:@L> "sizeof" "(" <region:MemRegion> ")" <r_span_idx:@R> =>  Expr::size_of_region(region, ctx.span_from_to(l_span_idx, r_span_idx)),
 	<l_span_idx:@L> "startof" "(" <sect:StringExpr>  ")" <r_span_idx:@R> => Expr::start_of_section(sect.0, ctx.span_from_to(l_span_idx, r_span_idx)),
 	<l_span_idx:@L> "startof" "(" <region:MemRegion> ")" <r_span_idx:@R> =>  Expr::start_of_region(region, ctx.span_from_to(l_span_idx, r_span_idx)),
-	<l_span_idx:@L> "sizeof" "(" Reg8       ")" <r_span_idx:@R> => Expr::number(1, ctx.span_from_to(l_span_idx, r_span_idx)),
-	<l_span_idx:@L> "sizeof" "(" Reg16Arith ")" <r_span_idx:@R> => Expr::number(2, ctx.span_from_to(l_span_idx, r_span_idx)),
+	<l_span_idx:@L> "sizeof" "(" Reg8             ")" <r_span_idx:@R> => Expr::number(1, ctx.span_from_to(l_span_idx, r_span_idx)),
+	<l_span_idx:@L> "sizeof" "(" "[" Reg16Mem "]" ")" <r_span_idx:@R> => Expr::number(1, ctx.span_from_to(l_span_idx, r_span_idx)),
+	<l_span_idx:@L> "sizeof" "(" Reg16Arith       ")" <r_span_idx:@R> => Expr::number(2, ctx.span_from_to(l_span_idx, r_span_idx)),
+	<l_span_idx:@L> "sizeof" "(" "af"             ")" <r_span_idx:@R> => Expr::number(2, ctx.span_from_to(l_span_idx, r_span_idx)),
 	// Fixed-point functions.
 	<l_span_idx:@L> "round" "(" <expr:Expr> <prec:("," <Expr>)?> ")" <r_span_idx:@R> => ctx.fixpoint_round(expr, prec, l_span_idx, r_span_idx),
 	<l_span_idx:@L> "ceil"  "(" <expr:Expr> <prec:("," <Expr>)?> ")" <r_span_idx:@R> =>  ctx.fixpoint_ceil(expr, prec, l_span_idx, r_span_idx),
