@@ -108,9 +108,9 @@ fn assert_failure(
 ) -> Result<(), ParseError> {
     match level {
         AssertLevel::Warn => {
-            parse_ctx.error(span, |error| {
+            parse_ctx.warn(warning!("assert"), span, |error| {
                 error.set_message("assertion failed");
-                error.add_label(diagnostics::error_label(span).with_message(match msg {
+                error.add_label(diagnostics::warning_label(span).with_message(match msg {
                     Some((text, _span)) => text,
                     None => "this expression evaluates to 0",
                 }));
