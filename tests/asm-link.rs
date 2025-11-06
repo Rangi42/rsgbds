@@ -268,42 +268,42 @@ fn consistency(link_err_path: &Utf8Path) -> datatest_stable::Result<()> {
         .arg("one-two.asm")
         .assert()
         .with_assert(assert_cfg())
-        .success()
         .stdout_eq("")
-        .stderr_eq("");
+        .stderr_eq("")
+        .success();
     command(RGBASM_PATH, dir, tmp2.path())?
         .arg("one-two.asm")
         .arg("-DSECOND")
         .assert()
         .with_assert(assert_cfg())
-        .success()
         .stdout_eq("")
-        .stderr_eq("");
-    command(RGBLINK_PATH, dir, "".as_ref())?
+        .stderr_eq("")
+        .success();
+    command(RGBLINK_PATH, dir, "/dev/null".as_ref())?
         .args([tmp1.path(), tmp2.path()])
         .assert()
         .with_assert(assert_cfg())
-        .failure()
         .stdout_eq("")
         .stderr_eq(
             Data::try_read_from(link_err_path.as_std_path(), Some(DataFormat::Text))
                 .context("Error reading expected linker errput")?,
-        );
+        )
+        .failure();
 
     let asm_err_path = link_err_path.with_file_name("rgbasm.err");
     std::fs::write(tmp1.path(), "def SECOND equs \"1\"").context("Failed to write SECOND stub")?;
-    command(RGBASM_PATH, dir, "".as_ref())?
+    command(RGBASM_PATH, dir, "/dev/null".as_ref())?
         .args(["--preinclude", "one-two.asm", "--preinclude"])
         .arg(tmp1.path()) // Define `SECOND` for the second pass.
         .arg("one-two.asm")
         .assert()
         .with_assert(assert_cfg())
-        .failure()
         .stdout_eq("")
         .stderr_eq(
             Data::try_read_from(asm_err_path.as_std_path(), Some(DataFormat::Text))
                 .context("Error reading expected assembler errput")?,
-        );
+        )
+        .failure();
 
     Ok(())
 }
