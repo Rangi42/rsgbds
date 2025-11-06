@@ -207,7 +207,7 @@ AssertParams: (AssertLevel, Expr, Option<(CompactString, Span)>) = {
 AssertLevel: AssertLevel = { "warn" => AssertLevel::Warn, "fail" => AssertLevel::Error, "fatal" => AssertLevel::Fatal };
 
 SectionAttrs: (SectionAttrs, (CompactString, Span)) = {
-	<kind:SectionKind?> <name:StringExpr> "," <mem_region:MemRegion> <addr:("[" <Expr> "]")?> => {
+	<kind:(@L SectionKind)?> <name:StringExpr> "," <mem_region:MemRegion> <addr:("[" <Expr> "]")?> => {
 		(ctx.mandatory_section_attrs(kind, mem_region, addr), name)
 	},
 	<attrs:SectionAttrs> "," <span_idx:@L> "bank"  "[" <bank:Expr>       "]" =>  ctx.set_bank_of(attrs, bank,  span_idx),

@@ -14,12 +14,33 @@ use super::parse_ctx;
 impl parse_ctx!() {
     pub fn mandatory_section_attrs(
         &self,
-        kind: Option<SectionKind>,
+        kind: Option<(usize, SectionKind)>,
         mem_region: MemRegion,
         addr: Option<Expr>,
     ) -> SectionAttrs {
+        let reject_modifier = |kind_name, span_idx| {
+            let span = &self.line_spans[span_idx];
+            self.error(span, |error| {
+                error.set_message("sections containing data cannot have a modifier");
+                error.add_label(diagnostics::error_label(span).with_message(format!(
+                    "`{}` is not allowed on a {} section",
+                    kind_name,
+                    mem_region.name(),
+                )));
+            });
+            SectionKind::Normal
+        };
         SectionAttrs {
-            kind: kind.unwrap_or(SectionKind::Normal),
+            kind: match kind {
+                Some((span_idx, SectionKind::Union)) if mem_region.has_data() => {
+                    reject_modifier("union", span_idx)
+                }
+                Some((span_idx, SectionKind::Fragment)) if mem_region.has_data() => {
+                    reject_modifier("fragment", span_idx)
+                }
+                Some((_span_idx, kind)) => kind,
+                None => SectionKind::Normal,
+            },
             mem_region,
             address: match addr {
                 Some(expr) => match self.try_const_eval(&expr) {
