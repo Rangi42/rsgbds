@@ -1,4 +1,8 @@
-error: Section already declared as fixed at different address $beef
-    at one-two.asm(16)
-FATAL: Cannot create section "conflicting address" (1 error)
-    at one-two.asm(16)
+error: cannot place the section at address $babe
+   ╭─[ one-two.asm:7:15 ]
+   │
+ 7 │ SECTION UNION "conflicting address", SRAM[ADDR]
+   │               ──────────┬──────────  
+   │                         ╰──────────── the section is already fixed at address $beef
+───╯
+1 error generated.

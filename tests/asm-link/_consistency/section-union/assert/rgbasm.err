@@ -1,3 +1,8 @@
-error: Assertion failed: Force failing the build
-    at one-two.asm(30)
-Assembly aborted with 1 error!
+error: assertion failed
+    ╭─[ one-two.asm:11:9 ]
+    │
+ 11 │     assert @ != BASE, "Force failing the build" ; Force failure in RGBLINK, though
+    │            ────┬────  
+    │                ╰────── Force failing the build
+────╯
+1 error generated.

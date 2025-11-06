@@ -726,6 +726,7 @@ pub enum MergeError {
 }
 impl MergeError {
     pub fn details(&self) -> (String, String) {
+        // TODO: be consistent between indicative and conditional tense here
         match self {
             Self::AddrMismatch(addr, other_addr) => (
                 format!("cannot place the section at address ${other_addr:04x}"),
@@ -744,6 +745,7 @@ impl MergeError {
             ),
             Self::BadAlignFixed(align, align_ofs, addr) => (
                 format!("cannot place the section at address ${addr:04x}"),
+                // TODO: in this and the next one, report what they *ought* to be, too
                 format!(
                     "the lower {align} bit{} of the address are equal to ${align_ofs:02x} here",
                     S::from(*align),
