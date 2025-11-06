@@ -193,8 +193,13 @@ fn multi(err_path: &Utf8Path) -> datatest_stable::Result<()> {
                 Some(Err(anyhow!("`test.asm` is not allowed in `_multi` tests, as this'd overlap with regular tests")))
             } else {
                 Some(NamedTempFile::new().context("Error creating temp obj file").and_then(|obj_file| {
-                    command(RGBASM_PATH, dir, obj_file.path())?
-                        .arg(&file_name)
+                    let mut cmd = command(RGBASM_PATH, dir, obj_file.path())?
+                        .arg(&file_name);
+                    let asm_flags_path = err_path.with_file_name("rgbasm.flags");
+                    if asm_flags_path.exists() {
+                        cmd = cmd.arg("@rgbasm.flags");
+                    }
+                    cmd
                         .assert()
                         .with_assert(assert_cfg())
                         .success()
