@@ -269,7 +269,7 @@ fn consistency(link_err_path: &Utf8Path) -> datatest_stable::Result<()> {
         .assert()
         .with_assert(assert_cfg())
         .stdout_eq("")
-        .stderr_eq("")
+        // .stderr_eq("") Warnings can be emitted.
         .success();
     command(RGBASM_PATH, dir, tmp2.path())?
         .arg("one-two.asm")
@@ -277,7 +277,7 @@ fn consistency(link_err_path: &Utf8Path) -> datatest_stable::Result<()> {
         .assert()
         .with_assert(assert_cfg())
         .stdout_eq("")
-        .stderr_eq("")
+        // .stderr_eq("") Warnings can be emitted.
         .success();
     command(RGBLINK_PATH, dir, "/dev/null".as_ref())?
         .args([tmp1.path(), tmp2.path()])

@@ -1,4 +1,26 @@
-error: Section already declared as aligned to 4 bytes (offset 0)
-    at one-two.asm(18)
-FATAL: Cannot create section "conflicting alignment" (1 error)
-    at one-two.asm(18)
+[-Wempty-data-directive] warning: `db` without data in ROM
+   ╭─[ one-two.asm:8:2 ]
+   │
+ 8 │     db
+   │     ─┬  
+   │      ╰── was this intended for a RAM section?
+   │ 
+   │ Help: consider using `ds 1` instead, if this is intentional
+───╯
+error: cannot place the section at address $1337
+   ╭─[ one-two.asm:7:18 ]
+   │
+ 7 │ SECTION FRAGMENT "conflicting alignment", ROM0 {ATTRS}
+   │                  ───────────┬───────────  
+   │                             ╰───────────── the lower 2 bits of the address are equal to $01 here
+───╯
+[-Wempty-data-directive] warning: `db` without data in ROM
+   ╭─[ one-two.asm:8:2 ]
+   │
+ 8 │     db
+   │     ─┬  
+   │      ╰── was this intended for a RAM section?
+   │ 
+   │ Help: consider using `ds 1` instead, if this is intentional
+───╯
+1 error generated.
