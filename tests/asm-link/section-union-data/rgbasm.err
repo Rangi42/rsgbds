@@ -1,5 +1,8 @@
-error: Cannot declare ROM sections as `UNION`
-    at section-union-data.asm(1)
-error: Cannot output data outside of a `SECTION`
-    at section-union-data.asm(2)
-Assembly aborted with 2 errors!
+error: sections containing data cannot have a modifier
+   ╭─[ test.asm:1:9 ]
+   │
+ 1 │ SECTION UNION "wat", ROM0
+   │         ──┬──  
+   │           ╰──── `union` is not allowed on a ROM0 section
+───╯
+1 error generated.

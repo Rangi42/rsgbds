@@ -1,6 +1,29 @@
-error: syntax error, unexpected ENDC
-    at label-before-endc.asm(4)
-error: syntax error, unexpected ENDC
-    at label-before-endc.asm(7)
-FATAL: Ended block with 2 unterminated conditionals (`IF`/`ELIF`/`ELSE` blocks)
-    at label-before-endc.asm(8)
+error: syntax error: unexpected endc
+   ╭─[ test.asm:4:9 ]
+   │
+ 4 │ label0: endc
+   │         ──┬─  
+   │           ╰─── expected "identifier", "adc", "add", "and", "bit", "call", "ccf", ...76 others
+───╯
+error: syntax error: unexpected endc
+   ╭─[ test.asm:7:9 ]
+   │
+ 7 │ label1: endc
+   │         ──┬─  
+   │           ╰─── expected "identifier", "adc", "add", "and", "bit", "call", "ccf", ...76 others
+───╯
+error: unterminated conditional block
+   ╭─[ test.asm:5:1 ]
+   │
+ 5 │ if 2
+   │ ─┬  
+   │  ╰── this `if` is missing a corresponding `endc`
+───╯
+error: unterminated conditional block
+   ╭─[ test.asm:2:1 ]
+   │
+ 2 │ if 1
+   │ ─┬  
+   │  ╰── this `if` is missing a corresponding `endc`
+───╯
+4 errors generated.
