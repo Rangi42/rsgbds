@@ -204,7 +204,7 @@ impl Sections {
                                     diagnostics::error_label(&def_span)
                                         .with_message(format!("defined again as {new} here...")),
                                     diagnostics::error_label(&sect.def_span).with_message(format!(
-                                        "...but originally defined as {old} here"
+                                        "...but originally defined as {old} here",
                                     )),
                                 ])
                             },
@@ -214,6 +214,7 @@ impl Sections {
                         sect.bytes.len()
                     }
                 };
+
                 if let Err(err) = entry.get_mut().attrs.address.merge(attrs.address, offset) {
                     diagnostics::error(
                         &def_span,
@@ -227,6 +228,54 @@ impl Sections {
                         nb_errors_left,
                         options,
                     );
+                }
+
+                match (entry.get().attrs.bank, attrs.bank) {
+                    (Some(old), Some(new)) if old != new => diagnostics::error(
+                        &def_span,
+                        |error| {
+                            error.set_message(format!(
+                                "conflicting banks specified for section \"{}\"",
+                                entry.key(),
+                            ));
+                            error.add_labels([
+                                diagnostics::note_label(&entry.get().def_span)
+                                    .with_message(format!("previously placed in bank {old}")),
+                                diagnostics::error_label(&def_span)
+                                    .with_message(format!("redefined in bank {new} here")),
+                            ]);
+                        },
+                        nb_errors_left,
+                        options,
+                    ),
+                    (None, _) => entry.get_mut().attrs.bank = attrs.bank,
+                    _ => {}
+                }
+
+                if entry.get().attrs.mem_region != attrs.mem_region {
+                    diagnostics::error(
+                        &def_span,
+                        |error| {
+                            error.set_message(format!(
+                                "conflicting memory regions specified for section \"{}\"",
+                                entry.key(),
+                            ));
+                            error.add_labels([
+                                diagnostics::note_label(&entry.get().def_span).with_message(
+                                    format!(
+                                        "previously defined as {}",
+                                        entry.get().attrs.mem_region.name(),
+                                    ),
+                                ),
+                                diagnostics::error_label(&def_span).with_message(format!(
+                                    "redefined as {} here",
+                                    attrs.mem_region.name(),
+                                )),
+                            ]);
+                        },
+                        nb_errors_left,
+                        options,
+                    )
                 }
 
                 let id = entry.index();
