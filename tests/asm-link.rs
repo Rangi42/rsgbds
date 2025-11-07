@@ -2,7 +2,11 @@ use std::{ffi::OsStr, path::Path};
 
 use anyhow::{anyhow, Context};
 use datatest_stable::Utf8Path;
-use snapbox::{cmd::Command, data::DataFormat, Assert, Data};
+use snapbox::{
+    cmd::{Command, OutputAssert},
+    data::DataFormat,
+    Assert, Data,
+};
 use tempfile::NamedTempFile;
 
 datatest_stable::harness! {
@@ -264,21 +268,35 @@ fn consistency(link_err_path: &Utf8Path) -> datatest_stable::Result<()> {
     let tmp1 = NamedTempFile::new().context("Error creating temp file")?;
     let tmp2 = NamedTempFile::new().context("Error creating temp file")?;
 
-    command(RGBASM_PATH, dir, tmp1.path())?
-        .arg("one-two.asm")
-        .assert()
-        .with_assert(assert_cfg())
-        .stdout_eq("")
-        // .stderr_eq("") Warnings can be emitted.
-        .success();
-    command(RGBASM_PATH, dir, tmp2.path())?
-        .arg("one-two.asm")
-        .arg("-DSECOND")
-        .assert()
-        .with_assert(assert_cfg())
-        .stdout_eq("")
-        // .stderr_eq("") Warnings can be emitted.
-        .success();
+    fn assert_success(assert: OutputAssert) -> datatest_stable::Result<OutputAssert> {
+        let output = assert.get_output();
+        if output.status.success() {
+            Ok(assert)
+        } else {
+            Err(format!(
+                "rgbasm invocation failed! Error output:\n{}",
+                String::from_utf8_lossy(&output.stderr),
+            )
+            .into())
+        }
+    }
+    assert_success(
+        command(RGBASM_PATH, dir, tmp1.path())?
+            .arg("one-two.asm")
+            .assert()
+            .with_assert(assert_cfg())
+            // .stderr_eq("") Warnings can be emitted.
+            .stdout_eq(""),
+    )?;
+    assert_success(
+        command(RGBASM_PATH, dir, tmp2.path())?
+            .arg("one-two.asm")
+            .arg("-DSECOND")
+            .assert()
+            .with_assert(assert_cfg())
+            // .stderr_eq("") Warnings can be emitted.
+            .stdout_eq(""),
+    )?;
     command(RGBLINK_PATH, dir, "/dev/null".as_ref())?
         .args([tmp1.path(), tmp2.path()])
         .assert()
