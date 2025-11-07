@@ -1,4 +1,0 @@
-error: Cannot declare ROM sections as `UNION`
-    at one-two.asm(16)
-FATAL: Cannot create section "different section sizes" (1 error)
-    at one-two.asm(16)

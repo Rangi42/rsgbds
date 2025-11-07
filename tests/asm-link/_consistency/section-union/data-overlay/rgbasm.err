@@ -1,4 +1,0 @@
-error: Cannot declare ROM sections as `UNION`
-    at one-two.asm(18)
-FATAL: Cannot create section "overlaid data" (1 error)
-    at one-two.asm(18)
