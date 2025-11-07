@@ -35,9 +35,6 @@ impl parse_ctx!() {
                 Some((span_idx, SectionKind::Union)) if mem_region.has_data() => {
                     reject_modifier("union", span_idx)
                 }
-                Some((span_idx, SectionKind::Fragment)) if mem_region.has_data() => {
-                    reject_modifier("fragment", span_idx)
-                }
                 Some((_span_idx, kind)) => kind,
                 None => SectionKind::Normal,
             },
