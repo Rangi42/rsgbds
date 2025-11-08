@@ -183,77 +183,97 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
 fn multi(err_path: &Utf8Path) -> datatest_stable::Result<()> {
     let dir = err_path.parent().unwrap();
 
-    let obj_files = std::fs::read_dir(dir)
-        .context("Unable to scan directory")?
-        .filter_map(|entry| {
-            let entry = match entry {
-                Ok(entry) => entry,
-                Err(err) => return Some(Err(err.into())),
-            };
-            let file_name = entry.file_name();
-            if Path::new(&file_name).extension() != Some(OsStr::new("asm")){
-                None
-            } else if file_name == OsStr::new("test.asm") {
-                Some(Err(anyhow!("`test.asm` is not allowed in `_multi` tests, as this'd overlap with regular tests")))
+    let mut obj_files = Vec::with_capacity(2);
+    let mut sdcc_objs = vec![];
+    for entry in std::fs::read_dir(dir).context("Unable to scan directory")? {
+        let entry = entry.context("Error while scanning directory")?;
+        let file_name = entry.file_name();
+        let extension = Path::new(&file_name).extension();
+
+        if extension == Some(OsStr::new("rel")) {
+            sdcc_objs.push(file_name);
+        } else if extension == Some(OsStr::new("asm")) {
+            if file_name == OsStr::new("test.asm") {
+                return Err(anyhow!("`test.asm` is not allowed in `_multi` tests, as this'd overlap with regular tests").into());
             } else {
-                Some(NamedTempFile::new().context("Error creating temp obj file").and_then(|obj_file| {
-                    let mut cmd = command(RGBASM_PATH, dir, obj_file.path())?
-                        .arg(&file_name);
-                    let asm_flags_path = err_path.with_file_name("rgbasm.flags");
-                    if asm_flags_path.exists() {
-                        cmd = cmd.arg("@rgbasm.flags");
-                    }
-                    cmd
-                        .assert()
-                        .with_assert(assert_cfg())
-                        .success()
-                        .stdout_eq("")
-                        .stderr_eq("");
-                    Ok(obj_file)
-                }))
+                let obj_file = NamedTempFile::new().context("Error creating temp obj file")?;
+                let mut cmd = command(RGBASM_PATH, dir, obj_file.path())?.arg(&file_name);
+                let asm_flags_path = err_path.with_file_name("rgbasm.flags");
+                if asm_flags_path.exists() {
+                    cmd = cmd.arg("@rgbasm.flags");
+                }
+                cmd.assert()
+                    .with_assert(assert_cfg())
+                    .success()
+                    .stdout_eq("")
+                    .stderr_eq("");
+                obj_files.push(obj_file);
             }
-        })
-        .collect::<Result<Vec<_>, _>>()?;
+        }
+    }
 
     let bin_file = NamedTempFile::new().context("Error creating temp bin file")?;
     let sym_file = NamedTempFile::new().context("Error creating temp sym file")?;
     let map_file = NamedTempFile::new().context("Error creating temp map file")?;
-    command(RGBLINK_PATH, dir, bin_file.path())?
+    let mut cmd = command(RGBLINK_PATH, dir, bin_file.path())?
         .args(obj_files.iter().map(|obj| obj.path()))
+        .args(&sdcc_objs)
         .arg("--map")
         .arg(map_file.path())
         .arg("--sym")
-        .arg(sym_file.path())
-        .arg("--nopad")
-        .assert()
-        .with_assert(assert_cfg())
-        .stdout_eq("")
-        .stderr_eq(
-            Data::try_read_from(err_path.as_std_path(), Some(DataFormat::Text))
-                .context("Error reading expected linker errput")?,
-        );
-
-    let mut path = err_path.with_file_name("out.bin");
-    let generated = std::fs::read(bin_file).context("Error reading generated bin file")?;
-    let reference = Data::try_read_from(path.as_std_path(), Some(DataFormat::Binary))
-        .context("Error reading expected bin data")?;
-    if assert_cfg()
-        .try_eq(None, Data::binary(generated.as_slice()), reference.clone())
-        .is_err()
+        .arg(sym_file.path());
+    let flags_path = err_path.with_file_name("rgblink.flags");
+    if flags_path
+        .try_exists()
+        .context("Unable to check for existence of rgblink flags")?
     {
-        return Err(BinDiff {
-            expected: reference.to_bytes().unwrap(),
-            actual: generated,
-            path,
-        }
-        .into());
+        cmd = cmd.arg("@rgblink.flags");
     }
-    for (extension, output) in [("sym", &sym_file), ("map", &map_file)] {
-        path.set_extension(extension);
 
-        if path.exists() {
-            let expected = Data::try_read_from(path.as_std_path(), Some(DataFormat::Text))
-                .context("Error reading expected data")?;
+    let linker_errput = Data::try_read_from(err_path.as_std_path(), Some(DataFormat::Text))
+        .context("Error reading expected linker errput")?;
+    let mut expected_bin_path = err_path.with_file_name("out.bin");
+
+    if expected_bin_path
+        .try_exists()
+        .context("Unable to check for existence of expected bin output")?
+    {
+        cmd.arg("--nopad")
+            .assert()
+            .with_assert(assert_cfg())
+            .stdout_eq("")
+            .stderr_eq(linker_errput);
+
+        let generated = std::fs::read(bin_file).context("Error reading generated bin file")?;
+        let reference =
+            Data::try_read_from(expected_bin_path.as_std_path(), Some(DataFormat::Binary))
+                .context("Error reading expected bin data")?;
+        if assert_cfg()
+            .try_eq(None, Data::binary(generated.as_slice()), reference.clone())
+            .is_err()
+        {
+            return Err(BinDiff {
+                expected: reference.to_bytes().unwrap(),
+                actual: generated,
+                path: expected_bin_path,
+            }
+            .into());
+        }
+    } else {
+        cmd.assert()
+            .with_assert(assert_cfg())
+            .stdout_eq("")
+            .stderr_eq(linker_errput);
+    }
+
+    for (extension, output) in [("sym", &sym_file), ("map", &map_file)] {
+        expected_bin_path.set_extension(extension);
+
+        if expected_bin_path.exists() {
+            // TODO: replace all `exists` with `try_exists`.
+            let expected =
+                Data::try_read_from(expected_bin_path.as_std_path(), Some(DataFormat::Text))
+                    .context("Error reading expected data")?;
             let actual =
                 std::fs::read_to_string(output.path()).context("Error reading generated file")?;
             assert_cfg().eq(Data::text(actual), expected)
