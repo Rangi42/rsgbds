@@ -238,8 +238,7 @@ fn multi(err_path: &Utf8Path) -> datatest_stable::Result<()> {
         .try_exists()
         .context("Unable to check for existence of expected bin output")?
     {
-        cmd.arg("--nopad")
-            .assert()
+        cmd.assert()
             .with_assert(assert_cfg())
             .stdout_eq("")
             .stderr_eq(linker_errput);
