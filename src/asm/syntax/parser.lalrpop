@@ -77,8 +77,8 @@ Datum: () = {
 };
 
 // LALRPOP doesn't support rules matching 0 tokens, so we have to have `MacroArgs` work around that.
-MacroCall: () = <span_idx:@L> <name:"identifier"> <args:MacroArgs?> => {
-	ctx.call_macro(name, span_idx, args.unwrap_or_else(MacroArgs::new));
+MacroCall: () = <span_idx:@L> <name:"identifier"> <silently:"?"?> <args:MacroArgs?> => {
+	ctx.call_macro(name, span_idx, args.unwrap_or_else(MacroArgs::new), silently.is_some());
 };
 MacroArgs: MacroArgs = {
 	@L "string" => { let args = MacroArgs::new(); ctx.push_macro_arg(args, <>) },
@@ -89,16 +89,18 @@ MacroArgs: MacroArgs = {
 // They are also special to the lexer, since they can introduce levels of nesting;
 // therefore, label definitions are not allowed before them.
 SpecialDirective: () = {
-	"macro" <span_idx:@L> <name:"identifier"> => ctx.capture_macro_def(name, span_idx),
-
-	<span_idx:@L> "rept" <nb_iters:Expr> => {
-		let span = ctx.nth_span(span_idx);
-		ctx.capture_loop(None, (None, nb_iters, None), span)
+	"macro" <silently:"?"?> <span_idx:@L> <name:"identifier"> => {
+		ctx.capture_macro_def(name, span_idx, silently.is_some())
 	},
-	<span_idx:@L> "for" <var_span_idx:@L> <var:"identifier"> "," <params:ForParams> => {
+
+	<span_idx:@L> "rept" <silently:"?"?> <nb_iters:Expr> => {
+		let span = ctx.nth_span(span_idx);
+		ctx.capture_loop(None, (None, nb_iters, None), span, silently.is_some())
+	},
+	<span_idx:@L> "for" <silently:"?"?> <var_span_idx:@L> <var:"identifier"> "," <params:ForParams> => {
 		let span = ctx.nth_span(span_idx);
 		let var_span = ctx.nth_span(var_span_idx);
-		ctx.capture_loop(Some((var, var_span)), params, span)
+		ctx.capture_loop(Some((var, var_span)), params, span, silently.is_some())
 	},
 
 	// These are consumed by the capturing functions; so if we see them here, they are not matched by a block opening.
@@ -134,7 +136,9 @@ Directive: () = {
 	<span_idx:@L> "popc" => ctx.pop_charmap(span_idx),
 	// `context.rs`
 	<@L> "break" => ctx.break_loop(<>),
-	<span_idx:@L> "include" <path:StringExpr> => ctx.include_file(path, span_idx),
+	<span_idx:@L> "include" <silently:"?"?> <path:StringExpr> => {
+		ctx.include_file(path, span_idx, silently.is_some())
+	},
 	// `data.rs`
 	// `db`, `dw`, `dl` and `ds` are `Datum`s, instead.
 	<span_idx:@L> "incbin" <path:StringExpr> <start:("," <Expr> ","?)?>         => {
@@ -724,6 +728,7 @@ extern {
 		"&&" => TokenPayload::DblAmpersand,
 		"||" => TokenPayload::DlbPipe,
 		"!" => TokenPayload::Bang,
+		"?" => TokenPayload::Question,
 		"&" => TokenPayload::Ampersand,
 		"|" => TokenPayload::Pipe,
 		"^" => TokenPayload::Caret,

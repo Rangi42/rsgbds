@@ -14,7 +14,13 @@ use crate::{
 use super::parse_ctx;
 
 impl parse_ctx!() {
-    pub fn call_macro(&mut self, name: Identifier, name_span_id: usize, args: MacroArgs) {
+    pub fn call_macro(
+        &mut self,
+        name: Identifier,
+        name_span_id: usize,
+        args: MacroArgs,
+        silently: bool,
+    ) {
         let name_span = self.nth_span(name_span_id);
 
         let name_str = self.identifiers.resolve(name).unwrap();
@@ -51,7 +57,7 @@ impl parse_ctx!() {
         }
     }
 
-    pub fn capture_macro_def(&mut self, name: Identifier, span_idx: usize) {
+    pub fn capture_macro_def(&mut self, name: Identifier, span_idx: usize, silently: bool) {
         let def_span = self.nth_span(span_idx);
 
         let (body, res) = self
@@ -86,6 +92,7 @@ impl parse_ctx!() {
         for_var: Option<(Identifier, Span)>,
         (start, end, step): (Option<Expr>, Expr, Option<Expr>),
         span: Span,
+        silently: bool,
     ) {
         let start = match start.map(|expr| self.try_const_eval(&expr)) {
             Some(Ok((value, _span))) => value,
@@ -182,7 +189,12 @@ impl parse_ctx!() {
         }
     }
 
-    pub fn include_file(&mut self, (path, path_span): (CompactString, Span), span_idx: usize) {
+    pub fn include_file(
+        &mut self,
+        (path, path_span): (CompactString, Span),
+        span_idx: usize,
+        silently: bool,
+    ) {
         let span = self.nth_span(span_idx);
 
         match self.options.search_file(path.as_ref()) {

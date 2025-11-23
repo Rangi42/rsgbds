@@ -1454,6 +1454,10 @@ impl Lexer {
                     self.consume(&mut span);
                     break token!(",");
                 }
+                Some('?') => {
+                    self.consume(&mut span);
+                    break token!("?");
+                }
 
                 // 1- or 2-char tokens.
                 Some('+') => {

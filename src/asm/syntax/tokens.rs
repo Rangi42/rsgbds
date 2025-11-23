@@ -88,6 +88,8 @@ define_tokens! {
         LParen,
         #[name = ")"]
         RParen,
+        #[name = "?"]
+        Question,
 
         // Arithmetic operators.
         #[name = "+"]

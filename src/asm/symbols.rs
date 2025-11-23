@@ -41,6 +41,7 @@ pub enum SymbolData {
     Narg,
     Dot,
     DotDot,
+    Scope,
 
     /// Placeholder left over after purging a symbol, to improve error messages.
     Deleted(Span),
@@ -103,6 +104,7 @@ impl Symbols {
         def_builtin("_NARG", SymbolData::Narg);
         def_builtin(".", SymbolData::Dot);
         def_builtin("..", SymbolData::DotDot);
+        def_builtin("__SCOPE__", SymbolData::Scope);
 
         def_builtin(
             "__RGBDS_VERSION__",
@@ -869,6 +871,7 @@ impl Symbols {
                     SymbolData::Builtin(..)
                     | SymbolData::Dot
                     | SymbolData::DotDot
+                    | SymbolData::Scope
                     | SymbolData::Narg
                     | SymbolData::Pc => diagnostics::error(
                         &deletion_span,
@@ -975,6 +978,8 @@ pub enum SymbolError<'name, 'sym> {
     DotOutsideMacro,
     /// `..` doesn't have a value outside of a local label scope
     DotDotOutsideMacro,
+    /// `__SCOPE__` doesn't have a value outside of a section
+    ScopeOutsideSect,
 }
 impl From<FormatError> for SymbolError<'_, '_> {
     fn from(value: FormatError) -> Self {
@@ -1044,6 +1049,7 @@ impl SymbolData {
             Self::DotDot => active_sections
                 .and_then(|active| active.sym_scope(1))
                 .is_some(),
+            Self::Scope => active_sections.is_some(),
         }
     }
 
@@ -1052,7 +1058,7 @@ impl SymbolData {
             Self::User { kind, .. } | Self::Builtin(kind) => kind.name(),
             Self::Pc => "label",
             Self::Narg => "constant",
-            Self::Dot | Self::DotDot => "string symbol",
+            Self::Dot | Self::DotDot | Self::Scope => "string symbol",
             Self::Deleted(_) => "deleted",
             Self::ExportPlaceholder(..) | Self::RefPlaceholder(..) => "undefined",
         }
@@ -1085,6 +1091,17 @@ impl SymbolData {
                     None => Err(SymbolError::DotDotOutsideMacro),
                 },
             ),
+            Self::Scope => Some(match active_sections {
+                Some(active) => Ok((if active.sym_scope(1).is_some() {
+                    ".."
+                } else if active.sym_scope(0).is_some() {
+                    "."
+                } else {
+                    ""
+                })
+                .into()),
+                None => Err(SymbolError::ScopeOutsideSect),
+            }),
             Self::Deleted(..) | Self::ExportPlaceholder(..) | Self::RefPlaceholder(..) => None,
         }
     }
@@ -1120,7 +1137,7 @@ impl SymbolData {
                 Some(args) => Ok(Some(args.max_valid() as i32)),
                 None => Err(SymbolError::NargOutsideMacro),
             }),
-            Self::Dot | Self::DotDot => None,
+            Self::Dot | Self::DotDot | Self::Scope => None,
             Self::Deleted(..) | Self::ExportPlaceholder(..) | Self::RefPlaceholder(..) => None,
         }
     }
@@ -1148,6 +1165,7 @@ impl SymbolData {
             Self::Narg => None,
             Self::Dot => None,
             Self::DotDot => None,
+            Self::Scope => None,
             Self::Deleted(..) | Self::ExportPlaceholder(..) | Self::RefPlaceholder(..) => None,
         }
     }

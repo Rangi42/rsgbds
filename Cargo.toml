@@ -1,6 +1,6 @@
 [package]
 name = "rgbds"
-version = "0.9.5"
+version = "1.0.99"
 edition = "2021"
 rust-version = "1.73" # 1.74 dropped support for older Apple platforms we wish to keep supporting.
 description = "The premier Game Boy assembly toolchain"
