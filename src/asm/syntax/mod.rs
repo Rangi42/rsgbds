@@ -154,30 +154,25 @@ pub fn parse_file(
                 }
                 _ => {
                     // Regular line.
+                    // Start-of-line `def`, `redef`, and `for` disable `equs` expansion
+                    // just for the single next token.
+                    // Start-of-line `purge` disables `equs` expansion for the whole line.
                     let mut enable_equs_expansion = true;
+                    if matches!(token.payload, tok!("def") | tok!("redef") | tok!("for")) {
+                        parse_ctx.push_line_token(token, &mut line_tokens);
+                        token = parse_ctx.next_token(false);
+                    } else if matches!(token.payload, tok!("purge")) {
+                        enable_equs_expansion = false;
+                    }
                     loop {
-                        match &token.payload {
-                            tok!("purge") | tok!("for") | tok!("def") | tok!("redef") => enable_equs_expansion = false,
-                            tok!(")") // The closing parens of a `def()`...
-                            | tok!(",") // ...the comma of a `for`...
-                            | tok!("equ") // ...or a symbol definition keyword.
-                            | tok!("equs")
-                            | tok!("rb")
-                            | tok!("rw")
-                            | tok!("rl")
-                            | tok!("=")
-                            | tok!("+=")
-                            | tok!("-=")
-                            | tok!("*=")
-                            | tok!("/=")
-                            | tok!("%=")
-                            | tok!("&=")
-                            | tok!("|=")
-                            | tok!("^=") => enable_equs_expansion = true,
-                            _ => {}
-                        }
+                        // `def` followed by `(` disables `equs` expansion for the single next token.
+                        let is_def = matches!(token.payload, tok!("def"));
                         parse_ctx.push_line_token(token, &mut line_tokens);
                         token = parse_ctx.next_token(enable_equs_expansion);
+                        if is_def && matches!(token.payload, tok!("(")) {
+                            parse_ctx.push_line_token(token, &mut line_tokens);
+                            token = parse_ctx.next_token(false);
+                        }
                         if matches!(token.payload, tok!("end of line")) {
                             break;
                         }
