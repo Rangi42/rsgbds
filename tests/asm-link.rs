@@ -44,14 +44,7 @@ fn rgbasm_rgblink(asm_path: &Utf8Path) -> datatest_stable::Result<()> {
         asm_cmd = asm_cmd.arg("@rgbasm.flags");
     }
 
-    let result = asm_cmd.assert().with_assert(
-        assert_cfg()
-            // On its face, path normalisation is desirable;
-            // however, it causes `snapbox` to replace ALL backslashes with slashes...
-            // including in source code listings (e.g. macro args).
-            // `datatest-stable` passes relative paths with forward slashes always, anyway.
-            .normalize_paths(false),
-    );
+    let result = asm_cmd.assert().with_assert(assert_cfg());
 
     let err_file_path = asm_path.with_file_name("rgbasm.err");
     let result = if err_file_path.exists() {
@@ -363,7 +356,13 @@ fn command(
         .arg("-Weverything"))
 }
 fn assert_cfg() -> Assert {
-    Assert::new().action_env(ACTION_ENV_VAR_NAME)
+    Assert::new()
+        .action_env(ACTION_ENV_VAR_NAME)
+        // On its face, path normalisation is desirable;
+        // however, it causes `snapbox` to replace ALL backslashes with slashes...
+        // including in source code listings (e.g. macro args).
+        // `datatest-stable` passes relative paths with forward slashes always, anyway.
+        .normalize_paths(false)
 }
 
 struct BinDiff<D> {
